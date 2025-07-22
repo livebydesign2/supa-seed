@@ -376,16 +376,25 @@ export class ConfigManager {
   printConfigSummary(config: FlexibleSeedConfig): void {
     console.log('\n📋 Configuration Summary:');
     console.log(`   Environment: ${config.environment}`);
-    console.log(`   Framework: ${config.schema.framework}`);
+    console.log(`   Framework: ${config.schema?.framework || 'auto-detect'}`);
     console.log(`   Users: ${config.userCount}`);
     console.log(`   Setups per user: ${config.setupsPerUser}`);
     console.log(`   Images per setup: ${config.imagesPerSetup}`);
-    console.log(`   User table: ${config.schema.userTable.name}`);
-    console.log(`   Setup table: ${config.schema.setupTable.name}`);
     
-    if (config.schema.optionalTables) {
+    if (config.schema?.userTable?.name) {
+      console.log(`   User table: ${config.schema.userTable.name}`);
+    }
+    
+    if (config.schema?.setupTable?.name) {
+      console.log(`   Setup table: ${config.schema.setupTable.name}`);
+    }
+    
+    if (config.schema?.optionalTables) {
       const enabled = Object.entries(config.schema.optionalTables)
-        .filter(([, opts]) => opts?.enabled)
+        .filter(([, opts]) => {
+          if (typeof opts === 'boolean') return opts;
+          return opts?.enabled;
+        })
         .map(([name]) => name);
       if (enabled.length > 0) {
         console.log(`   Optional tables: ${enabled.join(', ')}`);

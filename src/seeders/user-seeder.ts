@@ -6,8 +6,8 @@ export class UserSeeder extends SeedModule {
   private schemaAdapter!: SchemaAdapter;
 
   async seed(): Promise<void> {
-    // Initialize schema adapter
-    this.schemaAdapter = new SchemaAdapter(this.context.client);
+    // Initialize schema adapter with config override
+    this.schemaAdapter = new SchemaAdapter(this.context.client, this.context.config);
     await this.schemaAdapter.detectSchema();
 
     const users: CachedUser[] = [];

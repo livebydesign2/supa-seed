@@ -12,6 +12,42 @@ export interface SeedConfig {
   imagesPerSetup: number;
   enableRealImages: boolean;
   seed: string; // For deterministic fake data
+  schema?: {
+    framework?: 'makerkit' | 'simple' | 'custom';
+    primaryUserTable?: 'accounts' | 'profiles' | 'users';
+    userTable?: {
+      name: string;
+      emailField: string;
+      idField: string;
+      nameField: string;
+      pictureField?: string;
+    };
+    setupsTable?: {
+      name: string;
+      userField: string; // Match config-types naming
+      titleField: string;
+      descriptionField?: string;
+    };
+    optionalTables?: {
+      categories?: boolean | {
+        enabled: boolean;
+        autoCreate: boolean;
+        tableName?: string;
+      };
+      baseTemplates?: boolean | {
+        enabled: boolean;
+        autoCreate: boolean;
+        tableName?: string;
+      };
+      gearItems?: boolean | {
+        enabled: boolean;
+        autoCreate: boolean;
+        tableName?: string;
+      };
+      organizations?: boolean;
+      memberships?: boolean;
+    };
+  };
 }
 
 export interface SeedStats {

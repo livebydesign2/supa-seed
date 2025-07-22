@@ -1,4 +1,5 @@
 import type { createClient } from '@supabase/supabase-js';
+import { Logger } from './utils/logger';
 
 type SupabaseClient = ReturnType<typeof createClient>;
 
@@ -16,8 +17,15 @@ export interface SchemaInfo {
 
 export class SchemaAdapter {
   private schemaInfo: SchemaInfo | null = null;
+  private configOverride?: {
+    framework?: string;
+    primaryUserTable?: 'accounts' | 'profiles' | 'users';
+    schema?: any;
+  };
 
-  constructor(private client: SupabaseClient) {}
+  constructor(private client: SupabaseClient, configOverride?: any) {
+    this.configOverride = configOverride;
+  }
 
   /**
    * Detect the database schema and return compatibility info
@@ -65,7 +73,7 @@ export class SchemaAdapter {
       schemaInfo.accountsTableStructure = accountsStructure;
     }
 
-    // Determine primary user table
+    // Determine primary user table (prioritize config override)
     schemaInfo.primaryUserTable = this.determinePrimaryUserTable(schemaInfo);
 
     this.schemaInfo = schemaInfo;
@@ -90,12 +98,24 @@ export class SchemaAdapter {
       throw new Error('Schema not detected. Call detectSchema() first.');
     }
 
-    if (this.schemaInfo.hasProfiles && this.schemaInfo.hasTeams) {
+    // Check config override first
+    if (this.configOverride?.schema?.primaryUserTable === 'accounts' || 
+        this.configOverride?.primaryUserTable === 'accounts') {
+      Logger.debug('Using simple-accounts strategy due to config override');
+      return 'simple-accounts';
+    }
+
+    // Original logic with MakerKit detection improvements
+    if (this.schemaInfo.hasAccounts && this.schemaInfo.accountsTableStructure === 'makerkit') {
+      return 'makerkit-profiles';
+    } else if (this.schemaInfo.hasProfiles && this.schemaInfo.hasTeams) {
       return 'makerkit-profiles';
     } else if (this.schemaInfo.hasProfiles && this.schemaInfo.hasUsers) {
       return 'custom-profiles';
-    } else {
+    } else if (this.schemaInfo.hasAccounts) {
       return 'simple-accounts';
+    } else {
+      return 'custom-profiles';
     }
   }
 
@@ -157,29 +177,68 @@ export class SchemaAdapter {
 
   private async detectAccountsStructure(): Promise<'simple' | 'makerkit' | 'custom'> {
     try {
-      // Try to get table schema information
-      const { data, error } = await this.client
+      // Test if the table has MakerKit-specific fields by trying to select them
+      const { error: primaryOwnerError } = await this.client
         .from('accounts')
-        .select('*')
+        .select('primary_owner_user_id')
         .limit(1);
 
-      if (error) {
-        // Check error message for clues about structure
-        if (error.message.includes('primary_owner_user_id')) {
-          return 'makerkit';
-        }
-        return 'custom';
+      if (!primaryOwnerError) {
+        Logger.debug('Found primary_owner_user_id field - MakerKit pattern detected');
+        return 'makerkit';
       }
 
-      // If we got data, we can't determine structure without actual records
-      // Default to simple for now
-      return 'simple';
-    } catch {
+      // Test for other MakerKit indicators
+      const { error: slugError } = await this.client
+        .from('accounts')
+        .select('slug, is_personal_account')
+        .limit(1);
+
+      if (!slugError) {
+        Logger.debug('Found slug field - MakerKit pattern detected');
+        return 'makerkit';
+      }
+
+      // Check for simple pattern with id field
+      const { error: idError } = await this.client
+        .from('accounts')
+        .select('id')
+        .limit(1);
+
+      if (!idError) {
+        Logger.debug('Simple accounts pattern detected');
+        return 'simple';
+      }
+
+      return 'custom';
+    } catch (error: any) {
+      Logger.debug('Account structure detection failed:', error);
       return 'custom';
     }
   }
 
   private determinePrimaryUserTable(schemaInfo: SchemaInfo): 'accounts' | 'profiles' | 'users' {
+    // First check if config override specifies primary user table
+    if (this.configOverride?.schema?.primaryUserTable) {
+      const configTable = this.configOverride.schema.primaryUserTable;
+      Logger.debug(`Using config override for primary user table: ${configTable}`);
+      return configTable;
+    }
+    
+    // Also check direct primaryUserTable property
+    if (this.configOverride?.primaryUserTable) {
+      const configTable = this.configOverride.primaryUserTable;
+      Logger.debug(`Using config override for primary user table: ${configTable}`);
+      return configTable;
+    }
+    
+    // Prioritize accounts table for MakerKit patterns
+    if (schemaInfo.hasAccounts && schemaInfo.accountsTableStructure === 'makerkit') {
+      Logger.debug('Detected MakerKit pattern with accounts table, using accounts as primary');
+      return 'accounts';
+    }
+    
+    // Fall back to original logic
     if (schemaInfo.hasProfiles && schemaInfo.hasUsers) {
       return 'profiles';
     } else if (schemaInfo.hasAccounts) {
@@ -216,24 +275,39 @@ export class SchemaAdapter {
       return { id: '', success: false, error: `Auth user creation failed: ${authError.message}` };
     }
 
-    // Create account record
+    // Create account record with proper fields based on schema
+    const accountData: any = {
+      email: userData.email,
+      name: userData.name,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    // Add optional fields if provided
+    if (userData.username) accountData.username = userData.username;
+    if (userData.bio) accountData.bio = userData.bio;
+    if (userData.picture_url) accountData.picture_url = userData.picture_url;
+
+    // For MakerKit-style accounts, use primary_owner_user_id
+    if (this.schemaInfo?.accountsTableStructure === 'makerkit') {
+      accountData.primary_owner_user_id = userId;
+      accountData.is_personal_account = true;
+      // Don't set slug for personal accounts due to constraint
+    } else {
+      // For simple accounts, use id field
+      accountData.id = userId;
+    }
+
     const { error: accountError } = await this.client
       .from('accounts')
-      .insert({
-        id: userId,
-        email: userData.email,
-        name: userData.name,
-        username: userData.username,
-        bio: userData.bio,
-        picture_url: userData.picture_url,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      });
+      .insert(accountData);
 
     if (accountError) {
+      Logger.debug('Account creation error:', accountError);
       return { id: '', success: false, error: `Account creation failed: ${accountError.message}` };
     }
 
+    Logger.debug(`Successfully created account for ${userData.email} with ID ${userId}`);
     return { id: userId, success: true };
   }
 
@@ -371,6 +445,11 @@ export class SchemaAdapter {
    * Get the appropriate foreign key for user relationships
    */
   getUserForeignKey(): string {
+    // Check config override first
+    if (this.configOverride?.schema?.setupsTable?.userField) {
+      return this.configOverride.schema.setupsTable.userField;
+    }
+    
     const strategy = this.getUserCreationStrategy();
     
     switch (strategy) {

@@ -156,8 +156,8 @@ export class SupaSeedFramework {
       
       Logger.success(`Database connection validated (method: ${connectionMethod})`)
       
-      // Initialize schema adapter to detect schema
-      const schemaAdapter = new SchemaAdapter(this.client);
+      // Initialize schema adapter to detect schema - pass config for overrides
+      const schemaAdapter = new SchemaAdapter(this.client, this.config);
       const schemaInfo = await schemaAdapter.detectSchema();
       
       // Provide helpful guidance based on detected schema

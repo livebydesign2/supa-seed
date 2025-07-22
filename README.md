@@ -17,6 +17,8 @@ A modern TypeScript-based database seeding framework for Supabase projects that 
 - **🧪 Test Suite**: Comprehensive test coverage with Jest for reliability
 - **📋 Schema Management**: Complete SQL schema files for easy database setup
 - **🗄️ Schema Detection**: Automatic detection and adaptation to existing database schemas (Makerkit, custom profiles, etc.)
+- **⚙️ Configuration Override**: Force specific schema patterns and table mappings via configuration
+- **🔧 Flexible Field Mapping**: Support for different field names across various schema patterns
 
 ## Installation
 
@@ -266,6 +268,58 @@ export class CustomSeeder extends SeedModule {
   "seed": "supa-seed-2025"
 }
 ```
+
+### Advanced Configuration with Schema Override
+
+For complex schemas or when you need to override auto-detection, use the extended configuration format:
+
+```json
+{
+  "supabaseUrl": "http://127.0.0.1:54321",
+  "supabaseServiceKey": "your-service-role-key",
+  "environment": "local",
+  "userCount": 5,
+  "setupsPerUser": 2,
+  "imagesPerSetup": 1,
+  "enableRealImages": false,
+  "seed": "test-seed-2025",
+  "schema": {
+    "framework": "makerkit",
+    "primaryUserTable": "accounts",
+    "userTable": {
+      "name": "accounts",
+      "emailField": "email",
+      "idField": "id",
+      "nameField": "name",
+      "pictureField": "picture_url"
+    },
+    "setupsTable": {
+      "name": "setups", 
+      "userField": "account_id",
+      "titleField": "title",
+      "descriptionField": "description"
+    },
+    "optionalTables": {
+      "categories": false,
+      "baseTemplates": false,
+      "gearItems": false
+    }
+  }
+}
+```
+
+**Schema Configuration Options:**
+
+- **`framework`** (`"makerkit" | "simple" | "custom"`): Override auto-detected framework type
+- **`primaryUserTable`** (`"accounts" | "profiles" | "users"`): Force which table to use for users
+- **`userTable`**: Configure field mappings for the user table
+- **`setupsTable`**: Configure field mappings for the setups/content table
+- **`optionalTables`**: Control which optional tables to seed
+
+This is especially useful for:
+- **Makerkit projects** where you want to use `accounts` instead of `profiles` as the primary user table
+- **Custom schemas** with non-standard field names
+- **Partial seeding** where you want to skip certain tables
 
 ### Environment Variables
 

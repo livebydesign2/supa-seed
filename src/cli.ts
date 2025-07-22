@@ -55,6 +55,7 @@ async function main() {
             imagesPerSetup: options.images ? parseInt(options.images) : flexConfig.imagesPerSetup,
             enableRealImages: options.realImages || flexConfig.enableRealImages,
             seed: options.seedValue || flexConfig.seed,
+            schema: flexConfig.schema, // Pass through schema configuration
           };
           
           spinner.succeed(`Configuration loaded from: ${options.config}`);
