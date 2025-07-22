@@ -74,14 +74,44 @@ export class SupaSeedFramework {
     console.log('🔍 Validating database connection and schema...');
     
     try {
-      // Test basic connection
-      const { error: connectionError } = await this.client
-        .from('information_schema.tables')
-        .select('table_name')
-        .limit(1);
-        
-      if (connectionError) {
-        throw new Error(`Database connection failed: ${connectionError.message}`);
+      // Test basic connection using a more reliable method
+      // First try a simple RPC call to test connectivity
+      let connectionValid = false;
+      
+      try {
+        // Test with auth.users query (works with service role)
+        const { error: authError } = await this.client.auth.admin.listUsers({
+          page: 1,
+          perPage: 1
+        });
+        connectionValid = !authError;
+      } catch (error) {
+        // If auth fails, try a direct database query to a table we know exists
+        console.log('🔄 Auth test failed, trying alternative connection test...');
+      }
+      
+      // If auth test failed, try querying pg_tables (more reliable than information_schema)
+      if (!connectionValid) {
+        const { error: pgTablesError } = await this.client
+          .from('pg_tables')
+          .select('tablename')
+          .limit(1);
+          
+        if (!pgTablesError) {
+          connectionValid = true;
+        }
+      }
+      
+      // Final fallback - try to create a very simple query
+      if (!connectionValid) {
+        const { error: simpleError } = await this.client
+          .rpc('version'); // PostgreSQL version function
+          
+        if (!simpleError) {
+          connectionValid = true;
+        } else {
+          throw new Error(`Database connection failed: ${simpleError.message}`);
+        }
       }
       
       // Initialize schema adapter to detect schema
@@ -100,23 +130,54 @@ export class SupaSeedFramework {
       }
       
     } catch (error: any) {
-      if (error.message.includes('permission denied')) {
+      console.error('❌ Connection validation failed:', error);
+      
+      // Provide detailed debugging information
+      console.log('🔧 Connection Debug Info:');
+      console.log(`   URL: ${this.config.supabaseUrl}`);
+      console.log(`   Service Key: ${this.config.supabaseServiceKey ? '***' + this.config.supabaseServiceKey.slice(-4) : 'Not provided'}`);
+      console.log(`   Environment: ${this.config.environment}`);
+      
+      if (error.message.includes('permission denied') || error.message.includes('JWT')) {
         throw new Error(
-          'Database permissions error. Please ensure your SUPABASE_SERVICE_ROLE_KEY has the necessary permissions to:\n' +
-          '  • Create auth users (admin.createUser)\n' +
-          '  • Insert into user tables (accounts/profiles)\n' +
-          '  • Access table schemas'
+          `❌ Database permissions error. Please ensure your SUPABASE_SERVICE_ROLE_KEY has the necessary permissions.\n\n` +
+          `🔧 Debug Info:\n` +
+          `   • URL: ${this.config.supabaseUrl}\n` +
+          `   • Key ends with: ${this.config.supabaseServiceKey ? '***' + this.config.supabaseServiceKey.slice(-4) : 'NOT_PROVIDED'}\n\n` +
+          `✅ Required permissions:\n` +
+          `   • Create auth users (admin.createUser)\n` +
+          `   • Insert into user tables (accounts/profiles)\n` +
+          `   • Access table schemas\n\n` +
+          `💡 For local Supabase, make sure you're using the service_role key, not anon key.`
         );
-      } else if (error.message.includes('connection')) {
+      } else if (error.message.includes('connection') || error.message.includes('ECONNREFUSED') || error.message.includes('fetch')) {
         throw new Error(
-          'Database connection failed. Please check:\n' +
-          '  • SUPABASE_URL is correct and accessible\n' +
-          '  • SUPABASE_SERVICE_ROLE_KEY is valid\n' +
-          '  • Your network connection\n' +
-          '  • Supabase instance is running'
+          `❌ Database connection failed. Connection details:\n\n` +
+          `🔧 Debug Info:\n` +
+          `   • URL: ${this.config.supabaseUrl}\n` +
+          `   • Key: ${this.config.supabaseServiceKey ? 'PROVIDED' : 'MISSING'}\n` +
+          `   • Error: ${error.message}\n\n` +
+          `✅ Please check:\n` +
+          `   • SUPABASE_URL is correct and accessible\n` +
+          `   • SUPABASE_SERVICE_ROLE_KEY is valid\n` +
+          `   • Your network connection\n` +
+          `   • Supabase instance is running\n\n` +
+          `💡 For local development, ensure Supabase is running on ${this.config.supabaseUrl}`
+        );
+      } else if (error.message.includes('Invalid JWT') || error.message.includes('jwt')) {
+        throw new Error(
+          `❌ JWT/Authentication error:\n\n` +
+          `🔧 Debug Info:\n` +
+          `   • URL: ${this.config.supabaseUrl}\n` +
+          `   • Error: ${error.message}\n\n` +
+          `💡 This usually means:\n` +
+          `   • You're using the wrong API key (use service_role, not anon)\n` +
+          `   • The API key has expired or is malformed\n` +
+          `   • Local Supabase JWT_SECRET doesn't match`
         );
       }
-      throw error;
+      
+      throw new Error(`❌ Connection validation failed: ${error.message}`);
     }
   }
 
