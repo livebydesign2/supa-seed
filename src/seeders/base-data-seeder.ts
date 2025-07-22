@@ -1,6 +1,7 @@
-import { SeedModule } from '../types';
+import { BaseSeeder } from './base-seeder';
+import { Logger } from '../utils/logger';
 
-export class BaseDataSeeder extends SeedModule {
+export class BaseDataSeeder extends BaseSeeder {
   async seed(): Promise<void> {
     console.log('🗂️  Seeding base data...');
     
@@ -11,8 +12,6 @@ export class BaseDataSeeder extends SeedModule {
   }
 
   private async seedGearCategories(): Promise<void> {
-    const { client } = this.context;
-    
     const categories = [
       { name: 'Shelter', description: 'Tents, tarps, and protective gear' },
       { name: 'Sleep System', description: 'Sleeping bags, pads, and comfort items' },
@@ -26,72 +25,47 @@ export class BaseDataSeeder extends SeedModule {
       { name: 'Vehicle', description: 'Overland and camping vehicle modifications' },
     ];
 
-    try {
-      // Check if categories table exists by attempting a simple query
-      const { error: testError } = await client
-        .from('categories')
-        .select('id')
-        .limit(1);
-      
-      if (testError && testError.code === 'PGRST106') {
-        console.log('⚠️  Categories table not found. Creating basic categories...');
-        // Table doesn't exist, skip this step
-        return;
-      }
-
-      const { data: existingCategories, error: selectError } = await client
-        .from('categories')
-        .select('name');
-
-      if (selectError) {
-        throw new Error(`Failed to check existing categories: ${selectError.message}`);
-      }
-
-      const existingNames = new Set(
-        existingCategories?.map(c => c.name) || []
-      );
-
-      const newCategories = categories.filter(
-        cat => !existingNames.has(cat.name)
-      );
-
-      if (newCategories.length > 0) {
-        const { error: insertError } = await client
+    await this.seedWithFallback(
+      async () => {
+        const { client } = this.context;
+        
+        const { data: existingCategories, error: selectError } = await client
           .from('categories')
-          .insert(newCategories);
+          .select('name');
 
-        if (insertError) {
-          console.log(`⚠️  Warning: Could not insert categories: ${insertError.message}`);
-          console.log('   This might be because the table doesn\'t exist or you lack permissions.');
-          return;
+        if (selectError) {
+          throw new Error(`Failed to check existing categories: ${selectError.message}`);
         }
 
-        console.log(`   ✅ Created ${newCategories.length} categories`);
-      } else {
-        console.log('   ℹ️  Categories already exist, skipping');
-      }
-    } catch (error) {
-      console.log(`⚠️  Warning: Could not seed categories: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      console.log('   This seeder will continue with other data...');
-    }
+        const existingNames = new Set(
+          existingCategories?.map(c => c.name) || []
+        );
+
+        const newCategories = categories.filter(
+          cat => !existingNames.has(cat.name)
+        );
+
+        if (newCategories.length > 0) {
+          const { error: insertError } = await client
+            .from('categories')
+            .insert(newCategories);
+
+          if (insertError) {
+            throw insertError;
+          }
+
+          Logger.complete(`Created ${newCategories.length} categories`);
+        } else {
+          Logger.info('Categories already exist, skipping');
+        }
+      },
+      'categories',
+      'Categories are optional for basic seeding'
+    );
   }
 
   private async seedBaseTemplates(): Promise<void> {
-    const { client } = this.context;
-    
-    try {
-      // Check if base_templates table exists
-      const { error: testError } = await client
-        .from('base_templates')
-        .select('id')
-        .limit(1);
-      
-      if (testError && testError.code === 'PGRST106') {
-        console.log('⚠️  Base templates table not found, skipping template seeding.');
-        return;
-      }
-    
-      const templates = [
+    const templates = [
         // Vehicle Templates
         {
           type: 'Vehicle' as const,
@@ -161,47 +135,53 @@ export class BaseDataSeeder extends SeedModule {
       },
     ];
 
-      const { data: existingTemplates, error: selectError } = await client
-        .from('base_templates')
-        .select('make, model, type');
-
-      if (selectError) {
-        throw new Error(`Failed to check existing templates: ${selectError.message}`);
-      }
-
-      const existingKeys = new Set(
-        existingTemplates?.map(t => `${t.type}-${t.make}-${t.model}`) || []
-      );
-
-      const newTemplates = templates.filter(
-        template => !existingKeys.has(`${template.type}-${template.make}-${template.model}`)
-      );
-
-      if (newTemplates.length > 0) {
-        const { error: insertError } = await client
+    await this.seedWithFallback(
+      async () => {
+        const { client } = this.context;
+        
+        const { data: existingTemplates, error: selectError } = await client
           .from('base_templates')
-          .insert(newTemplates);
+          .select('make, model, type');
 
-        if (insertError) {
-          console.log(`⚠️  Warning: Could not insert base templates: ${insertError.message}`);
-          return;
+        if (selectError) {
+          throw new Error(`Failed to check existing templates: ${selectError.message}`);
         }
 
-        console.log(`   ✅ Created ${newTemplates.length} base templates`);
-      } else {
-        console.log('   ℹ️  Base templates already exist, skipping');
-      }
+        const existingKeys = new Set(
+          existingTemplates?.map(t => `${t.type}-${t.make}-${t.model}`) || []
+        );
 
-      // Cache templates for other seeders
-      const { data: allTemplates } = await client
-        .from('base_templates')
-        .select('*');
+        const newTemplates = templates.filter(
+          template => !existingKeys.has(`${template.type}-${template.make}-${template.model}`)
+        );
 
-      this.context.cache.set('baseTemplates', allTemplates || []);
-    } catch (error) {
-      console.log(`⚠️  Warning: Could not seed base templates: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      console.log('   Other seeders will continue without base templates...');
-      // Set empty cache so other seeders don't fail
+        if (newTemplates.length > 0) {
+          const { error: insertError } = await client
+            .from('base_templates')
+            .insert(newTemplates);
+
+          if (insertError) {
+            throw insertError;
+          }
+
+          Logger.complete(`Created ${newTemplates.length} base templates`);
+        } else {
+          Logger.info('Base templates already exist, skipping');
+        }
+
+        // Cache templates for other seeders
+        const { data: allTemplates } = await client
+          .from('base_templates')
+          .select('*');
+
+        this.context.cache.set('baseTemplates', allTemplates || []);
+      },
+      'base_templates',
+      'Base templates are optional for basic seeding'
+    );
+    
+    // Ensure cache has at least empty array if table doesn't exist
+    if (!this.context.cache.has('baseTemplates')) {
       this.context.cache.set('baseTemplates', []);
     }
   }

@@ -48,12 +48,19 @@ export class SchemaAdapter {
     schemaInfo.hasCategories = await this.tableExists('categories');
     schemaInfo.hasTeams = await this.tableExists('teams');
     schemaInfo.hasOrganizations = await this.tableExists('organizations');
+    
+    // Check for additional Makerkit-specific tables
+    const hasMemberships = await this.tableExists('memberships');
+    const hasSubscriptions = await this.tableExists('subscriptions');
 
     // Check if auth.users has records (standard Supabase pattern)
     schemaInfo.hasUsers = await this.checkAuthUsers();
 
-    // Determine account table structure
-    if (schemaInfo.hasAccounts) {
+    // Determine account table structure with improved Makerkit detection
+    if (schemaInfo.hasAccounts && hasMemberships) {
+      // Strong indicator of Makerkit pattern
+      schemaInfo.accountsTableStructure = 'makerkit';
+    } else if (schemaInfo.hasAccounts) {
       const accountsStructure = await this.detectAccountsStructure();
       schemaInfo.accountsTableStructure = accountsStructure;
     }
@@ -68,6 +75,8 @@ export class SchemaAdapter {
       structure: schemaInfo.accountsTableStructure,
       hasProfiles: schemaInfo.hasProfiles,
       hasTeams: schemaInfo.hasTeams,
+      hasMemberships,
+      framework: this.getFrameworkType(schemaInfo, hasMemberships),
     });
 
     return schemaInfo;
@@ -373,5 +382,27 @@ export class SchemaAdapter {
       default:
         return 'account_id';
     }
+  }
+
+  /**
+   * Determine the framework type based on detected schema
+   */
+  private getFrameworkType(schemaInfo: SchemaInfo, hasMemberships: boolean): 'simple' | 'makerkit' | 'custom' {
+    // Check for MakerKit patterns first
+    if (schemaInfo.hasAccounts && hasMemberships) {
+      return 'makerkit';
+    }
+    
+    if (schemaInfo.hasProfiles && schemaInfo.hasOrganizations) {
+      return 'makerkit';
+    }
+    
+    // Check for simple framework patterns
+    if (schemaInfo.hasProfiles && !schemaInfo.hasAccounts) {
+      return 'simple';
+    }
+    
+    // Default to custom
+    return 'custom';
   }
 }

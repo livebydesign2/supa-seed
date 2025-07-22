@@ -8,6 +8,8 @@ import { SetupSeeder } from './seeders/setup-seeder';
 import { GearSeeder } from './seeders/gear-seeder';
 import { MediaSeeder } from './seeders/media-seeder';
 import { SchemaAdapter } from './schema-adapter';
+import { Logger } from './utils/logger';
+import { SchemaValidator } from './validation/schema-validator';
 
 export class SupaSeedFramework {
   private client: ReturnType<typeof createClient>;
@@ -40,7 +42,21 @@ export class SupaSeedFramework {
     
     try {
       // First, check database connectivity and schema
-      await this.validateDatabaseAndSchema();
+      const schemaAdapter = await this.validateDatabaseAndSchema();
+      
+      // Validate schema compatibility
+      const validator = new SchemaValidator(this.client, schemaAdapter);
+      const validationResult = await validator.validateSchema();
+      
+      SchemaValidator.printResults(validationResult);
+      
+      if (!validationResult.valid) {
+        const continueAnyway = process.env.FORCE_SEED === 'true';
+        if (!continueAnyway) {
+          throw new Error('Schema validation failed. Set FORCE_SEED=true to continue anyway.');
+        }
+        Logger.warn('Continuing despite validation errors (FORCE_SEED=true)');
+      }
       
       // Define seeding order (dependency-aware)
       const seeders: SeedModule[] = [
@@ -70,49 +86,75 @@ export class SupaSeedFramework {
     }
   }
 
-  private async validateDatabaseAndSchema(): Promise<void> {
-    console.log('🔍 Validating database connection and schema...');
+  private async validateDatabaseAndSchema(): Promise<SchemaAdapter> {
+    Logger.step('Validating database connection and schema...');
     
     try {
-      // Test basic connection using a more reliable method
-      // First try a simple RPC call to test connectivity
+      // Test basic connection using multiple methods with clear feedback
       let connectionValid = false;
+      let connectionMethod = '';
       
+      // Method 1: Test with auth.users query (most reliable for service role)
       try {
-        // Test with auth.users query (works with service role)
+        Logger.debug('Testing connection with auth.admin.listUsers...');
         const { error: authError } = await this.client.auth.admin.listUsers({
           page: 1,
           perPage: 1
         });
-        connectionValid = !authError;
-      } catch (error) {
-        // If auth fails, try a direct database query to a table we know exists
-        console.log('🔄 Auth test failed, trying alternative connection test...');
-      }
-      
-      // If auth test failed, try querying pg_tables (more reliable than information_schema)
-      if (!connectionValid) {
-        const { error: pgTablesError } = await this.client
-          .from('pg_tables')
-          .select('tablename')
-          .limit(1);
-          
-        if (!pgTablesError) {
+        
+        if (!authError) {
           connectionValid = true;
-        }
-      }
-      
-      // Final fallback - try to create a very simple query
-      if (!connectionValid) {
-        const { error: simpleError } = await this.client
-          .rpc('version'); // PostgreSQL version function
-          
-        if (!simpleError) {
-          connectionValid = true;
+          connectionMethod = 'auth.admin';
+          Logger.debug('Connection successful via auth.admin');
         } else {
-          throw new Error(`Database connection failed: ${simpleError.message}`);
+          Logger.debug('Auth test failed:', authError);
+        }
+      } catch (error) {
+        Logger.debug('Auth test threw error:', error);
+      }
+      
+      // Method 2: Try a simple table query
+      if (!connectionValid) {
+        try {
+          Logger.debug('Testing connection with simple table query...');
+          const { error } = await this.client
+            .from('_dummy_table_test_connection')
+            .select('*')
+            .limit(1);
+          
+          // PGRST116 = table doesn't exist (which is expected, but means connection works)
+          if (!error || error.code === 'PGRST116') {
+            connectionValid = true;
+            connectionMethod = 'table query';
+            Logger.debug('Connection successful via table query');
+          }
+        } catch (error) {
+          Logger.debug('Table query test failed:', error);
         }
       }
+      
+      // Method 3: Try RPC call
+      if (!connectionValid) {
+        try {
+          Logger.debug('Testing connection with RPC call...');
+          const { error } = await this.client.rpc('version');
+          
+          if (!error) {
+            connectionValid = true;
+            connectionMethod = 'rpc';
+            Logger.debug('Connection successful via RPC');
+          }
+        } catch (error) {
+          // RPC might not exist, which is fine
+          Logger.debug('RPC test failed:', error);
+        }
+      }
+      
+      if (!connectionValid) {
+        throw new Error('All connection test methods failed');
+      }
+      
+      Logger.success(`Database connection validated (method: ${connectionMethod})`)
       
       // Initialize schema adapter to detect schema
       const schemaAdapter = new SchemaAdapter(this.client);
@@ -120,23 +162,26 @@ export class SupaSeedFramework {
       
       // Provide helpful guidance based on detected schema
       if (!schemaInfo.hasAccounts && !schemaInfo.hasProfiles) {
-        console.warn('⚠️  No user tables detected. You may need to:');
-        console.warn('   1. Run the schema.sql file to create required tables');
-        console.warn('   2. Or ensure your custom schema is compatible');
-        console.warn('   3. Check your database permissions');
+        Logger.warn('No user tables detected. You may need to:');
+        Logger.info('   1. Run the schema.sql file to create required tables');
+        Logger.info('   2. Or ensure your custom schema is compatible');
+        Logger.info('   3. Check your database permissions');
       } else {
         const strategy = schemaAdapter.getUserCreationStrategy();
-        console.log(`✅ Schema validated. Using ${strategy} user creation strategy.`);
+        Logger.success(`Schema validated. Using ${strategy} user creation strategy.`);
       }
       
+      return schemaAdapter;
+      
     } catch (error: any) {
-      console.error('❌ Connection validation failed:', error);
+      Logger.error('Connection validation failed:', error);
       
       // Provide detailed debugging information
-      console.log('🔧 Connection Debug Info:');
-      console.log(`   URL: ${this.config.supabaseUrl}`);
-      console.log(`   Service Key: ${this.config.supabaseServiceKey ? '***' + this.config.supabaseServiceKey.slice(-4) : 'Not provided'}`);
-      console.log(`   Environment: ${this.config.environment}`);
+      Logger.debug('Connection Debug Info:', {
+        URL: this.config.supabaseUrl,
+        ServiceKey: this.config.supabaseServiceKey ? '***' + this.config.supabaseServiceKey.slice(-4) : 'Not provided',
+        Environment: this.config.environment
+      });
       
       if (error.message.includes('permission denied') || error.message.includes('JWT')) {
         throw new Error(

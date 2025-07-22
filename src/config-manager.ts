@@ -23,11 +23,21 @@ export class ConfigManager {
     const missingTables: string[] = [];
     const suggestedConfig: Partial<FlexibleSeedConfig> = {};
 
-    // Detect framework type
+    // Detect framework type using improved detection
     let framework: 'simple' | 'makerkit' | 'custom' = 'simple';
-    if (schemaInfo.hasProfiles && schemaInfo.hasTeams) {
+    
+    // Check for additional Makerkit-specific tables
+    const hasMemberships = await this.tableExists(client, 'memberships');
+    const hasSubscriptions = await this.tableExists(client, 'subscriptions');
+    
+    // Check for MakerKit patterns first
+    if (schemaInfo.hasAccounts && hasMemberships) {
+      framework = 'makerkit';
+    } else if (schemaInfo.hasProfiles && (schemaInfo.hasOrganizations || schemaInfo.hasTeams)) {
       framework = 'makerkit';
     } else if (schemaInfo.hasProfiles && !schemaInfo.hasAccounts) {
+      framework = 'simple';
+    } else {
       framework = 'custom';
     }
 
@@ -380,6 +390,18 @@ export class ConfigManager {
       if (enabled.length > 0) {
         console.log(`   Optional tables: ${enabled.join(', ')}`);
       }
+    }
+  }
+
+  /**
+   * Check if a table exists in the database
+   */
+  private async tableExists(client: SupabaseClient, tableName: string): Promise<boolean> {
+    try {
+      const { error } = await client.from(tableName).select('*').limit(1);
+      return !error;
+    } catch {
+      return false;
     }
   }
 }

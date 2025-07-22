@@ -1,9 +1,12 @@
 #!/usr/bin/env node
 
 import { program } from 'commander';
+import ora from 'ora';
 import { SupaSeedFramework, createDefaultConfig } from './index';
 import { ConfigManager } from './config-manager';
 import { createClient } from '@supabase/supabase-js';
+import { loadConfiguration } from './config';
+import { Logger } from './utils/logger';
 import type { SeedConfig } from './types';
 
 async function main() {
@@ -23,20 +26,30 @@ async function main() {
     .option('--cleanup', 'Clean up existing seed data first', false)
     .option('--env <environment>', 'Environment (local|staging|production)')
     .option('--seed-value <string>', 'Seed value for deterministic data')
+    .option('--verbose', 'Enable verbose logging')
     .action(async (options) => {
+      const spinner = ora('Initializing seeding process...').start();
+      
       try {
+        // Set verbose mode if requested
+        if (options.verbose) {
+          Logger.setVerbose(true);
+        }
+        
         let config: SeedConfig;
         
-        // Try to use config file first
-        const configManager = new ConfigManager(options.config);
-        try {
-          const flexConfig = configManager.loadConfig();
-          
-          // Convert flexible config to legacy config format
+        spinner.text = 'Loading configuration...';
+        
+        // Try to load configuration using the enhanced config loader
+        const configResult = loadConfiguration(options.config);
+        
+        if (configResult.source === 'config-file' && configResult.flexConfig) {
+          // Use flexible config from file
+          const flexConfig = configResult.flexConfig;
           config = {
             supabaseUrl: flexConfig.supabaseUrl,
             supabaseServiceKey: flexConfig.supabaseServiceKey,
-            environment: flexConfig.environment,
+            environment: options.env || flexConfig.environment,
             userCount: options.users ? parseInt(options.users) : flexConfig.userCount,
             setupsPerUser: options.setups ? parseInt(options.setups) : flexConfig.setupsPerUser,
             imagesPerSetup: options.images ? parseInt(options.images) : flexConfig.imagesPerSetup,
@@ -44,32 +57,43 @@ async function main() {
             seed: options.seedValue || flexConfig.seed,
           };
           
-          console.log('📋 Using configuration file:', options.config);
+          spinner.succeed(`Configuration loaded from: ${options.config}`);
+          const configManager = new ConfigManager(options.config);
           configManager.printConfigSummary(flexConfig);
           
-        } catch (configError) {
-          console.log('⚠️  No config file found, using defaults and CLI options');
+        } else {
+          // Use config from environment or defaults
+          config = configResult.config;
           
-          // Fall back to legacy config
-          config = createDefaultConfig({
-            userCount: options.users ? parseInt(options.users) : 10,
-            setupsPerUser: options.setups ? parseInt(options.setups) : 3,
-            imagesPerSetup: options.images ? parseInt(options.images) : 3,
-            enableRealImages: options.realImages,
-            environment: (options.env as 'local' | 'staging' | 'production') || 'local',
-            seed: options.seedValue || 'supa-seed-2025',
-          });
+          // Override with CLI options
+          if (options.users) config.userCount = parseInt(options.users);
+          if (options.setups) config.setupsPerUser = parseInt(options.setups);
+          if (options.images) config.imagesPerSetup = parseInt(options.images);
+          if (options.realImages) config.enableRealImages = true;
+          if (options.env) config.environment = options.env as 'local' | 'staging' | 'production';
+          if (options.seedValue) config.seed = options.seedValue;
+          
+          spinner.succeed(`Configuration loaded from: ${configResult.source}`);
         }
-
+        
+        spinner.text = 'Connecting to database...';
         const seeder = new SupaSeedFramework(config);
         
         if (options.cleanup) {
+          spinner.text = 'Cleaning up existing seed data...';
           await seeder.cleanup();
+          spinner.succeed('Cleanup completed');
         }
         
+        spinner.text = 'Starting database seeding...';
+        spinner.stop(); // Stop spinner as seeding has its own output
+        
         await seeder.seed();
-      } catch (error) {
-        console.error('❌ Seeding failed:', error);
+        
+        Logger.success('🎉 Seeding completed successfully!');
+      } catch (error: any) {
+        spinner.fail('Seeding failed');
+        Logger.error('Error details:', error);
         process.exit(1);
       }
     });
@@ -118,9 +142,14 @@ async function main() {
     .option('-u, --users <number>', 'Number of users to create', '10')
     .option('--force', 'Overwrite existing configuration file')
     .option('--detect', 'Auto-detect database schema and suggest configuration', true)
+    .option('--verbose', 'Enable verbose logging')
     .action(async (options) => {
+      const spinner = ora('Initializing supa-seed configuration...').start();
+      
       try {
-        console.log('🔍 Initializing supa-seed configuration...');
+        if (options.verbose) {
+          Logger.setVerbose(true);
+        }
         
         const configManager = new ConfigManager(options.configFile);
         
@@ -130,9 +159,10 @@ async function main() {
           const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
           
           if (!supabaseUrl || !supabaseKey) {
-            console.log('⚠️  SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY environment variables not found.');
-            console.log('💡 Set these variables or create a .env file to enable schema detection.');
-            console.log('\nCreating basic configuration...');
+            spinner.warn('Missing environment variables for schema detection');
+            Logger.warn('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY environment variables not found.');
+            Logger.info('Set these variables or create a .env file to enable schema detection.');
+            Logger.info('\nCreating basic configuration...');
             
             // Create basic config without detection
             const basicConfig = createDefaultConfig({
@@ -149,10 +179,13 @@ async function main() {
           }
           
           // Create client for schema detection
+          spinner.text = 'Connecting to database...';
           const client = createClient(supabaseUrl, supabaseKey);
           
-          console.log('🔎 Analyzing database schema...');
+          spinner.text = 'Analyzing database schema...';
           const detection = await configManager.detectAndSuggestConfig(client as any);
+          
+          spinner.succeed('Schema analysis complete');
           
           console.log('\n📊 Schema Analysis Results:');
           console.log(`   Framework detected: ${detection.framework}`);
@@ -210,23 +243,33 @@ async function main() {
     .description('Analyze database schema and show compatibility information')
     .option('--url <url>', 'Supabase URL (overrides env var)')
     .option('--key <key>', 'Supabase service role key (overrides env var)')
+    .option('--verbose', 'Enable verbose logging')
     .action(async (options) => {
+      const spinner = ora('Analyzing database schema...').start();
+      
       try {
-        console.log('🔍 Analyzing database schema...');
+        if (options.verbose) {
+          Logger.setVerbose(true);
+        }
         
         const supabaseUrl = options.url || process.env.SUPABASE_URL;
         const supabaseKey = options.key || process.env.SUPABASE_SERVICE_ROLE_KEY;
         
         if (!supabaseUrl || !supabaseKey) {
-          console.error('❌ SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required');
-          console.log('💡 Set environment variables or use --url and --key options');
+          spinner.fail('Missing required credentials');
+          Logger.error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required');
+          Logger.info('Set environment variables or use --url and --key options');
           process.exit(1);
         }
         
+        spinner.text = 'Connecting to database...';
         const client = createClient(supabaseUrl, supabaseKey);
         const configManager = new ConfigManager();
         
+        spinner.text = 'Detecting schema structure...';
         const detection = await configManager.detectAndSuggestConfig(client as any);
+        
+        spinner.succeed('Schema analysis complete');
         
         console.log('\n📊 Database Schema Analysis:');
         console.log(`   🏗️  Framework detected: ${detection.framework}`);
@@ -236,24 +279,25 @@ async function main() {
         console.log(`   🏷️  Has categories table: ${detection.hasCategories ? '✅' : '❌'}`);
         
         if (detection.missingTables.length > 0) {
-          console.log(`\n⚠️  Missing tables: ${detection.missingTables.join(', ')}`);
-          console.log('💡 Run the appropriate schema file:');
+          Logger.warn(`Missing tables: ${detection.missingTables.join(', ')}`);
+          Logger.info('Run the appropriate schema file:');
           
           if (detection.framework === 'makerkit') {
-            console.log('   psql -f schema-wildernest.sql');
+            Logger.info('   psql -f schema-wildernest.sql');
           } else {
-            console.log('   psql -f schema.sql');
+            Logger.info('   psql -f schema.sql');
           }
         } else {
-          console.log('\n✅ All required tables found!');
+          Logger.success('All required tables found!');
         }
         
         console.log('\n🚀 Next steps:');
         console.log('   1. Run "supa-seed init" to create a configuration file');
         console.log('   2. Run "supa-seed seed" to start seeding your database');
         
-      } catch (error) {
-        console.error('❌ Schema detection failed:', error);
+      } catch (error: any) {
+        spinner.fail('Schema detection failed');
+        Logger.error('Error details:', error);
         process.exit(1);
       }
     });
