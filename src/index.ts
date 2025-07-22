@@ -320,4 +320,7 @@ export function createDefaultConfig(overrides: Partial<SeedConfig> = {}): SeedCo
 
 // Export types and classes for library usage
 export * from './types';
+export * from './config-types';
+export { ConfigManager } from './config-manager';
+export { SchemaAdapter } from './schema-adapter';
 export { AuthSeeder, BaseDataSeeder, UserSeeder, SetupSeeder, GearSeeder, MediaSeeder }; 

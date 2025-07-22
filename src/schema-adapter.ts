@@ -1,4 +1,6 @@
-import { SupabaseClient } from './types';
+import type { createClient } from '@supabase/supabase-js';
+
+type SupabaseClient = ReturnType<typeof createClient>;
 
 export interface SchemaInfo {
   hasAccounts: boolean;
