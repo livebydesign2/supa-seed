@@ -12,6 +12,10 @@ A modern TypeScript-based database seeding framework for Supabase projects that 
 - **📊 Progress Tracking**: Real-time feedback and statistics
 - **🔒 Type-Safe**: Full TypeScript support with Supabase types
 - **📦 CLI & Library**: Use as command-line tool or import as library
+- **⚡ Robust Error Handling**: Automatic retry logic, graceful degradation, and comprehensive error reporting
+- **🛡️ Configuration Validation**: Built-in validation for environment variables and configuration
+- **🧪 Test Suite**: Comprehensive test coverage with Jest for reliability
+- **📋 Schema Management**: Complete SQL schema files for easy database setup
 
 ## Installation
 
@@ -25,7 +29,21 @@ npm install --save-dev supa-seed
 
 ## Quick Start
 
-### 1. Environment Setup
+### 1. Database Schema Setup
+
+First, set up your database schema using one of the provided SQL files:
+
+```bash
+# For complete setup with all optional tables
+psql -h localhost -U postgres -d your_database -f schema.sql
+
+# For minimal setup with only required tables
+psql -h localhost -U postgres -d your_database -f schema-minimal.sql
+```
+
+Or apply directly in your Supabase Dashboard's SQL editor.
+
+### 2. Environment Setup
 
 Create a `.env` file or set environment variables:
 
@@ -36,7 +54,9 @@ SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 UNSPLASH_ACCESS_KEY=your-unsplash-key
 ```
 
-### 2. Initialize Configuration
+Copy `.env.example` to `.env` and fill in your values.
+
+### 3. Initialize Configuration
 
 ```bash
 # Create a configuration file
@@ -46,7 +66,7 @@ supa-seed init
 supa-seed init --config-file my-config.json
 ```
 
-### 3. Start Seeding
+### 4. Start Seeding
 
 ```bash
 # Basic seeding (10 users, 3 setups each)
@@ -62,7 +82,7 @@ supa-seed seed --users 25 --setups 5 --images 5
 supa-seed seed --real-images
 ```
 
-### 4. Check Status & Cleanup
+### 5. Check Status & Cleanup
 
 ```bash
 # Check what data exists
@@ -71,6 +91,57 @@ supa-seed status
 # Clean up all seed data
 supa-seed cleanup --force
 ```
+
+## Testing & Development
+
+### Running Tests
+
+```bash
+# Run the test suite
+npm test
+
+# Run tests in watch mode during development
+npm run test:watch
+
+# Generate coverage report
+npm run test:coverage
+```
+
+### Development Setup
+
+```bash
+# Clone the repository
+git clone https://github.com/livebydesign2/supa-seed.git
+cd supa-seed
+
+# Install dependencies
+npm install
+
+# Build the project
+npm run build
+
+# Run development build (watches for changes)
+npm run dev
+```
+
+## Error Handling & Reliability
+
+Supa Seed includes comprehensive error handling to ensure reliable operation:
+
+- **🔄 Automatic Retry Logic**: Failed operations are automatically retried with exponential backoff
+- **🛡️ Table Validation**: Checks if required tables exist before attempting operations
+- **⚠️ Graceful Degradation**: Continues with available functionality when optional features fail
+- **📝 Detailed Logging**: Comprehensive error reporting with context and suggestions
+- **🔍 Connection Monitoring**: Database health checks and connection validation
+
+### Common Error Scenarios
+
+The framework automatically handles:
+- Missing database tables (skips gracefully)
+- Network connection issues (retries automatically)
+- Permission errors (provides clear feedback)
+- Rate limiting (backs off and retries)
+- Invalid configurations (validates before execution)
 
 ## Usage
 
@@ -129,11 +200,23 @@ export class CustomSeeder extends SeedModule {
   async seed(): Promise<void> {
     const { client, faker } = this.context;
     
-    // Your custom seeding logic
-    await client.from('my_table').insert({
-      name: faker.person.fullName(),
-      email: faker.internet.email(),
+    // Check if table exists before seeding
+    if (!(await this.checkTableExists('my_table'))) {
+      console.log('⚠️  Table my_table not found, skipping...');
+      return;
+    }
+    
+    // Your custom seeding logic with error handling
+    const result = await this.executeWithRetry(async () => {
+      return await client.from('my_table').insert({
+        name: faker.person.fullName(),
+        email: faker.internet.email(),
+      });
     });
+    
+    if (!result) {
+      this.logWarning('Custom seeding', 'Failed to insert data after retries');
+    }
   }
 }
 ```
@@ -164,74 +247,98 @@ export class CustomSeeder extends SeedModule {
 
 ## Built-in Seeders
 
-The framework includes several pre-built seeders:
+The framework includes several pre-built seeders with robust error handling:
 
-1. **AuthSeeder** - Sets up authentication and basic users
-2. **BaseDataSeeder** - Creates foundational data and categories  
-3. **UserSeeder** - Generates realistic user profiles
-4. **GearSeeder** - Seeds professional gear database with real items
-5. **SetupSeeder** - Creates contextual gear configurations
-6. **MediaSeeder** - Handles image generation and upload
+1. **AuthSeeder** - Sets up authentication and validates user creation capabilities
+2. **BaseDataSeeder** - Creates foundational data and categories with table existence checks
+3. **UserSeeder** - Generates realistic user profiles with automatic retry logic
+4. **GearSeeder** - Seeds professional gear database with graceful degradation
+5. **SetupSeeder** - Creates contextual gear configurations with dependency validation
+6. **MediaSeeder** - Handles image generation and upload with fallback mechanisms
 
-## Database Schema Requirements
+Each seeder includes:
+- ✅ Table existence validation before operations
+- ✅ Automatic retry logic for transient failures  
+- ✅ Graceful handling of missing dependencies
+- ✅ Comprehensive error logging and reporting
+- ✅ Rollback capabilities for failed operations
 
-Supa Seed expects certain tables to exist in your Supabase database:
+## Database Schema Setup
 
-### Required Tables
+Supa Seed provides complete SQL schema files for easy database setup. Choose the appropriate schema based on your needs:
+
+### Schema Options
+
+**Complete Schema (`schema.sql`)**
+- All tables with full feature support
+- Includes gear items, base templates, and junction tables
+- Row Level Security (RLS) policies
+- Storage buckets for images
+- Indexes for optimal performance
+- Sample data and helper functions
+
+**Minimal Schema (`schema-minimal.sql`)**
+- Essential tables only (accounts, categories, setups)
+- Basic functionality for simple projects
+- Faster setup and smaller footprint
+
+### Installation
+
+```bash
+# Apply complete schema
+psql -h your-host -U postgres -d your_database -f schema.sql
+
+# Or apply minimal schema  
+psql -h your-host -U postgres -d your_database -f schema-minimal.sql
+
+# Via Supabase Dashboard
+# Copy and paste the contents of either file into the SQL editor
+```
+
+### Required Tables (Minimal)
+
+For basic functionality, you need these tables:
 
 ```sql
--- Users/Accounts table
+-- User accounts
 CREATE TABLE accounts (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  email VARCHAR UNIQUE NOT NULL,
-  name VARCHAR,
-  username VARCHAR UNIQUE,
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  email VARCHAR(255) UNIQUE NOT NULL,
+  name VARCHAR(255),
+  username VARCHAR(100) UNIQUE,
   bio TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Categories for organizing data
+-- Content categories  
 CREATE TABLE categories (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name VARCHAR NOT NULL,
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name VARCHAR(255) NOT NULL UNIQUE,
   description TEXT
 );
 
--- Main content/setup table
+-- User setups/content
 CREATE TABLE setups (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  account_id UUID REFERENCES accounts(id) ON DELETE CASCADE,
-  title VARCHAR NOT NULL,
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  title VARCHAR(255) NOT NULL,
   description TEXT,
-  category VARCHAR,
+  category VARCHAR(100),
   is_public BOOLEAN DEFAULT true,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 ```
 
-### Optional Tables
+### Optional Tables (Complete Schema)
 
-```sql
--- For gear/item management
-CREATE TABLE gear_items (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  category_id UUID REFERENCES categories(id),
-  make VARCHAR,
-  model VARCHAR,
-  price DECIMAL,
-  weight VARCHAR,
-  description TEXT
-);
+The complete schema includes additional tables for advanced features:
 
--- For item associations
-CREATE TABLE setup_items (
-  setup_id UUID REFERENCES setups(id) ON DELETE CASCADE,
-  gear_item_id UUID REFERENCES gear_items(id),
-  quantity INTEGER DEFAULT 1,
-  notes TEXT,
-  PRIMARY KEY (setup_id, gear_item_id)
-);
-```
+- **gear_items** - Product/gear database with specifications
+- **setup_gear_items** - Many-to-many relationships between setups and gear
+- **base_templates** - Reusable templates (vehicles, backpacks, etc.)
+- **setup_base_templates** - Template associations
+
+See `schema.sql` for complete table definitions with proper indexes, constraints, and RLS policies.
 
 ## Image Management
 

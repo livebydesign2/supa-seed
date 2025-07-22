@@ -40,14 +40,14 @@ export async function downloadUnsplashImage(query: string, options: ImageGenerat
     const searchUrl = `https://api.unsplash.com/photos/random?query=${encodeURIComponent(query)}&orientation=landscape&client_id=${accessKey}`;
     
     const response = await fetch(searchUrl);
-    const data = await response.json();
+    const data = await response.json() as any;
     
-    if (!data.urls?.regular) {
+    if (!data?.urls?.regular) {
       throw new Error('No image URL found in Unsplash response');
     }
     
     // Download the image
-    const imageResponse = await fetch(data.urls.regular);
+    const imageResponse = await fetch(data.urls.regular as string);
     const arrayBuffer = await imageResponse.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
     
@@ -94,7 +94,7 @@ function createMockCanvas(width: number, height: number, category: string): HTML
   // This is a simplified mock implementation
   // In a real Node.js environment, you might use node-canvas
   
-  const colors = {
+  const colors: Record<string, string> = {
     outdoor: '#4A7C59',
     gear: '#8B4513',
     vehicle: '#2F4F4F',

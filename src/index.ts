@@ -13,6 +13,8 @@ export class SupaSeedFramework {
   private context: SeedContext;
   
   constructor(private config: SeedConfig) {
+    this.validateConfig(config);
+    
     this.client = createClient(
       config.supabaseUrl,
       config.supabaseServiceKey
@@ -137,6 +139,32 @@ export class SupaSeedFramework {
     } catch (error) {
       console.error('❌ Status check failed:', error);
       throw error;
+    }
+  }
+
+  private validateConfig(config: SeedConfig): void {
+    const requiredFields = [
+      'supabaseUrl',
+      'supabaseServiceKey',
+    ];
+
+    const missingFields = requiredFields.filter(field => 
+      !config[field as keyof SeedConfig] || config[field as keyof SeedConfig] === ''
+    );
+
+    if (missingFields.length > 0) {
+      throw new Error(
+        `Missing required configuration: ${missingFields.join(', ')}.\n` +
+        'Please ensure SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are set in your environment or configuration.'
+      );
+    }
+
+    if (!config.supabaseUrl.startsWith('http')) {
+      throw new Error('supabaseUrl must be a valid HTTP/HTTPS URL');
+    }
+
+    if (config.userCount <= 0 || config.setupsPerUser <= 0) {
+      throw new Error('userCount and setupsPerUser must be greater than 0');
     }
   }
 

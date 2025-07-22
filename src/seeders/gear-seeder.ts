@@ -199,7 +199,7 @@ export class GearSeeder extends SeedModule {
 
   private selectRelevantGear(setup: CachedSetup, allGear: any[]): any[] {
     // Filter gear based on setup type and category
-    if (setup.category.includes('Vehicle') || setup.baseTemplateId.includes('Vehicle')) {
+    if (setup.category.includes('Vehicle') || (setup.baseTemplateId && setup.baseTemplateId.includes('Vehicle'))) {
       // Vehicle setups get vehicle-specific gear plus general outdoor gear
       return allGear.filter(gear => 
         ['Vehicle', 'Electronics', 'Safety', 'Cooking', 'Tools'].includes(gear.gear_categories.name)

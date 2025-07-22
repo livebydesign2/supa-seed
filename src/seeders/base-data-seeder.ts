@@ -26,45 +26,80 @@ export class BaseDataSeeder extends SeedModule {
       { name: 'Vehicle', description: 'Overland and camping vehicle modifications' },
     ];
 
-    const existingCategories = await client
-      .from('gear_categories')
-      .select('name');
-
-    const existingNames = new Set(
-      existingCategories.data?.map(c => c.name) || []
-    );
-
-    const newCategories = categories.filter(
-      cat => !existingNames.has(cat.name)
-    );
-
-    if (newCategories.length > 0) {
-      const { error } = await client
-        .from('gear_categories')
-        .insert(newCategories);
-
-      if (error) {
-        throw new Error(`Failed to seed gear categories: ${error.message}`);
+    try {
+      // Check if categories table exists by attempting a simple query
+      const { error: testError } = await client
+        .from('categories')
+        .select('id')
+        .limit(1);
+      
+      if (testError && testError.code === 'PGRST106') {
+        console.log('⚠️  Categories table not found. Creating basic categories...');
+        // Table doesn't exist, skip this step
+        return;
       }
 
-      console.log(`   ✅ Created ${newCategories.length} gear categories`);
-    } else {
-      console.log('   ℹ️  Gear categories already exist, skipping');
+      const { data: existingCategories, error: selectError } = await client
+        .from('categories')
+        .select('name');
+
+      if (selectError) {
+        throw new Error(`Failed to check existing categories: ${selectError.message}`);
+      }
+
+      const existingNames = new Set(
+        existingCategories?.map(c => c.name) || []
+      );
+
+      const newCategories = categories.filter(
+        cat => !existingNames.has(cat.name)
+      );
+
+      if (newCategories.length > 0) {
+        const { error: insertError } = await client
+          .from('categories')
+          .insert(newCategories);
+
+        if (insertError) {
+          console.log(`⚠️  Warning: Could not insert categories: ${insertError.message}`);
+          console.log('   This might be because the table doesn\'t exist or you lack permissions.');
+          return;
+        }
+
+        console.log(`   ✅ Created ${newCategories.length} categories`);
+      } else {
+        console.log('   ℹ️  Categories already exist, skipping');
+      }
+    } catch (error) {
+      console.log(`⚠️  Warning: Could not seed categories: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.log('   This seeder will continue with other data...');
     }
   }
 
   private async seedBaseTemplates(): Promise<void> {
     const { client } = this.context;
     
-    const templates = [
-      // Vehicle Templates
-      {
-        type: 'Vehicle' as const,
-        make: 'Toyota',
-        model: 'Tacoma',
-        year: 2023,
-        description: 'Mid-size pickup truck popular for overlanding'
-      },
+    try {
+      // Check if base_templates table exists
+      const { error: testError } = await client
+        .from('base_templates')
+        .select('id')
+        .limit(1);
+      
+      if (testError && testError.code === 'PGRST106') {
+        console.log('⚠️  Base templates table not found, skipping template seeding.');
+        return;
+      }
+    
+      const templates = [
+        // Vehicle Templates
+        {
+          type: 'Vehicle' as const,
+          make: 'Toyota',
+          model: 'Tacoma',
+          year: 2023,
+          description: 'Mid-size pickup truck popular for overlanding'
+        },
       {
         type: 'Vehicle' as const,
         make: 'Toyota',
@@ -126,37 +161,48 @@ export class BaseDataSeeder extends SeedModule {
       },
     ];
 
-    const existingTemplates = await client
-      .from('base_templates')
-      .select('make, model, type');
-
-    const existingKeys = new Set(
-      existingTemplates.data?.map(t => `${t.type}-${t.make}-${t.model}`) || []
-    );
-
-    const newTemplates = templates.filter(
-      template => !existingKeys.has(`${template.type}-${template.make}-${template.model}`)
-    );
-
-    if (newTemplates.length > 0) {
-      const { error } = await client
+      const { data: existingTemplates, error: selectError } = await client
         .from('base_templates')
-        .insert(newTemplates);
+        .select('make, model, type');
 
-      if (error) {
-        throw new Error(`Failed to seed base templates: ${error.message}`);
+      if (selectError) {
+        throw new Error(`Failed to check existing templates: ${selectError.message}`);
       }
 
-      console.log(`   ✅ Created ${newTemplates.length} base templates`);
-    } else {
-      console.log('   ℹ️  Base templates already exist, skipping');
+      const existingKeys = new Set(
+        existingTemplates?.map(t => `${t.type}-${t.make}-${t.model}`) || []
+      );
+
+      const newTemplates = templates.filter(
+        template => !existingKeys.has(`${template.type}-${template.make}-${template.model}`)
+      );
+
+      if (newTemplates.length > 0) {
+        const { error: insertError } = await client
+          .from('base_templates')
+          .insert(newTemplates);
+
+        if (insertError) {
+          console.log(`⚠️  Warning: Could not insert base templates: ${insertError.message}`);
+          return;
+        }
+
+        console.log(`   ✅ Created ${newTemplates.length} base templates`);
+      } else {
+        console.log('   ℹ️  Base templates already exist, skipping');
+      }
+
+      // Cache templates for other seeders
+      const { data: allTemplates } = await client
+        .from('base_templates')
+        .select('*');
+
+      this.context.cache.set('baseTemplates', allTemplates || []);
+    } catch (error) {
+      console.log(`⚠️  Warning: Could not seed base templates: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.log('   Other seeders will continue without base templates...');
+      // Set empty cache so other seeders don't fail
+      this.context.cache.set('baseTemplates', []);
     }
-
-    // Cache templates for other seeders
-    const { data: allTemplates } = await client
-      .from('base_templates')
-      .select('*');
-
-    this.context.cache.set('baseTemplates', allTemplates || []);
   }
 } 

@@ -54,11 +54,15 @@ export class MediaSeeder extends SeedModule {
     // Try to download from Unsplash (requires API key)
     if (process.env.UNSPLASH_ACCESS_KEY) {
       try {
-        return await downloadUnsplashImage(searchTerm, {
+        const unsplashImage = await downloadUnsplashImage(searchTerm, {
           width: 1200,
           height: 800,
           category: this.mapCategoryToImageCategory(setup.category),
         });
+        
+        if (unsplashImage) {
+          return unsplashImage;
+        }
       } catch (error) {
         console.log(`Failed to download Unsplash image: ${error}`);
         // Fall back to placeholder
@@ -80,7 +84,7 @@ export class MediaSeeder extends SeedModule {
     };
 
     // Generate contextual placeholder
-    return await generatePlaceholderImage(setup.title, options);
+    return await generatePlaceholderImage(options);
   }
 
   private async uploadAndSaveImage(

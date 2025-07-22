@@ -1,7 +1,7 @@
 import { SeedModule, CachedUser, CachedBaseTemplate, CachedSetup } from '../types';
 
 export class SetupSeeder extends SeedModule {
-  private setupTypes = {
+  private setupTypes: Record<string, string[]> = {
     'Vehicle': [
       'Weekend Car Camping',
       'Extended Overland Trip',
@@ -69,7 +69,11 @@ export class SetupSeeder extends SeedModule {
     
     // Pick a random template
     const template = faker.helpers.arrayElement(templates);
-    const setupTypes = this.setupTypes[template.type];
+    const setupTypes = this.setupTypes[template.type] || [];
+    if (setupTypes.length === 0) {
+      console.warn(`⚠️  No setup types found for template type: ${template.type}`);
+      return null;
+    }
     const setupCategory = faker.helpers.arrayElement(setupTypes);
     
     // Generate contextual title and description
@@ -102,7 +106,7 @@ export class SetupSeeder extends SeedModule {
       }
 
       return {
-        id: data.id,
+        id: data.id as string,
         userId: user.id,
         title,
         category: setupCategory,
@@ -117,7 +121,7 @@ export class SetupSeeder extends SeedModule {
   private generateSetupTitle(template: CachedBaseTemplate, category: string): string {
     const { faker } = this.context;
     
-    const descriptors = {
+    const descriptors: Record<string, string[]> = {
       'Vehicle': [
         'Overland', 'Adventure', 'Expedition', 'Journey', 'Explorer',
         'Wanderer', 'Nomad', 'Trail', 'Backcountry', 'Wilderness'
@@ -128,11 +132,12 @@ export class SetupSeeder extends SeedModule {
       ]
     };
 
-    const desc = faker.helpers.arrayElement(descriptors[template.type]);
+    const templateDescriptors = descriptors[template.type] || ['Custom'];
+    const desc = faker.helpers.arrayElement(templateDescriptors);
     const year = template.year || '';
     
-    if (template.type === 'Vehicle') {
-      return `${desc} ${template.make} ${template.model} ${year} Build`;
+    if (template.type === 'Vehicle' && template.make && template.model) {
+      return `${desc} ${template.make} ${template.model} ${year} Build`.trim();
     } else {
       return `${desc} ${category} Kit`;
     }
@@ -159,7 +164,7 @@ export class SetupSeeder extends SeedModule {
     const experience = faker.helpers.arrayElement(experiences);
     const terrain = faker.helpers.arrayElement(terrains);
     
-    if (template.type === 'Vehicle') {
+    if (template.type === 'Vehicle' && template.make && template.model) {
       return `My ${template.make} ${template.model} setup for ${category.toLowerCase()}, ${experience}. Perfect for exploring ${terrain} and handling whatever adventure throws your way. This build focuses on reliability, comfort, and versatility.`;
     } else {
       return `A carefully curated ${category.toLowerCase()} kit ${experience}. This loadout has served me well across ${terrain} and various weather conditions. Every item has earned its place through real-world use.`;
