@@ -1,4 +1,5 @@
 import { SeedModule, CachedUser, CachedBaseTemplate, CachedSetup } from '../types';
+import { SchemaAdapter } from '../schema-adapter';
 
 export class SetupSeeder extends SeedModule {
   private setupTypes: Record<string, string[]> = {
@@ -29,15 +30,21 @@ export class SetupSeeder extends SeedModule {
     
     const users = this.context.cache.get('users') as CachedUser[];
     const templates = this.context.cache.get('baseTemplates') as CachedBaseTemplate[];
+    const schemaAdapter = this.context.cache.get('schemaAdapter') as SchemaAdapter;
     
     if (!users?.length) {
       console.log('⚠️  No users found in cache, skipping setup seeding');
       return;
     }
 
-    if (!templates?.length) {
-      console.log('⚠️  No base templates found in cache, skipping setup seeding');
+    // Check if setups table exists
+    if (!(await this.checkTableExists('setups'))) {
+      console.log('⚠️  Setups table not found, skipping setup seeding');
       return;
+    }
+
+    if (!templates?.length) {
+      console.log('⚠️  No base templates found in cache, creating default setups instead');
     }
 
     const createdSetups: CachedSetup[] = [];
@@ -49,7 +56,7 @@ export class SetupSeeder extends SeedModule {
       });
       
       for (let i = 0; i < setupCount; i++) {
-        const setup = await this.createSetup(user, templates);
+        const setup = await this.createSetup(user, templates, schemaAdapter);
         if (setup) {
           createdSetups.push(setup);
           this.context.stats.setupsCreated++;
@@ -63,28 +70,47 @@ export class SetupSeeder extends SeedModule {
 
   private async createSetup(
     user: CachedUser, 
-    templates: CachedBaseTemplate[]
+    templates: CachedBaseTemplate[],
+    schemaAdapter: SchemaAdapter
   ): Promise<CachedSetup | null> {
     const { client, faker } = this.context;
     
-    // Pick a random template
-    const template = faker.helpers.arrayElement(templates);
-    const setupTypes = this.setupTypes[template.type] || [];
-    if (setupTypes.length === 0) {
-      console.warn(`⚠️  No setup types found for template type: ${template.type}`);
-      return null;
+    // Pick a random template (or create generic if no templates)
+    let template: CachedBaseTemplate;
+    let setupCategory: string;
+    
+    if (templates && templates.length > 0) {
+      template = faker.helpers.arrayElement(templates);
+      const setupTypes = this.setupTypes[template.type] || [];
+      if (setupTypes.length === 0) {
+        console.warn(`⚠️  No setup types found for template type: ${template.type}`);
+        return null;
+      }
+      setupCategory = faker.helpers.arrayElement(setupTypes);
+    } else {
+      // Create a generic setup without templates
+      template = {
+        id: '',
+        type: 'General',
+        make: '',
+        model: '',
+      };
+      setupCategory = faker.helpers.arrayElement([
+        'Adventure Kit', 'Travel Setup', 'Outdoor Essentials', 'Exploration Gear'
+      ]);
     }
-    const setupCategory = faker.helpers.arrayElement(setupTypes);
     
     // Generate contextual title and description
     const title = this.generateSetupTitle(template, setupCategory);
     const description = this.generateSetupDescription(template, setupCategory);
     
-    const setupData = {
-      account_id: user.id,
+    // Use schema adapter to determine the correct foreign key
+    const userForeignKey = schemaAdapter ? schemaAdapter.getUserForeignKey() : 'account_id';
+    
+    const setupData: any = {
+      [userForeignKey]: user.id,
       title,
       description,
-      base_template_id: template.id,
       category: setupCategory,
       is_public: faker.datatype.boolean(0.8), // 80% public
       created_at: faker.date.between({ 
@@ -92,6 +118,11 @@ export class SetupSeeder extends SeedModule {
         to: new Date() 
       }).toISOString(),
     };
+    
+    // Only add base_template_id if we have a real template
+    if (template.id) {
+      setupData.base_template_id = template.id;
+    }
 
     try {
       const { data, error } = await client

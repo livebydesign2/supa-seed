@@ -1,23 +1,33 @@
 import { SeedModule, CachedUser } from '../types';
 import { generateOutdoorUsername, generateTestEmail } from '../utils/auth-utils';
+import { SchemaAdapter } from '../schema-adapter';
 
 export class UserSeeder extends SeedModule {
+  private schemaAdapter!: SchemaAdapter;
+
   async seed(): Promise<void> {
+    // Initialize schema adapter
+    this.schemaAdapter = new SchemaAdapter(this.context.client);
+    await this.schemaAdapter.detectSchema();
+
     const users: CachedUser[] = [];
     
     // Create diverse outdoor enthusiasts
     for (let i = 0; i < this.context.config.userCount; i++) {
       const user = await this.createUser();
-      users.push(user);
-      this.context.stats.usersCreated++;
+      if (user) {
+        users.push(user);
+        this.context.stats.usersCreated++;
+      }
     }
     
     // Cache users for other seeders
     this.context.cache.set('users', users);
+    this.context.cache.set('schemaAdapter', this.schemaAdapter);
   }
 
-  private async createUser(): Promise<CachedUser> {
-    const { faker, client } = this.context;
+  private async createUser(): Promise<CachedUser | null> {
+    const { faker } = this.context;
     
     // Generate realistic outdoor enthusiast profile
     const firstName = faker.person.firstName();
@@ -25,50 +35,27 @@ export class UserSeeder extends SeedModule {
     const username = generateOutdoorUsername(firstName, lastName);
     const email = generateTestEmail(username);
     const bio = this.generateOutdoorBio();
+    const name = `${firstName} ${lastName}`;
     
-    // Create auth user first
-    const userId = faker.string.uuid();
-    
-    const { error: authError } = await client.auth.admin.createUser({
-      id: userId,
+    // Use schema adapter to create user with appropriate strategy
+    const result = await this.schemaAdapter.createUserForSchema({
       email,
-      password: 'password',
-      email_confirm: true,
-      user_metadata: {
-        full_name: `${firstName} ${lastName}`,
-        username,
-      }
+      name,
+      username,
+      bio,
+      picture_url: this.generateProfileImage(firstName, lastName),
     });
 
-    if (authError) {
-      throw new Error(`Failed to create auth user: ${authError.message}`);
-    }
-
-    // Create account profile
-    const { data: account, error: accountError } = await client
-      .from('accounts')
-      .insert({
-        id: userId,
-        email,
-        name: `${firstName} ${lastName}`,
-        username,
-        bio,
-        picture_url: this.generateProfileImage(firstName, lastName),
-        created_at: faker.date.past({ years: 2 }).toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .select()
-      .single();
-
-    if (accountError) {
-      throw new Error(`Failed to create account: ${accountError.message}`);
+    if (!result.success) {
+      this.logWarning('User creation', `Failed to create user ${email}: ${result.error}`);
+      return null;
     }
 
     return {
-      id: userId,
+      id: result.id,
       email,
       username,
-      name: `${firstName} ${lastName}`,
+      name,
     };
   }
 

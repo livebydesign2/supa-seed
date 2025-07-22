@@ -7,6 +7,7 @@ import { UserSeeder } from './seeders/user-seeder';
 import { SetupSeeder } from './seeders/setup-seeder';
 import { GearSeeder } from './seeders/gear-seeder';
 import { MediaSeeder } from './seeders/media-seeder';
+import { SchemaAdapter } from './schema-adapter';
 
 export class SupaSeedFramework {
   private client: ReturnType<typeof createClient>;
@@ -37,26 +38,84 @@ export class SupaSeedFramework {
   async seed(): Promise<void> {
     console.log('🌱 Starting database seeding...');
     
-    // Define seeding order (dependency-aware)
-    const seeders: SeedModule[] = [
-      new AuthSeeder(this.context),
-      new BaseDataSeeder(this.context),
-      new UserSeeder(this.context),
-      new GearSeeder(this.context),
-      new SetupSeeder(this.context),
-      new MediaSeeder(this.context),
-    ];
-
     try {
+      // First, check database connectivity and schema
+      await this.validateDatabaseAndSchema();
+      
+      // Define seeding order (dependency-aware)
+      const seeders: SeedModule[] = [
+        new AuthSeeder(this.context),
+        new BaseDataSeeder(this.context),
+        new UserSeeder(this.context),
+        new GearSeeder(this.context),
+        new SetupSeeder(this.context),
+        new MediaSeeder(this.context),
+      ];
+
       for (const seeder of seeders) {
-        console.log(`🔄 Running ${seeder.constructor.name}...`);
-        await seeder.seed();
-        console.log(`✅ ${seeder.constructor.name} completed`);
+        try {
+          console.log(`🔄 Running ${seeder.constructor.name}...`);
+          await seeder.seed();
+          console.log(`✅ ${seeder.constructor.name} completed`);
+        } catch (error: any) {
+          console.warn(`⚠️  ${seeder.constructor.name} failed but seeding continues:`, error.message);
+          // Continue with next seeder rather than failing completely
+        }
       }
       
       await this.printSummary();
     } catch (error) {
       console.error('❌ Seeding failed:', error);
+      throw error;
+    }
+  }
+
+  private async validateDatabaseAndSchema(): Promise<void> {
+    console.log('🔍 Validating database connection and schema...');
+    
+    try {
+      // Test basic connection
+      const { error: connectionError } = await this.client
+        .from('information_schema.tables')
+        .select('table_name')
+        .limit(1);
+        
+      if (connectionError) {
+        throw new Error(`Database connection failed: ${connectionError.message}`);
+      }
+      
+      // Initialize schema adapter to detect schema
+      const schemaAdapter = new SchemaAdapter(this.client);
+      const schemaInfo = await schemaAdapter.detectSchema();
+      
+      // Provide helpful guidance based on detected schema
+      if (!schemaInfo.hasAccounts && !schemaInfo.hasProfiles) {
+        console.warn('⚠️  No user tables detected. You may need to:');
+        console.warn('   1. Run the schema.sql file to create required tables');
+        console.warn('   2. Or ensure your custom schema is compatible');
+        console.warn('   3. Check your database permissions');
+      } else {
+        const strategy = schemaAdapter.getUserCreationStrategy();
+        console.log(`✅ Schema validated. Using ${strategy} user creation strategy.`);
+      }
+      
+    } catch (error: any) {
+      if (error.message.includes('permission denied')) {
+        throw new Error(
+          'Database permissions error. Please ensure your SUPABASE_SERVICE_ROLE_KEY has the necessary permissions to:\n' +
+          '  • Create auth users (admin.createUser)\n' +
+          '  • Insert into user tables (accounts/profiles)\n' +
+          '  • Access table schemas'
+        );
+      } else if (error.message.includes('connection')) {
+        throw new Error(
+          'Database connection failed. Please check:\n' +
+          '  • SUPABASE_URL is correct and accessible\n' +
+          '  • SUPABASE_SERVICE_ROLE_KEY is valid\n' +
+          '  • Your network connection\n' +
+          '  • Supabase instance is running'
+        );
+      }
       throw error;
     }
   }

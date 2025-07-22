@@ -133,15 +133,43 @@ Supa Seed includes comprehensive error handling to ensure reliable operation:
 - **⚠️ Graceful Degradation**: Continues with available functionality when optional features fail
 - **📝 Detailed Logging**: Comprehensive error reporting with context and suggestions
 - **🔍 Connection Monitoring**: Database health checks and connection validation
+- **🗄️ Schema Detection**: Automatically detects and adapts to different database schemas
 
 ### Common Error Scenarios
 
 The framework automatically handles:
 - Missing database tables (skips gracefully)
+- Schema mismatches (detects and adapts)
 - Network connection issues (retries automatically)
 - Permission errors (provides clear feedback)
 - Rate limiting (backs off and retries)
 - Invalid configurations (validates before execution)
+
+### Troubleshooting Schema Issues
+
+**"No user tables detected" Warning:**
+```bash
+⚠️  No user tables detected. You may need to:
+   1. Run the schema.sql file to create required tables
+   2. Or ensure your custom schema is compatible
+   3. Check your database permissions
+```
+**Solution:** Apply schema.sql or ensure your database has user tables (accounts/profiles)
+
+**"Database connection failed":**
+```bash
+❌ Database connection failed: [error details]
+```
+**Solution:** Check SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY environment variables
+
+**"Permission denied" Errors:**
+```bash
+❌ Database permissions error. Please ensure your SUPABASE_SERVICE_ROLE_KEY has permissions to:
+  • Create auth users (admin.createUser)
+  • Insert into user tables (accounts/profiles)  
+  • Access table schemas
+```
+**Solution:** Use the service role key (not anon key) and ensure RLS policies allow service role access
 
 ## Usage
 
@@ -265,25 +293,38 @@ Each seeder includes:
 
 ## Database Schema Setup
 
-Supa Seed provides complete SQL schema files for easy database setup. Choose the appropriate schema based on your needs:
+Supa Seed now supports multiple database schema patterns and automatically detects your schema type for compatibility.
 
-### Schema Options
+### Supported Schema Types
 
-**Complete Schema (`schema.sql`)**
-- All tables with full feature support
-- Includes gear items, base templates, and junction tables
-- Row Level Security (RLS) policies
-- Storage buckets for images
-- Indexes for optimal performance
-- Sample data and helper functions
+**1. Simple Schema (schema.sql / schema-minimal.sql)**
+- Basic `accounts`, `categories`, `setups` tables
+- Direct foreign key relationships
+- Ideal for simple projects
 
-**Minimal Schema (`schema-minimal.sql`)**
-- Essential tables only (accounts, categories, setups)
-- Basic functionality for simple projects
-- Faster setup and smaller footprint
+**2. Makerkit Schema (Multi-tenant SaaS)**
+- Uses `auth.users` + `profiles` pattern  
+- Team/account-based multi-tenancy
+- Automatic detection and adaptation
 
-### Installation
+**3. Custom Profiles Schema**
+- Uses `auth.users` + `profiles` tables
+- Single-tenant with user profiles
+- Flexible for custom implementations
 
+### Automatic Schema Detection
+
+Supa Seed automatically detects your database schema and adapts:
+
+```typescript
+// The framework automatically detects and uses the right strategy
+const seeder = new SupaSeedFramework(config);
+await seeder.seed(); // Works with any supported schema
+```
+
+### Schema Installation Options
+
+**Option 1: Use Provided Schema**
 ```bash
 # Apply complete schema
 psql -h your-host -U postgres -d your_database -f schema.sql
@@ -294,6 +335,27 @@ psql -h your-host -U postgres -d your_database -f schema-minimal.sql
 # Via Supabase Dashboard
 # Copy and paste the contents of either file into the SQL editor
 ```
+
+**Option 2: Use Your Existing Schema**
+```bash
+# Supa Seed will detect and adapt to your existing schema
+# No schema changes required if you have:
+# - User tables (accounts, profiles, or custom)
+# - Basic content tables (setups, posts, etc.)
+supa-seed seed # Automatically detects schema
+```
+
+### Schema Compatibility Requirements
+
+**Minimum Requirements:**
+- At least one user table (`accounts`, `profiles`, etc.)
+- Supabase auth enabled
+- Service role key with appropriate permissions
+
+**Recommended Tables:**
+- User profiles: `accounts` or `profiles`  
+- Content: `setups`, `posts`, or similar
+- Categories: `categories` or `tags`
 
 ### Required Tables (Minimal)
 
