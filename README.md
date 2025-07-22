@@ -16,6 +16,7 @@ A modern TypeScript-based database seeding framework for Supabase projects that 
 - **🛡️ Configuration Validation**: Built-in validation for environment variables and configuration
 - **🧪 Test Suite**: Comprehensive test coverage with Jest for reliability
 - **📋 Schema Management**: Complete SQL schema files for easy database setup
+- **🗄️ Schema Detection**: Automatic detection and adaptation to existing database schemas (Makerkit, custom profiles, etc.)
 
 ## Installation
 
