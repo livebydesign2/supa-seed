@@ -303,6 +303,12 @@ Supa Seed now supports multiple database schema patterns and automatically detec
 - Direct foreign key relationships
 - Ideal for simple projects
 
+**1a. Wildernest/Makerkit Schema (schema-wildernest.sql)**
+- Compatible with existing Makerkit/complex multi-tenant projects
+- Adds missing tables: `categories`, `gear_items`, `base_templates`, junction tables
+- Preserves existing schema while adding supa-seed compatibility
+- Includes sample data and proper RLS policies
+
 **2. Makerkit Schema (Multi-tenant SaaS)**
 - Uses `auth.users` + `profiles` pattern  
 - Team/account-based multi-tenancy
@@ -332,6 +338,9 @@ psql -h your-host -U postgres -d your_database -f schema.sql
 
 # Or apply minimal schema  
 psql -h your-host -U postgres -d your_database -f schema-minimal.sql
+
+# For Wildernest/Makerkit projects (adds missing tables to existing schema)
+psql -h your-host -U postgres -d your_database -f schema-wildernest.sql
 
 # Via Supabase Dashboard
 # Copy and paste the contents of either file into the SQL editor
