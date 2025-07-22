@@ -9,8 +9,11 @@
   },
   "files": [
     "dist/**/*",
-    "templates/**/*",
-    "README.md"
+    "schema.sql",
+    "schema-minimal.sql",
+    ".env.example",
+    "README.md",
+    "LICENSE"
   ],
   "scripts": {
     "build": "tsc",
