@@ -63,4 +63,7 @@ supa-seed.config.json
 
 # Test files
 test-results/
-coverage/ 
+coverage/
+
+# Internal documentation
+docs/ 
