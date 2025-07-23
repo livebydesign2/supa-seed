@@ -29,7 +29,7 @@ export function generateSecurePassword(): string {
 /**
  * Generate a valid email address for seeding
  */
-export function generateTestEmail(username: string, domain: string = 'wildernest.test'): string {
+export function generateTestEmail(username: string, domain: string = 'supaseed.test'): string {
   return `${username.toLowerCase()}@${domain}`;
 }
 

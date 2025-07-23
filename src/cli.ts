@@ -55,6 +55,7 @@ async function main() {
             imagesPerSetup: options.images ? parseInt(options.images) : flexConfig.imagesPerSetup,
             enableRealImages: options.realImages || flexConfig.enableRealImages,
             seed: options.seedValue || flexConfig.seed,
+            emailDomain: flexConfig.emailDomain || 'supaseed.test',
             schema: flexConfig.schema, // Pass through schema configuration
           };
           

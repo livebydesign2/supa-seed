@@ -12,6 +12,7 @@ export interface SeedConfig {
   imagesPerSetup: number;
   enableRealImages: boolean;
   seed: string; // For deterministic fake data
+  emailDomain?: string; // Domain for test emails (default: supaseed.test)
   schema?: {
     framework?: 'makerkit' | 'simple' | 'custom';
     primaryUserTable?: 'accounts' | 'profiles' | 'users';

@@ -359,6 +359,7 @@ export function createDefaultConfig(overrides: Partial<SeedConfig> = {}): SeedCo
     imagesPerSetup: 3,
     enableRealImages: false,
     seed: 'supa-seed-2025',
+    emailDomain: 'supaseed.test',
     ...overrides,
   };
 }

@@ -265,7 +265,8 @@ export class CustomSeeder extends SeedModule {
   "setupsPerUser": 3,
   "imagesPerSetup": 2,
   "enableRealImages": false,
-  "seed": "supa-seed-2025"
+  "seed": "supa-seed-2025",
+  "emailDomain": "supaseed.test"
 }
 ```
 
@@ -348,6 +349,7 @@ A real-world example of SupaSeed successfully adapting to a complex MakerKit-bas
   "imagesPerSetup": 1,
   "enableRealImages": false,
   "seed": "wildernest-test-2025",
+  "emailDomain": "supaseed.test",
   "schema": {
     "framework": "makerkit",
     "primaryUserTable": "accounts",
@@ -381,6 +383,7 @@ A real-world example of SupaSeed successfully adapting to a complex MakerKit-bas
 - `SUPABASE_SERVICE_ROLE_KEY` - Service role key (required)
 - `UNSPLASH_ACCESS_KEY` - Unsplash API key (optional, for real images)
 - `NODE_ENV` - Environment (`local`|`staging`|`production`)
+- `SUPA_SEED_EMAIL_DOMAIN` - Domain for test emails (optional, default: supaseed.test)
 
 ## Built-in Seeders
 

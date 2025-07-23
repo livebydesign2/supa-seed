@@ -33,7 +33,7 @@ export class UserSeeder extends SeedModule {
     const firstName = faker.person.firstName();
     const lastName = faker.person.lastName();
     const username = generateOutdoorUsername(firstName, lastName);
-    const email = generateTestEmail(username);
+    const email = generateTestEmail(username, this.context.config.emailDomain);
     const bio = this.generateOutdoorBio();
     const name = `${firstName} ${lastName}`;
     

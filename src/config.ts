@@ -109,6 +109,7 @@ function loadFromEnvironment(): ConfigLoadResult {
     imagesPerSetup: parseInt(process.env.SUPA_SEED_IMAGES_PER_SETUP || '3'),
     enableRealImages: process.env.SUPA_SEED_ENABLE_REAL_IMAGES === 'true',
     seed: process.env.SUPA_SEED_SEED_VALUE || 'supa-seed-2025',
+    emailDomain: process.env.SUPA_SEED_EMAIL_DOMAIN || 'supaseed.test',
   };
   
   return {

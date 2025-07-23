@@ -10,6 +10,7 @@ export interface FlexibleSeedConfig {
   imagesPerSetup: number;
   enableRealImages: boolean;
   seed: string;
+  emailDomain?: string;
   
   // Schema configuration
   schema: {
