@@ -321,6 +321,60 @@ This is especially useful for:
 - **Custom schemas** with non-standard field names
 - **Partial seeding** where you want to skip certain tables
 
+### ✅ Success Story: Wildernest/MakerKit Integration
+
+A real-world example of SupaSeed successfully adapting to a complex MakerKit-based project:
+
+**The Challenge:** A Wildernest project using MakerKit's multi-tenant architecture had:
+- `accounts` table with `primary_owner_user_id` field (not standard `id`)
+- Missing optional tables (`categories`, `base_templates`)
+- Custom field names and constraints
+- Framework was auto-detecting `profiles` instead of `accounts` as primary table
+
+**The Solution:** Using configuration override, the framework now:
+- ✅ Correctly detects and uses `accounts` as primary user table
+- ✅ Handles MakerKit's `primary_owner_user_id` constraint properly  
+- ✅ Gracefully skips missing optional tables
+- ✅ Respects custom field mappings
+
+**Optimal Configuration for MakerKit/Wildernest:**
+```json
+{
+  "supabaseUrl": "http://127.0.0.1:54321",
+  "supabaseServiceKey": "your-service-role-key",
+  "environment": "local",
+  "userCount": 3,
+  "setupsPerUser": 2,
+  "imagesPerSetup": 1,
+  "enableRealImages": false,
+  "seed": "wildernest-test-2025",
+  "schema": {
+    "framework": "makerkit",
+    "primaryUserTable": "accounts",
+    "userTable": {
+      "name": "accounts",
+      "emailField": "email",
+      "idField": "id", 
+      "nameField": "name",
+      "pictureField": "picture_url"
+    },
+    "setupsTable": {
+      "name": "setups",
+      "userField": "account_id",
+      "titleField": "title", 
+      "descriptionField": "description"
+    },
+    "optionalTables": {
+      "categories": false,
+      "baseTemplates": false,
+      "gearItems": true
+    }
+  }
+}
+```
+
+**Result:** Framework now works seamlessly with complex production schemas!
+
 ### Environment Variables
 
 - `SUPABASE_URL` - Your Supabase project URL
