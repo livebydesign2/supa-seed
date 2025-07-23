@@ -322,11 +322,11 @@ This is especially useful for:
 - **Custom schemas** with non-standard field names
 - **Partial seeding** where you want to skip certain tables
 
-### ✅ Success Story: Wildernest/MakerKit Integration
+### ✅ Success Story: MakerKit Integration
 
 A real-world example of SupaSeed successfully adapting to a complex MakerKit-based project:
 
-**The Challenge:** A Wildernest project using MakerKit's multi-tenant architecture had:
+**The Challenge:** A project using MakerKit's multi-tenant architecture had:
 - `accounts` table with `primary_owner_user_id` field (not standard `id`)
 - Missing optional tables (`categories`, `base_templates`)
 - Custom field names and constraints
@@ -338,7 +338,7 @@ A real-world example of SupaSeed successfully adapting to a complex MakerKit-bas
 - ✅ Gracefully skips missing optional tables
 - ✅ Respects custom field mappings
 
-**Optimal Configuration for MakerKit/Wildernest:**
+**Optimal Configuration for MakerKit Projects:**
 ```json
 {
   "supabaseUrl": "http://127.0.0.1:54321",
@@ -348,8 +348,9 @@ A real-world example of SupaSeed successfully adapting to a complex MakerKit-bas
   "setupsPerUser": 2,
   "imagesPerSetup": 1,
   "enableRealImages": false,
-  "seed": "wildernest-test-2025",
+  "seed": "makerkit-test-2025",
   "emailDomain": "supaseed.test",
+  "createStandardTestEmails": true,
   "schema": {
     "framework": "makerkit",
     "primaryUserTable": "accounts",
@@ -377,6 +378,25 @@ A real-world example of SupaSeed successfully adapting to a complex MakerKit-bas
 
 **Result:** Framework now works seamlessly with complex production schemas!
 
+### 🧪 Standard MakerKit Test Emails
+
+For MakerKit projects, the framework can automatically create standard test email accounts that match the official MakerKit seed data:
+
+```json
+{
+  "createStandardTestEmails": true
+}
+```
+
+**Created Test Accounts:**
+- `test@makerkit.dev` - Test User (admin role)
+- `custom@makerkit.dev` - Custom User (custom role)  
+- `owner@makerkit.dev` - Owner User (owner role)
+- `member@makerkit.dev` - Member User (member role)
+- `super-admin@makerkit.dev` - Super Admin (super-admin role)
+
+These accounts are created in addition to your regular generated users and provide consistent test credentials across different environments.
+
 ### Environment Variables
 
 - `SUPABASE_URL` - Your Supabase project URL
@@ -384,6 +404,8 @@ A real-world example of SupaSeed successfully adapting to a complex MakerKit-bas
 - `UNSPLASH_ACCESS_KEY` - Unsplash API key (optional, for real images)
 - `NODE_ENV` - Environment (`local`|`staging`|`production`)
 - `SUPA_SEED_EMAIL_DOMAIN` - Domain for test emails (optional, default: supaseed.test)
+- `SUPA_SEED_DOMAIN` - Domain configuration (optional: generic, outdoor, ecommerce, saas)
+- `SUPA_SEED_CREATE_STANDARD_EMAILS` - Create MakerKit standard test emails (optional, default: false)
 
 ## Built-in Seeders
 
@@ -414,8 +436,8 @@ Supa Seed now supports multiple database schema patterns and automatically detec
 - Direct foreign key relationships
 - Ideal for simple projects
 
-**1a. Wildernest/Makerkit Schema (schema-wildernest.sql)**
-- Compatible with existing Makerkit/complex multi-tenant projects
+**1a. MakerKit Schema (schema-makerkit.sql)**
+- Compatible with existing MakerKit/complex multi-tenant projects
 - Adds missing tables: `categories`, `gear_items`, `base_templates`, junction tables
 - Preserves existing schema while adding supa-seed compatibility
 - Includes sample data and proper RLS policies
@@ -450,8 +472,8 @@ psql -h your-host -U postgres -d your_database -f schema.sql
 # Or apply minimal schema  
 psql -h your-host -U postgres -d your_database -f schema-minimal.sql
 
-# For Wildernest/Makerkit projects (adds missing tables to existing schema)
-psql -h your-host -U postgres -d your_database -f schema-wildernest.sql
+# For MakerKit projects (adds missing tables to existing schema)
+psql -h your-host -U postgres -d your_database -f schema-makerkit.sql
 
 # Via Supabase Dashboard
 # Copy and paste the contents of either file into the SQL editor

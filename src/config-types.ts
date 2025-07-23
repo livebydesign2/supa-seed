@@ -11,6 +11,8 @@ export interface FlexibleSeedConfig {
   enableRealImages: boolean;
   seed: string;
   emailDomain?: string;
+  domain?: string; // Domain configuration (generic, outdoor, ecommerce, saas, etc.)
+  createStandardTestEmails?: boolean; // Create MakerKit standard test emails (default: false)
   
   // Schema configuration
   schema: {

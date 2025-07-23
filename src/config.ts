@@ -51,6 +51,9 @@ export function loadConfiguration(configPath?: string): ConfigLoadResult {
         imagesPerSetup: flexConfig.imagesPerSetup,
         enableRealImages: flexConfig.enableRealImages,
         seed: flexConfig.seed,
+        emailDomain: flexConfig.emailDomain,
+        domain: flexConfig.domain,
+        createStandardTestEmails: flexConfig.createStandardTestEmails,
       };
       
       return {
@@ -90,6 +93,9 @@ function loadFromEnvironment(): ConfigLoadResult {
       imagesPerSetup: 3,
       enableRealImages: false,
       seed: 'supa-seed-2025',
+      emailDomain: 'supaseed.test',
+      domain: undefined,
+      createStandardTestEmails: false,
     };
     
     return {
@@ -110,6 +116,8 @@ function loadFromEnvironment(): ConfigLoadResult {
     enableRealImages: process.env.SUPA_SEED_ENABLE_REAL_IMAGES === 'true',
     seed: process.env.SUPA_SEED_SEED_VALUE || 'supa-seed-2025',
     emailDomain: process.env.SUPA_SEED_EMAIL_DOMAIN || 'supaseed.test',
+    domain: process.env.SUPA_SEED_DOMAIN,
+    createStandardTestEmails: process.env.SUPA_SEED_CREATE_STANDARD_EMAILS === 'true',
   };
   
   return {

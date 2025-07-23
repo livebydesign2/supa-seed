@@ -209,43 +209,44 @@ export class ConfigManager {
       data: {
         categories: [
           {
-            name: 'Overlanding',
-            description: 'Vehicle-dependent travel and camping',
-            icon: '🚛',
-            color: '#ef4444'
-          },
-          {
-            name: 'Backpacking',
-            description: 'Multi-day hiking with overnight camping',
-            icon: '🎒',
+            name: 'Primary',
+            description: 'Main category items',
+            icon: '⭐',
             color: '#22c55e'
           },
           {
-            name: 'Car Camping',
-            description: 'Vehicle-based camping adventures',
-            icon: '🚗',
+            name: 'Secondary',
+            description: 'Supporting items',
+            icon: '📋',
             color: '#3b82f6'
           },
           {
-            name: 'Day Hiking',
-            description: 'Single-day trail adventures',
-            icon: '🥾',
+            name: 'Tools',
+            description: 'Tools and utilities',
+            icon: '🔧',
             color: '#f59e0b'
+          },
+          {
+            name: 'Resources',
+            description: 'Resources and materials',
+            icon: '📚',
+            color: '#ef4444'
           }
         ],
         baseTemplates: [
           {
-            type: 'Vehicle',
-            make: 'Toyota',
-            model: '4Runner',
-            year: 2023,
-            description: 'Reliable mid-size SUV for overlanding'
+            type: 'Project',
+            make: 'Standard',
+            model: 'Basic',
+            year: undefined,
+            description: 'Standard project template'
           },
           {
-            type: 'Backpack',
-            make: 'Osprey',
-            model: 'Atmos AG 65',
-            description: '65L backpacking pack with anti-gravity suspension'
+            type: 'Collection',
+            make: 'Essential',
+            model: 'Starter',
+            year: undefined,
+            description: 'Essential starter collection template'
           }
         ]
       }

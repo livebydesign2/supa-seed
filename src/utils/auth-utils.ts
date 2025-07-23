@@ -34,7 +34,27 @@ export function generateTestEmail(username: string, domain: string = 'supaseed.t
 }
 
 /**
- * Generate realistic usernames for outdoor enthusiasts
+ * Generate realistic usernames based on domain configuration
+ */
+export function generateUsername(
+  firstName: string, 
+  lastName: string, 
+  suffixes: string[] = ['user', 'member', 'pro', 'fan', 'creator']
+): string {
+  const formats = [
+    `${firstName.toLowerCase()}_${suffixes[Math.floor(Math.random() * suffixes.length)]}`,
+    `${lastName.toLowerCase()}_${suffixes[Math.floor(Math.random() * suffixes.length)]}`,
+    `${firstName.toLowerCase()}${lastName.charAt(0).toLowerCase()}_${Math.floor(Math.random() * 99)}`,
+    `${firstName.charAt(0).toLowerCase()}${lastName.toLowerCase()}_${suffixes[0]}`,
+    `${firstName.toLowerCase()}_${Math.floor(Math.random() * 999)}`,
+  ];
+  
+  return formats[Math.floor(Math.random() * formats.length)];
+}
+
+/**
+ * Legacy function for backward compatibility
+ * @deprecated Use generateUsername instead
  */
 export function generateOutdoorUsername(firstName: string, lastName: string): string {
   const outdoorSuffixes = [
@@ -42,14 +62,5 @@ export function generateOutdoorUsername(firstName: string, lastName: string): st
     'camper', 'backpacker', 'outdoors', 'trails', 'peaks',
     'wild', 'summit', 'trek', 'journey', 'roam'
   ];
-  
-  const formats = [
-    `${firstName.toLowerCase()}_${outdoorSuffixes[Math.floor(Math.random() * outdoorSuffixes.length)]}`,
-    `${lastName.toLowerCase()}_${outdoorSuffixes[Math.floor(Math.random() * outdoorSuffixes.length)]}`,
-    `${firstName.toLowerCase()}${lastName.charAt(0).toLowerCase()}_${Math.floor(Math.random() * 99)}`,
-    `${firstName.charAt(0).toLowerCase()}${lastName.toLowerCase()}_outdoors`,
-    `${firstName.toLowerCase()}_adventures`,
-  ];
-  
-  return formats[Math.floor(Math.random() * formats.length)];
+  return generateUsername(firstName, lastName, outdoorSuffixes);
 } 

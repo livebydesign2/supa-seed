@@ -1,8 +1,15 @@
 import { SeedModule, CachedUser, CachedBaseTemplate, CachedSetup } from '../types';
 import { SchemaAdapter } from '../schema-adapter';
+import { getDomainConfig } from '../domains';
 
 export class SetupSeeder extends SeedModule {
-  private setupTypes: Record<string, string[]> = {
+  private getSetupTypes(): Record<string, string[]> {
+    const domainConfig = getDomainConfig(this.context.config.domain);
+    return domainConfig.setupTypes;
+  }
+
+  // Legacy outdoor setup types for backward compatibility
+  private outdoorSetupTypes: Record<string, string[]> = {
     'Vehicle': [
       'Weekend Car Camping',
       'Extended Overland Trip',
@@ -81,7 +88,8 @@ export class SetupSeeder extends SeedModule {
     
     if (templates && templates.length > 0) {
       template = faker.helpers.arrayElement(templates);
-      const setupTypes = this.setupTypes[template.type] || [];
+      const domainSetupTypes = this.getSetupTypes();
+      const setupTypes = domainSetupTypes[template.type] || [];
       if (setupTypes.length === 0) {
         console.warn(`⚠️  No setup types found for template type: ${template.type}`);
         return null;
@@ -89,15 +97,17 @@ export class SetupSeeder extends SeedModule {
       setupCategory = faker.helpers.arrayElement(setupTypes);
     } else {
       // Create a generic setup without templates
+      const domainSetupTypes = this.getSetupTypes();
+      const allSetupTypes = Object.values(domainSetupTypes).flat();
       template = {
         id: '',
         type: 'General',
         make: '',
         model: '',
       };
-      setupCategory = faker.helpers.arrayElement([
-        'Adventure Kit', 'Travel Setup', 'Outdoor Essentials', 'Exploration Gear'
-      ]);
+      setupCategory = faker.helpers.arrayElement(
+        allSetupTypes.length > 0 ? allSetupTypes : ['Adventure Kit', 'Travel Setup', 'Outdoor Essentials', 'Exploration Gear']
+      );
     }
     
     // Generate contextual title and description
@@ -151,19 +161,25 @@ export class SetupSeeder extends SeedModule {
 
   private generateSetupTitle(template: CachedBaseTemplate, category: string): string {
     const { faker } = this.context;
+    const domainConfig = getDomainConfig(this.context.config.domain);
     
-    const descriptors: Record<string, string[]> = {
+    // Use domain-specific descriptors or fallback to generic ones
+    const descriptors: Record<string, string[]> = domainConfig.titleDescriptors || {
       'Vehicle': [
-        'Overland', 'Adventure', 'Expedition', 'Journey', 'Explorer',
-        'Wanderer', 'Nomad', 'Trail', 'Backcountry', 'Wilderness'
+        'Custom', 'Professional', 'Complete', 'Premium', 'Essential',
+        'Advanced', 'Standard', 'Optimized', 'Versatile', 'Reliable'
       ],
       'Backpack': [
-        'Minimalist', 'Ultralight', 'Essential', 'Complete', 'Tested',
-        'Proven', 'Reliable', 'Compact', 'Versatile', 'Optimized'
+        'Essential', 'Complete', 'Tested', 'Proven', 'Reliable', 
+        'Compact', 'Versatile', 'Optimized', 'Professional', 'Premium'
+      ],
+      'General': [
+        'Custom', 'Professional', 'Complete', 'Essential', 'Advanced',
+        'Standard', 'Optimized', 'Versatile', 'Reliable', 'Premium'
       ]
     };
 
-    const templateDescriptors = descriptors[template.type] || ['Custom'];
+    const templateDescriptors = descriptors[template.type] || descriptors['General'] || ['Custom'];
     const desc = faker.helpers.arrayElement(templateDescriptors);
     const year = template.year || '';
     
@@ -176,29 +192,30 @@ export class SetupSeeder extends SeedModule {
 
   private generateSetupDescription(template: CachedBaseTemplate, category: string): string {
     const { faker } = this.context;
+    const domainConfig = getDomainConfig(this.context.config.domain);
     
-    const experiences = [
-      'after several seasons of testing',
-      'refined through multiple adventures',
-      'proven on countless trips',
-      'optimized for reliability and comfort',
-      'developed through trial and error',
-      'battle-tested in various conditions'
+    // Use domain-specific descriptions or fallback to generic ones
+    const experiences = domainConfig.experiences || [
+      'after extensive testing',
+      'refined through regular use',
+      'proven through experience',
+      'optimized for reliability',
+      'developed through practice',
+      'tested in various conditions'
     ];
 
-    const terrains = [
-      'mountain trails', 'desert landscapes', 'forest backroads', 
-      'coastal routes', 'alpine environments', 'wilderness areas',
-      'national parks', 'backcountry locations'
+    const contexts = domainConfig.contexts || [
+      'different environments', 'various situations', 'multiple contexts',
+      'diverse conditions', 'real-world scenarios', 'practical applications'
     ];
 
     const experience = faker.helpers.arrayElement(experiences);
-    const terrain = faker.helpers.arrayElement(terrains);
+    const context = faker.helpers.arrayElement(contexts);
     
     if (template.type === 'Vehicle' && template.make && template.model) {
-      return `My ${template.make} ${template.model} setup for ${category.toLowerCase()}, ${experience}. Perfect for exploring ${terrain} and handling whatever adventure throws your way. This build focuses on reliability, comfort, and versatility.`;
+      return `My ${template.make} ${template.model} setup for ${category.toLowerCase()}, ${experience}. Perfect for ${context} and handling whatever comes your way. This build focuses on reliability, comfort, and versatility.`;
     } else {
-      return `A carefully curated ${category.toLowerCase()} kit ${experience}. This loadout has served me well across ${terrain} and various weather conditions. Every item has earned its place through real-world use.`;
+      return `A carefully curated ${category.toLowerCase()} kit ${experience}. This setup has served me well across ${context}. Every item has earned its place through real-world use.`;
     }
   }
 } 

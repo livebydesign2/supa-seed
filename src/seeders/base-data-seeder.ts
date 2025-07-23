@@ -1,29 +1,20 @@
 import { BaseSeeder } from './base-seeder';
 import { Logger } from '../utils/logger';
+import { getDomainConfig } from '../domains';
 
 export class BaseDataSeeder extends BaseSeeder {
   async seed(): Promise<void> {
     console.log('🗂️  Seeding base data...');
     
-    await this.seedGearCategories();
+    await this.seedCategories();
     await this.seedBaseTemplates();
     
     console.log('✅ Base data seeding complete');
   }
 
-  private async seedGearCategories(): Promise<void> {
-    const categories = [
-      { name: 'Shelter', description: 'Tents, tarps, and protective gear' },
-      { name: 'Sleep System', description: 'Sleeping bags, pads, and comfort items' },
-      { name: 'Cooking', description: 'Stoves, cookware, and food preparation' },
-      { name: 'Navigation', description: 'Maps, compass, GPS, and wayfinding tools' },
-      { name: 'Safety', description: 'First aid, emergency, and safety equipment' },
-      { name: 'Clothing', description: 'Base layers, shells, and outdoor apparel' },
-      { name: 'Electronics', description: 'Lights, batteries, communication devices' },
-      { name: 'Tools', description: 'Knives, multi-tools, and utility items' },
-      { name: 'Hydration', description: 'Water bottles, filters, and treatment' },
-      { name: 'Vehicle', description: 'Overland and camping vehicle modifications' },
-    ];
+  private async seedCategories(): Promise<void> {
+    const domainConfig = getDomainConfig(this.context.config.domain);
+    const categories = domainConfig.categories;
 
     await this.seedWithFallback(
       async () => {
@@ -184,5 +175,48 @@ export class BaseDataSeeder extends BaseSeeder {
     if (!this.context.cache.has('baseTemplates')) {
       this.context.cache.set('baseTemplates', []);
     }
+  }
+
+  /**
+   * Legacy function for backward compatibility
+   * @deprecated Use seedCategories instead
+   */
+  private async seedGearCategories(): Promise<void> {
+    const categories = [
+      { name: 'Shelter', description: 'Tents, tarps, and protective gear' },
+      { name: 'Sleep System', description: 'Sleeping bags, pads, and comfort items' },
+      { name: 'Cooking', description: 'Stoves, cookware, and food preparation' },
+      { name: 'Navigation', description: 'Maps, compass, GPS, and wayfinding tools' },
+      { name: 'Safety', description: 'First aid, emergency, and safety equipment' },
+      { name: 'Clothing', description: 'Base layers, shells, and outdoor apparel' },
+      { name: 'Electronics', description: 'Lights, batteries, communication devices' },
+      { name: 'Tools', description: 'Knives, multi-tools, and utility items' },
+      { name: 'Hydration', description: 'Water bottles, filters, and treatment' },
+      { name: 'Vehicle', description: 'Overland and camping vehicle modifications' },
+    ];
+    
+    // Use the main seedCategories logic but with hardcoded categories
+    await this.seedWithFallback(
+      async () => {
+        const { client } = this.context;
+        const { data: existingCategories, error: selectError } = await client
+          .from('categories')
+          .select('name');
+        if (selectError) {
+          throw new Error(`Failed to check existing categories: ${selectError.message}`);
+        }
+        const existingNames = new Set(existingCategories?.map(c => c.name) || []);
+        const newCategories = categories.filter(cat => !existingNames.has(cat.name));
+        if (newCategories.length > 0) {
+          const { error: insertError } = await client.from('categories').insert(newCategories);
+          if (insertError) throw insertError;
+          Logger.complete(`Created ${newCategories.length} categories`);
+        } else {
+          Logger.info('Categories already exist, skipping');
+        }
+      },
+      'categories',
+      'Categories are optional for basic seeding'
+    );
   }
 } 

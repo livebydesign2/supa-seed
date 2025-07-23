@@ -1,5 +1,5 @@
--- Enhanced Schema for Wildernest/Makerkit Compatibility
--- This schema adds the missing tables needed for supa-seed to work with existing Wildernest projects
+-- Enhanced Schema for MakerKit Compatibility
+-- This schema adds the missing tables needed for supa-seed to work with existing MakerKit projects
 
 -- =====================================================
 -- MISSING TABLES FOR SUPA-SEED COMPATIBILITY
@@ -240,23 +240,19 @@ CREATE POLICY IF NOT EXISTS "profile_images_upload" ON storage.objects
 -- SAMPLE DATA
 -- =====================================================
 
--- Insert default categories
+-- Insert sample categories (customize for your domain)
 INSERT INTO public.categories (name, description, icon, color) VALUES 
-    ('Backpacking', 'Multi-day hiking with overnight camping', '🎒', '#22c55e'),
-    ('Car Camping', 'Vehicle-based camping adventures', '🚗', '#3b82f6'),
-    ('Day Hiking', 'Single-day trail adventures', '🥾', '#f59e0b'),
-    ('Overlanding', 'Vehicle-dependent travel and camping', '🚛', '#ef4444'),
-    ('Ultralight', 'Minimalist backpacking approach', '⚖️', '#8b5cf6'),
-    ('Photography', 'Outdoor photography expeditions', '📸', '#ec4899'),
-    ('Rock Climbing', 'Climbing gear and equipment', '🧗', '#f97316'),
-    ('Winter Sports', 'Cold weather outdoor activities', '❄️', '#06b6d4')
+    ('Primary', 'Main category items', '⭐', '#22c55e'),
+    ('Secondary', 'Supporting items', '📋', '#3b82f6'),
+    ('Tools', 'Tools and utilities', '🔧', '#f59e0b'),
+    ('Resources', 'Resources and materials', '📚', '#ef4444'),
+    ('Documentation', 'Guides and documentation', '📝', '#8b5cf6')
 ON CONFLICT (name) DO NOTHING;
 
--- Insert sample base templates
+-- Insert sample base templates (customize for your domain)
 INSERT INTO public.base_templates (type, make, model, year, description) VALUES 
-    ('Vehicle', 'Toyota', '4Runner', 2020, 'Reliable mid-size SUV for overlanding'),
-    ('Vehicle', 'Subaru', 'Outback', 2021, 'All-weather adventure wagon'),
-    ('Backpack', 'Osprey', 'Atmos AG 65', NULL, '65L backpacking pack with anti-gravity suspension'),
-    ('Backpack', 'Gregory', 'Baltoro 65', NULL, '65L expedition backpack'),
-    ('Backpack', 'Zpacks', 'Arc Blast', NULL, 'Ultralight 60L backpack')
+    ('Project', 'Standard', 'Basic', NULL, 'Standard project template'),
+    ('Project', 'Premium', 'Advanced', NULL, 'Advanced project template'),
+    ('Collection', 'Starter', 'Essential', NULL, 'Essential collection template'),
+    ('Collection', 'Professional', 'Complete', NULL, 'Complete collection template')
 ON CONFLICT DO NOTHING;
