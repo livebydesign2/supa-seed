@@ -1,260 +1,177 @@
-# 🌱 Supa Seed
+# 🌱 Supa-Seed v2.0.0
 
-A modern TypeScript-based database seeding framework for Supabase projects that generates realistic, contextual test data with smart image management.
+**Enterprise-Grade Hybrid Database Seeding Platform for Supabase**
 
-## Features
+Transform your database seeding from basic scripts into an intelligent, production-ready platform with AI integration, advanced asset management, and enterprise monitoring.
 
-- **🎯 Realistic Fake Data**: Uses Faker.js to generate contextual user profiles and content
-- **🖼️ Smart Image Management**: Handles image generation/download with Supabase Storage integration
-- **🔄 Dependency-Aware**: Automatically manages data dependencies and execution order
-- **🎛️ Configurable**: Multiple seeding profiles for different scenarios
-- **🧹 Clean-up Support**: Easy removal of seed data
-- **📊 Progress Tracking**: Real-time feedback and statistics
-- **🔒 Type-Safe**: Full TypeScript support with Supabase types
-- **📦 CLI & Library**: Use as command-line tool or import as library
-- **⚡ Robust Error Handling**: Automatic retry logic, graceful degradation, and comprehensive error reporting
-- **🛡️ Configuration Validation**: Built-in validation for environment variables and configuration
-- **🧪 Test Suite**: Comprehensive test coverage with Jest for reliability
-- **📋 Schema Management**: Complete SQL schema files for easy database setup
-- **🗄️ Schema Detection**: Automatic detection and adaptation to existing database schemas (Makerkit, custom profiles, etc.)
-- **⚙️ Configuration Override**: Force specific schema patterns and table mappings via configuration
-- **🔧 Flexible Field Mapping**: Support for different field names across various schema patterns
+[![npm version](https://img.shields.io/npm/v/supa-seed.svg)](https://www.npmjs.com/package/supa-seed)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-## Installation
+## 🚀 What's New in v2.0.0
+
+**Major Release**: Complete architectural transformation with 6-phase hybrid implementation:
+
+### 🎯 **Enterprise Features**
+- **🤖 AI Integration**: Local Ollama support with intelligent data generation
+- **📊 Performance Monitoring**: Real-time metrics and optimization
+- **🧠 Memory Management**: Automatic cleanup and intelligent resource management
+- **🛡️ Error Handling**: Advanced recovery with context and retry logic
+- **⚙️ Configuration Validation**: Built-in security and performance rules
+- **🖥️ Production CLI**: Professional interface with health checks
+
+### 🔧 **Advanced Capabilities**
+- **🎨 Asset Pool System**: Multi-format asset loading with 5 selection strategies
+- **🧩 Association Intelligence**: Smart distribution with constraint enforcement
+- **📈 Schema Evolution**: Automatic change detection with migration suggestions
+- **🔄 Graceful Degradation**: Circuit breakers for service reliability
+- **🎪 Template System**: Dynamic configuration with marketplace support
+
+## ⚡ Quick Start
+
+### **Local Supabase (Recommended for Development)**
 
 ```bash
-# Global installation for CLI usage
+# 1. Install globally
 npm install -g supa-seed
 
-# Or install as dev dependency in your project
-npm install --save-dev supa-seed
-```
+# 2. Start your local Supabase
+supabase start
 
-## Quick Start
+# 3. Set up schema
+psql -h localhost -U postgres -d postgres -f node_modules/supa-seed/schema.sql
 
-### 1. Database Schema Setup
+# 4. Configure environment
+echo "SUPABASE_URL=http://127.0.0.1:54321" > .env
+echo "SUPABASE_SERVICE_ROLE_KEY=your-service-key" >> .env
 
-First, set up your database schema using one of the provided SQL files:
-
-```bash
-# For complete setup with all optional tables
-psql -h localhost -U postgres -d your_database -f schema.sql
-
-# For minimal setup with only required tables
-psql -h localhost -U postgres -d your_database -f schema-minimal.sql
-```
-
-Or apply directly in your Supabase Dashboard's SQL editor.
-
-### 2. Environment Setup
-
-Create a `.env` file or set environment variables:
-
-```bash
-SUPABASE_URL=http://127.0.0.1:54321
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-# Optional: for real images
-UNSPLASH_ACCESS_KEY=your-unsplash-key
-```
-
-Copy `.env.example` to `.env` and fill in your values.
-
-### 3. Initialize Configuration
-
-```bash
-# Create a configuration file
-supa-seed init
-
-# Or with custom path
-supa-seed init --config-file my-config.json
-```
-
-### 4. Start Seeding
-
-```bash
-# Basic seeding (10 users, 3 setups each)
+# 5. Initialize and seed
+supa-seed init --env local
 supa-seed seed
-
-# Minimal data for quick testing
-supa-seed seed --users 3 --setups 1 --images 1
-
-# Comprehensive data for demos
-supa-seed seed --users 25 --setups 5 --images 5
-
-# With real images from Unsplash
-supa-seed seed --real-images
 ```
 
-### 5. Check Status & Cleanup
+### **Cloud Supabase (Production Ready)**
 
 ```bash
-# Check what data exists
-supa-seed status
+# 1. Install and configure
+npm install -g supa-seed
+supa-seed init --detect  # Auto-detects your schema
 
-# Clean up all seed data
-supa-seed cleanup --force
+# 2. Configure for production
+cat > .env << EOF
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+NODE_ENV=production
+EOF
+
+# 3. Run production seeding
+supa-seed seed --env production
 ```
 
-## Testing & Development
+## 🌟 Core Features
 
-### Running Tests
+### **🤖 AI-Powered Generation**
+```bash
+# Enable AI with local Ollama
+supa-seed ai status        # Check AI service
+supa-seed seed --ai        # AI-enhanced seeding
+```
+
+**Features:**
+- Local Ollama integration (privacy-first)
+- Domain-specific prompt engineering
+- Intelligent response caching
+- Graceful fallback to Faker.js
+
+### **📊 Performance Monitoring**
+```bash
+supa-seed analyze          # Performance analysis
+supa-seed status --detailed  # System health
+```
+
+**Built-in Monitoring:**
+- Real-time performance metrics
+- Memory usage tracking
+- Error rate monitoring
+- Export to Prometheus/JSON
+
+### **🎨 Advanced Asset Management**
+```bash
+# Configure asset strategies
+supa-seed templates list   # Available templates
+supa-seed seed --assets-strategy weighted
+```
+
+**5 Selection Strategies:**
+- `all` - Select all available assets
+- `random` - Random selection with seeding
+- `filtered` - Advanced filtering by metadata
+- `manual` - Specific asset selection
+- `weighted` - Priority-based selection
+
+### **🛡️ Production Hardening**
+```bash
+supa-seed health           # Comprehensive health check
+supa-seed memory status    # Memory management
+supa-seed validate-config  # Configuration validation
+```
+
+**Enterprise Features:**
+- Circuit breaker patterns
+- Automatic error recovery
+- Memory cleanup and optimization
+- Configuration security validation
+
+## 📋 Installation & Setup
+
+### **Prerequisites**
+- Node.js 16+ and npm
+- Supabase project (local or cloud)
+- PostgreSQL access
+
+### **Global Installation**
+```bash
+npm install -g supa-seed
+supa-seed --version  # Should show v2.0.0
+```
+
+### **Project Installation**
+```bash
+npm install --save-dev supa-seed
+npx supa-seed init
+```
+
+### **Schema Setup**
+
+Choose the appropriate schema for your project:
 
 ```bash
-# Run the test suite
-npm test
+# Basic schema (recommended for new projects)
+psql -f node_modules/supa-seed/schema.sql
 
-# Run tests in watch mode during development
-npm run test:watch
+# MakerKit v3 compatible schema
+psql -f node_modules/supa-seed/schema-makerkit.sql
 
-# Generate coverage report
-npm run test:coverage
+# Minimal schema (testing only)
+psql -f node_modules/supa-seed/schema-minimal.sql
 ```
 
-### Development Setup
+Or apply via Supabase Dashboard → SQL Editor.
 
+## 🎯 Configuration
+
+### **Interactive Setup (Recommended)**
 ```bash
-# Clone the repository
-git clone https://github.com/livebydesign2/supa-seed.git
-cd supa-seed
-
-# Install dependencies
-npm install
-
-# Build the project
-npm run build
-
-# Run development build (watches for changes)
-npm run dev
+supa-seed setup  # Interactive wizard
 ```
 
-## Error Handling & Reliability
-
-Supa Seed includes comprehensive error handling to ensure reliable operation:
-
-- **🔄 Automatic Retry Logic**: Failed operations are automatically retried with exponential backoff
-- **🛡️ Table Validation**: Checks if required tables exist before attempting operations
-- **⚠️ Graceful Degradation**: Continues with available functionality when optional features fail
-- **📝 Detailed Logging**: Comprehensive error reporting with context and suggestions
-- **🔍 Connection Monitoring**: Database health checks and connection validation
-- **🗄️ Schema Detection**: Automatically detects and adapts to different database schemas
-
-### Common Error Scenarios
-
-The framework automatically handles:
-- Missing database tables (skips gracefully)
-- Schema mismatches (detects and adapts)
-- Network connection issues (retries automatically)
-- Permission errors (provides clear feedback)
-- Rate limiting (backs off and retries)
-- Invalid configurations (validates before execution)
-
-### Troubleshooting Schema Issues
-
-**"No user tables detected" Warning:**
+### **Auto-Detection**
 ```bash
-⚠️  No user tables detected. You may need to:
-   1. Run the schema.sql file to create required tables
-   2. Or ensure your custom schema is compatible
-   3. Check your database permissions
-```
-**Solution:** Apply schema.sql or ensure your database has user tables (accounts/profiles)
-
-**"Database connection failed":**
-```bash
-❌ Database connection failed: [error details]
-```
-**Solution:** Check SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY environment variables
-
-**"Permission denied" Errors:**
-```bash
-❌ Database permissions error. Please ensure your SUPABASE_SERVICE_ROLE_KEY has permissions to:
-  • Create auth users (admin.createUser)
-  • Insert into user tables (accounts/profiles)  
-  • Access table schemas
-```
-**Solution:** Use the service role key (not anon key) and ensure RLS policies allow service role access
-
-## Usage
-
-### CLI Usage
-
-```bash
-# Seed with custom parameters
-supa-seed seed \
-  --users 15 \
-  --setups 4 \
-  --images 3 \
-  --real-images \
-  --env production
-
-# Initialize with custom config
-supa-seed init --config-file production.config.json
-
-# Clean up everything
-supa-seed cleanup --force
-
-# Check current status
-supa-seed status
+supa-seed init --detect  # Analyzes your database
 ```
 
-### Library Usage
+### **Manual Configuration**
 
-```typescript
-import { SupaSeedFramework, createDefaultConfig } from 'supa-seed';
-
-// Basic usage
-const config = createDefaultConfig({
-  userCount: 10,
-  setupsPerUser: 3,
-  imagesPerSetup: 2,
-  enableRealImages: false,
-});
-
-const seeder = new SupaSeedFramework(config);
-
-// Seed data
-await seeder.seed();
-
-// Check status
-await seeder.status();
-
-// Clean up
-await seeder.cleanup();
-```
-
-### Custom Seeders
-
-```typescript
-import { SeedModule, SeedContext } from 'supa-seed';
-
-export class CustomSeeder extends SeedModule {
-  async seed(): Promise<void> {
-    const { client, faker } = this.context;
-    
-    // Check if table exists before seeding
-    if (!(await this.checkTableExists('my_table'))) {
-      console.log('⚠️  Table my_table not found, skipping...');
-      return;
-    }
-    
-    // Your custom seeding logic with error handling
-    const result = await this.executeWithRetry(async () => {
-      return await client.from('my_table').insert({
-        name: faker.person.fullName(),
-        email: faker.internet.email(),
-      });
-    });
-    
-    if (!result) {
-      this.logWarning('Custom seeding', 'Failed to insert data after retries');
-    }
-  }
-}
-```
-
-## Configuration
-
-### Configuration File Structure
+Create `supa-seed.config.json`:
 
 ```json
 {
@@ -265,397 +182,372 @@ export class CustomSeeder extends SeedModule {
   "setupsPerUser": 3,
   "imagesPerSetup": 2,
   "enableRealImages": false,
-  "seed": "supa-seed-2025",
-  "emailDomain": "supaseed.test"
-}
-```
-
-### Advanced Configuration with Schema Override
-
-For complex schemas or when you need to override auto-detection, use the extended configuration format:
-
-```json
-{
-  "supabaseUrl": "http://127.0.0.1:54321",
-  "supabaseServiceKey": "your-service-role-key",
-  "environment": "local",
-  "userCount": 5,
-  "setupsPerUser": 2,
-  "imagesPerSetup": 1,
-  "enableRealImages": false,
-  "seed": "test-seed-2025",
-  "schema": {
-    "framework": "makerkit",
-    "primaryUserTable": "accounts",
-    "userTable": {
-      "name": "accounts",
-      "emailField": "email",
-      "idField": "id",
-      "nameField": "name",
-      "pictureField": "picture_url"
-    },
-    "setupsTable": {
-      "name": "setups", 
-      "userField": "account_id",
-      "titleField": "title",
-      "descriptionField": "description"
-    },
-    "optionalTables": {
-      "categories": false,
-      "baseTemplates": false,
-      "gearItems": false
-    }
+  "ai": {
+    "enabled": true,
+    "ollamaUrl": "http://localhost:11434",
+    "fallbackToFaker": true
+  },
+  "performance": {
+    "batchSize": 100,
+    "enableMonitoring": true,
+    "memoryLimit": 512
+  },
+  "assets": {
+    "selectionStrategy": "weighted",
+    "loadImages": true,
+    "loadMarkdown": true
   }
 }
 ```
 
-**Schema Configuration Options:**
+## 🖥️ CLI Commands
 
-- **`framework`** (`"makerkit" | "simple" | "custom"`): Override auto-detected framework type
-- **`primaryUserTable`** (`"accounts" | "profiles" | "users"`): Force which table to use for users
-- **`userTable`**: Configure field mappings for the user table
-- **`setupsTable`**: Configure field mappings for the setups/content table
-- **`optionalTables`**: Control which optional tables to seed
-
-This is especially useful for:
-- **Makerkit projects** where you want to use `accounts` instead of `profiles` as the primary user table
-- **Custom schemas** with non-standard field names
-- **Partial seeding** where you want to skip certain tables
-
-### ✅ Success Story: MakerKit Integration
-
-A real-world example of SupaSeed successfully adapting to a complex MakerKit-based project:
-
-**The Challenge:** A project using MakerKit's multi-tenant architecture had:
-- `accounts` table with `primary_owner_user_id` field (not standard `id`)
-- Missing optional tables (`categories`, `base_templates`)
-- Custom field names and constraints
-- Framework was auto-detecting `profiles` instead of `accounts` as primary table
-
-**The Solution:** Using configuration override, the framework now:
-- ✅ Correctly detects and uses `accounts` as primary user table
-- ✅ Handles MakerKit's `primary_owner_user_id` constraint properly  
-- ✅ Gracefully skips missing optional tables
-- ✅ Respects custom field mappings
-
-**Optimal Configuration for MakerKit Projects:**
-```json
-{
-  "supabaseUrl": "http://127.0.0.1:54321",
-  "supabaseServiceKey": "your-service-role-key",
-  "environment": "local",
-  "userCount": 3,
-  "setupsPerUser": 2,
-  "imagesPerSetup": 1,
-  "enableRealImages": false,
-  "seed": "makerkit-test-2025",
-  "emailDomain": "supaseed.test",
-  "createStandardTestEmails": true,
-  "schema": {
-    "framework": "makerkit",
-    "primaryUserTable": "accounts",
-    "userTable": {
-      "name": "accounts",
-      "emailField": "email",
-      "idField": "id", 
-      "nameField": "name",
-      "pictureField": "picture_url"
-    },
-    "setupsTable": {
-      "name": "setups",
-      "userField": "account_id",
-      "titleField": "title", 
-      "descriptionField": "description"
-    },
-    "optionalTables": {
-      "categories": false,
-      "baseTemplates": false,
-      "gearItems": true
-    }
-  }
-}
-```
-
-**Result:** Framework now works seamlessly with complex production schemas!
-
-### 🧪 Standard MakerKit Test Emails
-
-For MakerKit projects, the framework can automatically create standard test email accounts that match the official MakerKit seed data:
-
-```json
-{
-  "createStandardTestEmails": true
-}
-```
-
-**Created Test Accounts:**
-- `test@makerkit.dev` - Test User (admin role)
-- `custom@makerkit.dev` - Custom User (custom role)  
-- `owner@makerkit.dev` - Owner User (owner role)
-- `member@makerkit.dev` - Member User (member role)
-- `super-admin@makerkit.dev` - Super Admin (super-admin role)
-
-These accounts are created in addition to your regular generated users and provide consistent test credentials across different environments.
-
-### Environment Variables
-
-- `SUPABASE_URL` - Your Supabase project URL
-- `SUPABASE_SERVICE_ROLE_KEY` - Service role key (required)
-- `UNSPLASH_ACCESS_KEY` - Unsplash API key (optional, for real images)
-- `NODE_ENV` - Environment (`local`|`staging`|`production`)
-- `SUPA_SEED_EMAIL_DOMAIN` - Domain for test emails (optional, default: supaseed.test)
-- `SUPA_SEED_DOMAIN` - Domain configuration (optional: generic, outdoor, ecommerce, saas)
-- `SUPA_SEED_CREATE_STANDARD_EMAILS` - Create MakerKit standard test emails (optional, default: false)
-
-## Built-in Seeders
-
-The framework includes several pre-built seeders with robust error handling:
-
-1. **AuthSeeder** - Sets up authentication and validates user creation capabilities
-2. **BaseDataSeeder** - Creates foundational data and categories with table existence checks
-3. **UserSeeder** - Generates realistic user profiles with automatic retry logic
-4. **GearSeeder** - Seeds professional gear database with graceful degradation
-5. **SetupSeeder** - Creates contextual gear configurations with dependency validation
-6. **MediaSeeder** - Handles image generation and upload with fallback mechanisms
-
-Each seeder includes:
-- ✅ Table existence validation before operations
-- ✅ Automatic retry logic for transient failures  
-- ✅ Graceful handling of missing dependencies
-- ✅ Comprehensive error logging and reporting
-- ✅ Rollback capabilities for failed operations
-
-## Database Schema Setup
-
-Supa Seed now supports multiple database schema patterns and automatically detects your schema type for compatibility.
-
-### Supported Schema Types
-
-**1. Simple Schema (schema.sql / schema-minimal.sql)**
-- Basic `accounts`, `categories`, `setups` tables
-- Direct foreign key relationships
-- Ideal for simple projects
-
-**1a. MakerKit Schema (schema-makerkit.sql)**
-- Compatible with existing MakerKit/complex multi-tenant projects
-- Adds missing tables: `categories`, `gear_items`, `base_templates`, junction tables
-- Preserves existing schema while adding supa-seed compatibility
-- Includes sample data and proper RLS policies
-
-**2. Makerkit Schema (Multi-tenant SaaS)**
-- Uses `auth.users` + `profiles` pattern  
-- Team/account-based multi-tenancy
-- Automatic detection and adaptation
-
-**3. Custom Profiles Schema**
-- Uses `auth.users` + `profiles` tables
-- Single-tenant with user profiles
-- Flexible for custom implementations
-
-### Automatic Schema Detection
-
-Supa Seed automatically detects your database schema and adapts:
-
-```typescript
-// The framework automatically detects and uses the right strategy
-const seeder = new SupaSeedFramework(config);
-await seeder.seed(); // Works with any supported schema
-```
-
-### Schema Installation Options
-
-**Option 1: Use Provided Schema**
+### **Core Commands**
 ```bash
-# Apply complete schema
-psql -h your-host -U postgres -d your_database -f schema.sql
-
-# Or apply minimal schema  
-psql -h your-host -U postgres -d your_database -f schema-minimal.sql
-
-# For MakerKit projects (adds missing tables to existing schema)
-psql -h your-host -U postgres -d your_database -f schema-makerkit.sql
-
-# Via Supabase Dashboard
-# Copy and paste the contents of either file into the SQL editor
+supa-seed seed              # Run seeding process
+supa-seed cleanup           # Remove all seed data
+supa-seed status            # System status
+supa-seed health            # Health check
 ```
 
-**Option 2: Use Your Existing Schema**
+### **Configuration**
 ```bash
-# Supa Seed will detect and adapt to your existing schema
-# No schema changes required if you have:
-# - User tables (accounts, profiles, or custom)
-# - Basic content tables (setups, posts, etc.)
-supa-seed seed # Automatically detects schema
+supa-seed init              # Initialize configuration
+supa-seed setup             # Interactive setup wizard
+supa-seed detect            # Analyze database schema
+supa-seed validate-config   # Validate configuration
 ```
 
-### Schema Compatibility Requirements
-
-**Minimum Requirements:**
-- At least one user table (`accounts`, `profiles`, etc.)
-- Supabase auth enabled
-- Service role key with appropriate permissions
-
-**Recommended Tables:**
-- User profiles: `accounts` or `profiles`  
-- Content: `setups`, `posts`, or similar
-- Categories: `categories` or `tags`
-
-### Required Tables (Minimal)
-
-For basic functionality, you need these tables:
-
-```sql
--- User accounts
-CREATE TABLE accounts (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  email VARCHAR(255) UNIQUE NOT NULL,
-  name VARCHAR(255),
-  username VARCHAR(100) UNIQUE,
-  bio TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Content categories  
-CREATE TABLE categories (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  name VARCHAR(255) NOT NULL UNIQUE,
-  description TEXT
-);
-
--- User setups/content
-CREATE TABLE setups (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
-  title VARCHAR(255) NOT NULL,
-  description TEXT,
-  category VARCHAR(100),
-  is_public BOOLEAN DEFAULT true,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
+### **AI Management**
+```bash
+supa-seed ai status         # Check AI service
+supa-seed ai test           # Test AI connectivity
 ```
 
-### Optional Tables (Complete Schema)
-
-The complete schema includes additional tables for advanced features:
-
-- **gear_items** - Product/gear database with specifications
-- **setup_gear_items** - Many-to-many relationships between setups and gear
-- **base_templates** - Reusable templates (vehicles, backpacks, etc.)
-- **setup_base_templates** - Template associations
-
-See `schema.sql` for complete table definitions with proper indexes, constraints, and RLS policies.
-
-## Image Management
-
-### Placeholder Images
-
-By default, Supa Seed generates colored placeholder images:
-
-```typescript
-const config = createDefaultConfig({
-  enableRealImages: false,  // Use placeholders
-  imagesPerSetup: 3,
-});
+### **Performance & Monitoring**
+```bash
+supa-seed analyze           # Performance analysis
+supa-seed memory status     # Memory usage
+supa-seed memory cleanup    # Force cleanup
+supa-seed export --type metrics  # Export metrics
 ```
 
-### Real Images (Unsplash)
+### **Templates**
+```bash
+supa-seed templates list    # Available templates
+supa-seed templates validate # Validate all templates
+```
 
-Enable real images with an Unsplash API key:
+## 🎪 Advanced Usage
+
+### **Environment-Specific Seeding**
 
 ```bash
-export UNSPLASH_ACCESS_KEY=your-api-key
+# Development (small datasets)
+supa-seed seed --env local --users 5
+
+# Staging (medium datasets)  
+supa-seed seed --env staging --users 25
+
+# Production (large datasets)
+supa-seed seed --env production --users 100
 ```
 
-```typescript
-const config = createDefaultConfig({
-  enableRealImages: true,   // Use real images
-  imagesPerSetup: 3,
-});
+### **AI-Enhanced Seeding**
+
+```bash
+# Install and start Ollama locally
+curl -fsSL https://ollama.ai/install.sh | sh
+ollama serve
+ollama pull llama3.1:latest
+
+# Enable AI seeding
+supa-seed seed --ai --fallback
 ```
 
-### Custom Image Sources
+### **Asset Integration**
 
-Extend the MediaSeeder for custom image sources:
+```bash
+# Create assets directory
+mkdir -p assets/{images,markdown,json}
 
-```typescript
-import { MediaSeeder } from 'supa-seed';
+# Add your assets
+cp *.jpg assets/images/
+cp *.md assets/markdown/
+cp *.json assets/json/
 
-export class CustomMediaSeeder extends MediaSeeder {
-  async generateImage(category: string): Promise<Buffer> {
-    // Your custom image generation logic
-    // Could integrate with DALL-E, Midjourney, local files, etc.
-  }
-}
+# Run with asset integration
+supa-seed seed --assets-strategy filtered
 ```
 
-## Examples
+### **Schema Evolution**
 
-### Basic E-commerce Seeding
+```bash
+# Detect schema changes
+supa-seed detect --verbose
 
+# Interactive configuration updates
+supa-seed seed --interactive
+```
+
+## 🔧 Library Usage
+
+### **Basic Usage**
 ```typescript
 import { SupaSeedFramework, createDefaultConfig } from 'supa-seed';
 
 const config = createDefaultConfig({
-  userCount: 50,
-  setupsPerUser: 5,
-  imagesPerSetup: 4,
-  enableRealImages: true,
-  seed: 'ecommerce-demo-2025',
+  supabaseUrl: 'http://127.0.0.1:54321',
+  supabaseServiceKey: 'your-key',
+  environment: 'local'
 });
 
 const seeder = new SupaSeedFramework(config);
 await seeder.seed();
 ```
 
-### Development Environment
-
+### **With AI Integration**
 ```typescript
-// Quick setup for development
-const devConfig = createDefaultConfig({
-  userCount: 5,
-  setupsPerUser: 2,  
-  imagesPerSetup: 1,
-  enableRealImages: false,
-});
+import { SupaSeedFramework } from 'supa-seed';
+import { AIAssetGenerator } from 'supa-seed/ai';
 
-const seeder = new SupaSeedFramework(devConfig);
-await seeder.seed();
+const seeder = new SupaSeedFramework(config);
+const aiGenerator = new AIAssetGenerator();
+
+// AI-enhanced seeding
+const result = await aiGenerator.generateSeedData(
+  'users', 
+  10, 
+  { domain: 'saas', style: 'professional' }
+);
 ```
 
-### Production Demo Data
-
+### **With Performance Monitoring**
 ```typescript
-// High-quality demo data
-const demoConfig = createDefaultConfig({
-  userCount: 25,
-  setupsPerUser: 4,
-  imagesPerSetup: 5,
-  enableRealImages: true,
-  environment: 'production',
-});
+import { PerformanceMonitor, withPerformanceMonitoring } from 'supa-seed/utils';
 
-const seeder = new SupaSeedFramework(demoConfig);
-await seeder.seed();
+PerformanceMonitor.initialize();
+
+await withPerformanceMonitoring(
+  () => seeder.seed(),
+  'seeding',
+  'main_operation'
+);
+
+const stats = PerformanceMonitor.getPerformanceStats();
+console.log(`Average response time: ${stats.averageResponseTime}ms`);
 ```
 
-## Contributing
+## 🛡️ Production Features
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+### **Error Handling & Recovery**
+- Automatic retry with exponential backoff
+- Circuit breaker patterns for external services
+- Comprehensive error context and suggestions
+- Graceful degradation when services unavailable
 
-## License
+### **Performance Optimization**
+- Real-time performance monitoring
+- Memory usage tracking and cleanup
+- Batch processing with configurable sizes
+- Resource usage optimization
+
+### **Security & Validation**
+- Configuration validation with security rules
+- Environment-specific validation (dev vs prod)
+- Service key validation and rotation support
+- SQL injection prevention
+
+### **Monitoring & Observability**
+- Performance metrics export (Prometheus/JSON)
+- Health checks and system status
+- Memory management with cleanup recommendations
+- Service dependency monitoring
+
+## 🔍 Troubleshooting
+
+### **Common Issues**
+
+**"AI service unavailable"**
+```bash
+# Check Ollama status
+supa-seed ai status
+
+# Start Ollama if needed
+ollama serve
+
+# Test with fallback enabled
+supa-seed seed --ai --fallback
+```
+
+**"Memory usage high"**
+```bash
+# Check memory status
+supa-seed memory status
+
+# Force cleanup
+supa-seed memory cleanup
+
+# Adjust memory limits
+supa-seed seed --memory-limit 1024
+```
+
+**"Configuration invalid"**
+```bash
+# Validate configuration
+supa-seed validate-config --strict
+
+# Fix with interactive setup
+supa-seed setup
+```
+
+**"Database connection failed"**
+```bash
+# Check service health
+supa-seed health
+
+# Test database connectivity
+supa-seed detect --verbose
+
+# Verify credentials
+echo $SUPABASE_URL
+echo $SUPABASE_SERVICE_ROLE_KEY
+```
+
+### **Performance Issues**
+
+**Slow seeding performance:**
+```bash
+# Analyze performance
+supa-seed analyze
+
+# Reduce batch size
+supa-seed seed --batch-size 50
+
+# Monitor memory usage
+supa-seed memory status
+```
+
+**High memory usage:**
+```bash
+# Enable memory monitoring
+supa-seed seed --memory-limit 512
+
+# Force garbage collection
+supa-seed memory cleanup
+
+# Use smaller datasets for development
+supa-seed seed --env local
+```
+
+### **Debugging**
+
+Enable verbose logging:
+```bash
+supa-seed seed --verbose
+supa-seed health --detailed
+supa-seed analyze --export json > debug.json
+```
+
+## 📊 Schema Support
+
+### **Supported Frameworks**
+- ✅ **MakerKit v1/v2/v3** - Full compatibility with automatic detection
+- ✅ **Custom Supabase** - Works with any PostgreSQL schema
+- ✅ **Simple Profiles** - Basic user/profile patterns
+- ✅ **Wildernest Style** - Outdoor platform schemas
+
+### **Auto-Detection**
+The framework automatically detects:
+- MakerKit version and configuration
+- Custom table structures
+- Relationship patterns
+- Asset compatibility
+- Required migrations
+
+### **Schema Evolution**
+- Automatic change detection
+- Migration suggestions
+- Interactive configuration updates
+- Backup and rollback support
+
+## 🌐 Environment Configuration
+
+### **Local Development**
+```bash
+# .env.local
+SUPABASE_URL=http://127.0.0.1:54321
+SUPABASE_SERVICE_ROLE_KEY=your-local-key
+NODE_ENV=local
+```
+
+### **Staging**
+```bash
+# .env.staging  
+SUPABASE_URL=https://staging-project.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your-staging-key
+NODE_ENV=staging
+```
+
+### **Production**
+```bash
+# .env.production
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your-production-key
+NODE_ENV=production
+```
+
+## 🤝 Contributing
+
+We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+### **Development Setup**
+```bash
+git clone https://github.com/livebydesign2/supa-seed.git
+cd supa-seed
+npm install
+npm run build
+npm test
+```
+
+### **Running Tests**
+```bash
+npm test                    # All tests
+npm run test:unit          # Unit tests only
+npm run test:integration   # Integration tests
+npm run test:coverage      # Coverage report
+```
+
+## 📈 Roadmap
+
+### **v2.1.0 - Enhanced AI**
+- Multiple AI provider support (OpenAI, Anthropic)
+- Custom prompt templates
+- AI model fine-tuning support
+
+### **v2.2.0 - Advanced Analytics**
+- Database performance analytics
+- Seeding impact analysis
+- Custom metrics and dashboards
+
+### **v2.3.0 - Enterprise Features**
+- RBAC and team collaboration
+- Audit logging and compliance
+- Advanced security features
+
+## 📄 License
 
 MIT License - see the [LICENSE](LICENSE) file for details.
 
-## Support
+## 🙏 Acknowledgments
 
-- 🐛 [Report bugs](https://github.com/livebydesign2/supa-seed/issues)
-- 💡 [Request features](https://github.com/livebydesign2/supa-seed/issues)
-- 📖 [Documentation](https://github.com/livebydesign2/supa-seed#readme)
+- Built with ❤️ for the Supabase community
+- Powered by Faker.js for realistic data generation
+- AI features supported by Ollama for privacy-first intelligence
+- Inspired by the needs of modern full-stack development
 
 ---
 
-Made with ❤️ for the Supabase community 
+**Made by developers, for developers. Transform your database seeding experience with supa-seed v2.0.0.**
+
+🌱 **Happy Seeding!**
