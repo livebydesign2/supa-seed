@@ -13,6 +13,30 @@ export interface SchemaInfo {
   hasOrganizations: boolean;
   accountsTableStructure: 'simple' | 'makerkit' | 'custom';
   primaryUserTable: 'accounts' | 'profiles' | 'users';
+  // Enhanced detection fields
+  makerkitVersion: 'v1' | 'v2' | 'v3' | 'custom' | 'none';
+  customTables: string[];
+  detectedRelationships: TableRelationship[];
+  assetCompatibility: AssetCompatibilityInfo;
+  frameworkType: 'makerkit' | 'simple' | 'wildernest' | 'custom';
+}
+
+export interface TableRelationship {
+  fromTable: string;
+  fromColumn: string;
+  toTable: string;
+  toColumn: string;
+  relationshipType: 'one_to_one' | 'one_to_many' | 'many_to_many';
+  cascadeDelete: boolean;
+}
+
+export interface AssetCompatibilityInfo {
+  supportsImages: boolean;
+  supportsMarkdown: boolean;
+  supportsJson: boolean;
+  contentTables: string[];
+  userContentRelationships: TableRelationship[];
+  mediaStoragePattern: 'supabase_storage' | 'url_only' | 'base64' | 'custom';
 }
 
 export class SchemaAdapter {
@@ -28,7 +52,7 @@ export class SchemaAdapter {
   }
 
   /**
-   * Detect the database schema and return compatibility info
+   * Detect the database schema and return comprehensive compatibility info
    */
   async detectSchema(): Promise<SchemaInfo> {
     if (this.schemaInfo) {
@@ -47,9 +71,22 @@ export class SchemaAdapter {
       hasOrganizations: false,
       accountsTableStructure: 'simple',
       primaryUserTable: 'accounts',
+      // Enhanced detection fields
+      makerkitVersion: 'none',
+      customTables: [],
+      detectedRelationships: [],
+      assetCompatibility: {
+        supportsImages: false,
+        supportsMarkdown: false,
+        supportsJson: false,
+        contentTables: [],
+        userContentRelationships: [],
+        mediaStoragePattern: 'url_only'
+      },
+      frameworkType: 'custom'
     };
 
-    // Check for various tables
+    // Check for core tables
     schemaInfo.hasAccounts = await this.tableExists('accounts');
     schemaInfo.hasProfiles = await this.tableExists('profiles');
     schemaInfo.hasSetups = await this.tableExists('setups');
@@ -57,34 +94,86 @@ export class SchemaAdapter {
     schemaInfo.hasTeams = await this.tableExists('teams');
     schemaInfo.hasOrganizations = await this.tableExists('organizations');
     
-    // Check for additional Makerkit-specific tables
+    // Check for MakerKit-specific tables
     const hasMemberships = await this.tableExists('memberships');
     const hasSubscriptions = await this.tableExists('subscriptions');
+    const hasRoles = await this.tableExists('roles');
+    const hasInvitations = await this.tableExists('invitations');
+    const hasNotifications = await this.tableExists('notifications');
+    
+    // Check for content and media tables
+    const hasPosts = await this.tableExists('posts');
+    const hasMediaAttachments = await this.tableExists('media_attachments');
+    const hasGear = await this.tableExists('gear');
+    const hasBaseTemplates = await this.tableExists('base_templates');
+    const hasTrips = await this.tableExists('trips');
+    const hasModifications = await this.tableExists('modifications');
+    
+    // Detect custom tables (beyond standard MakerKit)
+    schemaInfo.customTables = await this.detectCustomTables([
+      'accounts', 'profiles', 'memberships', 'subscriptions', 'roles', 
+      'invitations', 'notifications', 'posts', 'media_attachments'
+    ]);
 
     // Check if auth.users has records (standard Supabase pattern)
     schemaInfo.hasUsers = await this.checkAuthUsers();
 
-    // Determine account table structure with improved Makerkit detection
+    // Enhanced MakerKit version detection
+    schemaInfo.makerkitVersion = await this.detectMakerKitVersion({
+      hasAccounts: schemaInfo.hasAccounts,
+      hasMemberships,
+      hasSubscriptions,
+      hasRoles,
+      hasInvitations,
+      hasNotifications
+    });
+    
+    // Determine account table structure with enhanced detection
     if (schemaInfo.hasAccounts && hasMemberships) {
-      // Strong indicator of Makerkit pattern
       schemaInfo.accountsTableStructure = 'makerkit';
     } else if (schemaInfo.hasAccounts) {
       const accountsStructure = await this.detectAccountsStructure();
       schemaInfo.accountsTableStructure = accountsStructure;
     }
+    
+    // Detect framework type based on table patterns
+    schemaInfo.frameworkType = this.detectFrameworkTypeEnhanced({
+      makerkitVersion: schemaInfo.makerkitVersion,
+      hasGear,
+      hasBaseTemplates,
+      hasSetups: schemaInfo.hasSetups,
+      hasTrips,
+      customTables: schemaInfo.customTables
+    });
+    
+    // Detect relationships for better association intelligence
+    schemaInfo.detectedRelationships = await this.detectTableRelationships();
+    
+    // Analyze asset compatibility
+    schemaInfo.assetCompatibility = await this.analyzeAssetCompatibility({
+      hasMediaAttachments,
+      hasPosts,
+      hasSetups: schemaInfo.hasSetups,
+      customTables: schemaInfo.customTables
+    });
 
     // Determine primary user table (prioritize config override)
     schemaInfo.primaryUserTable = this.determinePrimaryUserTable(schemaInfo);
 
     this.schemaInfo = schemaInfo;
     
-    console.log('📋 Schema detected:', {
+    console.log('📋 Enhanced schema detected:', {
       primaryUserTable: schemaInfo.primaryUserTable,
       structure: schemaInfo.accountsTableStructure,
-      hasProfiles: schemaInfo.hasProfiles,
-      hasTeams: schemaInfo.hasTeams,
-      hasMemberships,
-      framework: this.getFrameworkType(schemaInfo, hasMemberships),
+      makerkitVersion: schemaInfo.makerkitVersion,
+      frameworkType: schemaInfo.frameworkType,
+      customTables: schemaInfo.customTables.length,
+      relationships: schemaInfo.detectedRelationships.length,
+      assetCompatibility: {
+        images: schemaInfo.assetCompatibility.supportsImages,
+        markdown: schemaInfo.assetCompatibility.supportsMarkdown,
+        storage: schemaInfo.assetCompatibility.mediaStoragePattern
+      }
     });
 
     return schemaInfo;
@@ -461,6 +550,353 @@ export class SchemaAdapter {
       default:
         return 'account_id';
     }
+  }
+
+  /**
+   * Detect MakerKit version based on table patterns and schema structure
+   */
+  private async detectMakerKitVersion(tables: {
+    hasAccounts: boolean;
+    hasMemberships: boolean;
+    hasSubscriptions: boolean;
+    hasRoles: boolean;
+    hasInvitations: boolean;
+    hasNotifications: boolean;
+  }): Promise<'v1' | 'v2' | 'v3' | 'custom' | 'none'> {
+    const { hasAccounts, hasMemberships, hasSubscriptions, hasRoles, hasInvitations, hasNotifications } = tables;
+    
+    // No MakerKit if no accounts table
+    if (!hasAccounts) {
+      return 'none';
+    }
+    
+    // Check for v3 indicators (latest MakerKit with comprehensive feature set)
+    if (hasAccounts && hasMemberships && hasSubscriptions && hasRoles && hasInvitations && hasNotifications) {
+      // Check for v3-specific account structure
+      const hasAdvancedAccountFields = await this.checkAccountFields([
+        'primary_owner_user_id', 'slug', 'is_personal_account', 'public_data'
+      ]);
+      
+      if (hasAdvancedAccountFields) {
+        Logger.debug('Detected MakerKit v3 pattern with full feature set');
+        return 'v3';
+      }
+    }
+    
+    // Check for v2 indicators (mid-version with core multi-tenancy)
+    if (hasAccounts && hasMemberships && hasSubscriptions && hasRoles) {
+      const hasV2AccountFields = await this.checkAccountFields([
+        'primary_owner_user_id', 'is_personal_account'
+      ]);
+      
+      if (hasV2AccountFields) {
+        Logger.debug('Detected MakerKit v2 pattern with multi-tenancy');
+        return 'v2';
+      }
+    }
+    
+    // Check for v1 indicators (basic MakerKit with accounts and memberships)
+    if (hasAccounts && hasMemberships) {
+      Logger.debug('Detected MakerKit v1 pattern with basic accounts');
+      return 'v1';
+    }
+    
+    // Has accounts but not standard MakerKit pattern
+    if (hasAccounts) {
+      Logger.debug('Detected custom accounts pattern (non-MakerKit)');
+      return 'custom';
+    }
+    
+    return 'none';
+  }
+  
+  /**
+   * Check if specific fields exist in the accounts table
+   */
+  private async checkAccountFields(fields: string[]): Promise<boolean> {
+    try {
+      const selectFields = fields.join(', ');
+      const { error } = await this.client
+        .from('accounts')
+        .select(selectFields)
+        .limit(1);
+      
+      return !error;
+    } catch {
+      return false;
+    }
+  }
+  
+  /**
+   * Detect custom tables beyond standard MakerKit schema
+   */
+  private async detectCustomTables(standardTables: string[]): Promise<string[]> {
+    try {
+      // Fallback: try common custom table names since we can't easily query information_schema
+      const commonCustomTables = [
+        'setups', 'gear', 'base_templates', 'trips', 'modifications',
+        'posts', 'media_attachments', 'conversations', 'messages',
+        'user_preferences', 'audit_logs', 'analytics_events'
+      ];
+      
+      const customTables = [];
+      for (const table of commonCustomTables) {
+        if (await this.tableExists(table) && !standardTables.includes(table)) {
+          customTables.push(table);
+        }
+      }
+      
+      return customTables;
+    } catch (error) {
+      Logger.debug('Custom table detection failed:', error);
+      return [];
+    }
+  }
+  
+  /**
+   * Detect table relationships for better association intelligence
+   */
+  private async detectTableRelationships(): Promise<TableRelationship[]> {
+    const relationships: TableRelationship[] = [];
+    
+    try {
+      // Common relationship patterns to check
+      const commonRelationships = [
+        { from: 'setups', fromCol: 'user_id', to: 'auth.users', toCol: 'id' },
+        { from: 'setups', fromCol: 'account_id', to: 'accounts', toCol: 'id' },
+        { from: 'posts', fromCol: 'author_id', to: 'accounts', toCol: 'id' },
+        { from: 'media_attachments', fromCol: 'setup_id', to: 'setups', toCol: 'id' },
+        { from: 'setup_gear_items', fromCol: 'setup_id', to: 'setups', toCol: 'id' },
+        { from: 'memberships', fromCol: 'account_id', to: 'accounts', toCol: 'id' },
+        { from: 'memberships', fromCol: 'user_id', to: 'auth.users', toCol: 'id' }
+      ];
+      
+      for (const rel of commonRelationships) {
+        const fromExists = await this.tableExists(rel.from);
+        const toExists = await this.tableExists(rel.to.replace('auth.', ''));
+        
+        if (fromExists && toExists) {
+          // Try to detect the relationship by checking column existence
+          const hasColumn = await this.columnExists(rel.from, rel.fromCol);
+          
+          if (hasColumn) {
+            relationships.push({
+              fromTable: rel.from,
+              fromColumn: rel.fromCol,
+              toTable: rel.to,
+              toColumn: rel.toCol,
+              relationshipType: 'one_to_many', // Default assumption
+              cascadeDelete: false // Default assumption
+            });
+          }
+        }
+      }
+      
+      Logger.debug(`Detected ${relationships.length} table relationships`);
+      return relationships;
+    } catch (error) {
+      Logger.debug('Relationship detection failed:', error);
+      return [];
+    }
+  }
+  
+  /**
+   * Check if a column exists in a table
+   */
+  private async columnExists(tableName: string, columnName: string): Promise<boolean> {
+    try {
+      const { error } = await this.client
+        .from(tableName)
+        .select(columnName)
+        .limit(1);
+      
+      return !error;
+    } catch {
+      return false;
+    }
+  }
+  
+  /**
+   * Detect framework type based on comprehensive analysis
+   */
+  private detectFrameworkTypeEnhanced(analysis: {
+    makerkitVersion: string;
+    hasGear: boolean;
+    hasBaseTemplates: boolean;
+    hasSetups: boolean;
+    hasTrips: boolean;
+    customTables: string[];
+  }): 'makerkit' | 'simple' | 'wildernest' | 'custom' {
+    const { makerkitVersion, hasGear, hasBaseTemplates, hasSetups, hasTrips, customTables } = analysis;
+    
+    // Check for Wildernest pattern (MakerKit + outdoor platform tables)
+    if (makerkitVersion !== 'none' && hasGear && hasBaseTemplates && hasSetups) {
+      Logger.debug('Detected Wildernest-style outdoor platform');
+      return 'wildernest';
+    }
+    
+    // Standard MakerKit patterns
+    if (makerkitVersion === 'v3' || makerkitVersion === 'v2' || makerkitVersion === 'v1') {
+      Logger.debug(`Detected MakerKit ${makerkitVersion} framework`);
+      return 'makerkit';
+    }
+    
+    // Simple framework (basic Supabase without MakerKit)
+    if (makerkitVersion === 'none' && customTables.length < 3) {
+      Logger.debug('Detected simple Supabase framework');
+      return 'simple';
+    }
+    
+    // Custom framework with significant customizations
+    Logger.debug('Detected custom framework with extensive customizations');
+    return 'custom';
+  }
+  
+  /**
+   * Analyze asset compatibility for hybrid seeding
+   */
+  private async analyzeAssetCompatibility(tables: {
+    hasMediaAttachments: boolean;
+    hasPosts: boolean;
+    hasSetups: boolean;
+    customTables: string[];
+  }): Promise<AssetCompatibilityInfo> {
+    const { hasMediaAttachments, hasPosts, hasSetups, customTables } = tables;
+    
+    const compatibility: AssetCompatibilityInfo = {
+      supportsImages: false,
+      supportsMarkdown: false,
+      supportsJson: false,
+      contentTables: [],
+      userContentRelationships: [],
+      mediaStoragePattern: 'url_only'
+    };
+    
+    // Check for image support
+    if (hasMediaAttachments) {
+      compatibility.supportsImages = true;
+      compatibility.mediaStoragePattern = 'supabase_storage';
+    }
+    
+    // Check for markdown content support
+    if (hasPosts) {
+      compatibility.supportsMarkdown = await this.checkMarkdownSupport('posts');
+      compatibility.contentTables.push('posts');
+    }
+    
+    if (hasSetups) {
+      const setupMarkdown = await this.checkMarkdownSupport('setups');
+      if (setupMarkdown) {
+        compatibility.supportsMarkdown = true;
+      }
+      compatibility.contentTables.push('setups');
+    }
+    
+    // Check custom tables for content patterns
+    for (const table of customTables) {
+      const hasContent = await this.checkContentColumns(table);
+      if (hasContent) {
+        compatibility.contentTables.push(table);
+      }
+    }
+    
+    // JSON support is generally available in Postgres
+    compatibility.supportsJson = true;
+    
+    Logger.debug('Asset compatibility analysis:', compatibility);
+    return compatibility;
+  }
+  
+  /**
+   * Check if a table supports markdown content
+   */
+  private async checkMarkdownSupport(tableName: string): Promise<boolean> {
+    const markdownColumns = ['content', 'description', 'body', 'markdown', 'readme'];
+    
+    for (const column of markdownColumns) {
+      if (await this.columnExists(tableName, column)) {
+        return true;
+      }
+    }
+    
+    return false;
+  }
+  
+  /**
+   * Check if a table has content-related columns
+   */
+  private async checkContentColumns(tableName: string): Promise<boolean> {
+    const contentColumns = ['title', 'content', 'description', 'body', 'name'];
+    
+    for (const column of contentColumns) {
+      if (await this.columnExists(tableName, column)) {
+        return true;
+      }
+    }
+    
+    return false;
+  }
+  
+  /**
+   * Get comprehensive schema information for hybrid seeding
+   */
+  getHybridSeedingInfo(): {
+    compatibilityLevel: 'basic' | 'intermediate' | 'advanced';
+    recommendedAssetTypes: string[];
+    suggestedAssociations: string[];
+    frameworkSpecificTips: string[];
+  } {
+    if (!this.schemaInfo) {
+      throw new Error('Schema not detected. Call detectSchema() first.');
+    }
+    
+    const info = this.schemaInfo;
+    const tips: string[] = [];
+    const assets: string[] = [];
+    const associations: string[] = [];
+    
+    // Determine compatibility level
+    let compatibilityLevel: 'basic' | 'intermediate' | 'advanced' = 'basic';
+    
+    if (info.makerkitVersion !== 'none') {
+      compatibilityLevel = 'intermediate';
+      tips.push('MakerKit detected - standard test users will be created automatically');
+      tips.push('Team and personal accounts supported');
+    }
+    
+    if (info.frameworkType === 'wildernest' || info.customTables.length > 5) {
+      compatibilityLevel = 'advanced';
+      tips.push('Complex schema detected - consider using phase-based seeding');
+    }
+    
+    // Recommend asset types based on compatibility
+    if (info.assetCompatibility.supportsImages) {
+      assets.push('images');
+      associations.push('images_to_content');
+    }
+    
+    if (info.assetCompatibility.supportsMarkdown) {
+      assets.push('markdown');
+      associations.push('posts_to_users');
+    }
+    
+    if (info.assetCompatibility.supportsJson) {
+      assets.push('json');
+    }
+    
+    // Framework-specific recommendations
+    if (info.frameworkType === 'wildernest') {
+      assets.push('gear_catalog', 'setup_images');
+      associations.push('gear_to_setups', 'images_to_setups');
+      tips.push('Outdoor platform detected - gear and setup assets recommended');
+    }
+    
+    return {
+      compatibilityLevel,
+      recommendedAssetTypes: assets,
+      suggestedAssociations: associations,
+      frameworkSpecificTips: tips
+    };
   }
 
   /**

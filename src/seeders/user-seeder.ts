@@ -2,20 +2,29 @@ import { SeedModule, CachedUser } from '../types';
 import { generateUsername, generateTestEmail } from '../utils/auth-utils';
 import { SchemaAdapter } from '../schema-adapter';
 import { getDomainConfig } from '../domains';
+import { 
+  MakerKitCompatibilityLayer, 
+  MakerKitCompatibilityConfig,
+  StandardTestUser 
+} from '../compatibility/makerkit-compatibility';
 
 export class UserSeeder extends SeedModule {
   private schemaAdapter!: SchemaAdapter;
+  private makerkitCompatibility!: MakerKitCompatibilityLayer;
 
   async seed(): Promise<void> {
     // Initialize schema adapter with config override
     this.schemaAdapter = new SchemaAdapter(this.context.client, this.context.config);
     await this.schemaAdapter.detectSchema();
 
+    // Initialize MakerKit compatibility layer
+    await this.initializeMakerKitCompatibility();
+
     const users: CachedUser[] = [];
     
-    // Create standard MakerKit test emails if enabled
+    // Create standard MakerKit test emails if enabled (enhanced)
     if (this.context.config.createStandardTestEmails) {
-      const standardUsers = await this.createStandardTestUsers();
+      const standardUsers = await this.createEnhancedStandardTestUsers();
       users.push(...standardUsers);
     }
     
@@ -28,13 +37,98 @@ export class UserSeeder extends SeedModule {
       }
     }
     
-    // Cache users for other seeders
+    // Cache users and compatibility info for other seeders
     this.context.cache.set('users', users);
     this.context.cache.set('schemaAdapter', this.schemaAdapter);
+    this.context.cache.set('makerkitCompatibility', this.makerkitCompatibility);
   }
 
+  /**
+   * Initialize enhanced MakerKit compatibility layer
+   */
+  private async initializeMakerKitCompatibility(): Promise<void> {
+    // Build compatibility config from context
+    const compatibilityConfig: MakerKitCompatibilityConfig = {
+      standardTestUsers: this.context.config.createStandardTestEmails || false,
+      customTestEmails: this.context.config.customTestEmails || [],
+      preserveAuthFlow: true,
+      preserveRLS: true,
+      makerkitVersion: 'auto', // Auto-detect from schema
+      teamAccountCreation: this.context.config.createTeamAccounts ?? true,
+      personalAccountCreation: true,
+      roleHierarchy: true,
+      subscriptionSupport: true,
+      notificationSystem: true,
+      overrides: {
+        primaryUserTable: this.context.config.schema?.primaryUserTable,
+        testUserPasswords: {
+          default: this.context.config.testUserPassword || 'password123'
+        }
+      }
+    };
+
+    this.makerkitCompatibility = new MakerKitCompatibilityLayer(
+      this.context.client,
+      compatibilityConfig,
+      this.schemaAdapter
+    );
+
+    // Initialize and validate compatibility
+    const validation = await this.makerkitCompatibility.initialize();
+    
+    // Log compatibility status
+    console.log(`🔧 MakerKit compatibility: ${validation.compatibility}`);
+    console.log(`📋 Detected version: ${validation.detectedVersion}`);
+    
+    if (validation.issues.length > 0) {
+      console.log('⚠️  Compatibility issues:');
+      validation.issues.forEach(issue => console.log(`    • ${issue}`));
+    }
+    
+    if (validation.recommendations.length > 0) {
+      console.log('💡 Recommendations:');
+      validation.recommendations.forEach(rec => console.log(`    • ${rec}`));
+    }
+  }
+
+  /**
+   * Create enhanced standard test users using MakerKit compatibility layer
+   */
+  private async createEnhancedStandardTestUsers(): Promise<CachedUser[]> {
+    console.log('🧪 Creating enhanced MakerKit test users...');
+    
+    // Use the compatibility layer to create users with proper MakerKit integration
+    const result = await this.makerkitCompatibility.createStandardTestUsers();
+    
+    // Convert StandardTestUser[] to CachedUser[] format
+    const cachedUsers: CachedUser[] = result.created.map(user => ({
+      id: crypto.randomUUID(), // This will be updated with actual ID from database
+      email: user.email,
+      username: user.username,
+      name: user.name,
+    }));
+
+    // Update stats
+    this.context.stats.usersCreated += result.created.length;
+    
+    // Log any failures
+    if (result.failed.length > 0) {
+      console.log('⚠️  Some users failed to create:');
+      result.failed.forEach(failure => {
+        console.log(`    • ${failure.user.email}: ${failure.error}`);
+      });
+    }
+
+    console.log(`✅ Enhanced MakerKit users created: ${result.created.length}/${result.created.length + result.failed.length}`);
+    return cachedUsers;
+  }
+
+  /**
+   * Legacy method for backward compatibility
+   * @deprecated Use createEnhancedStandardTestUsers instead
+   */
   private async createStandardTestUsers(): Promise<CachedUser[]> {
-    console.log('🧪 Creating standard MakerKit test users...');
+    console.log('🧪 Creating standard MakerKit test users (legacy mode)...');
     
     const standardTestEmails = [
       { email: 'test@makerkit.dev', name: 'Test User', username: 'test_user', role: 'admin' },
