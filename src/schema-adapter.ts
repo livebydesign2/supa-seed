@@ -1,6 +1,13 @@
 import type { createClient } from '@supabase/supabase-js';
 import { Logger } from './utils/logger';
 
+class JWTAuthenticationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'JWTAuthenticationError';
+  }
+}
+
 type SupabaseClient = ReturnType<typeof createClient>;
 
 export interface SchemaInfo {
@@ -48,7 +55,7 @@ export class SchemaAdapter {
   };
   private supabaseUrl: string;
 
-  constructor(private client: SupabaseClient, configOverride?: any, supabaseUrl?: string) {
+  constructor(private client: SupabaseClient, configOverride?: any, supabaseUrl?: string, private supabaseKey?: string) {
     this.configOverride = configOverride;
     // Store the URL for local environment detection
     this.supabaseUrl = supabaseUrl || process.env.SUPABASE_URL || 'http://127.0.0.1:54321';
@@ -63,6 +70,19 @@ export class SchemaAdapter {
     return url.includes('127.0.0.1') || 
            url.includes('localhost') ||
            url.includes(':54321'); // Default local Supabase port
+  }
+
+  /**
+   * Check if a JWT token is a service role key (for better error messages)
+   */
+  private isServiceRoleKey(token: string): boolean {
+    try {
+      // Decode JWT payload without validation (just for role detection)
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      return payload.role === 'service_role';
+    } catch {
+      return false;
+    }
   }
 
   /**
@@ -287,6 +307,30 @@ export class SchemaAdapter {
         if (exists) {
           Logger.debug(`Table '${tableName}' found in local environment`);
         } else {
+          // Check for JWT authentication errors specifically
+          if (error?.message?.includes('JWSError') || error?.message?.includes('JWSInvalidSignature')) {
+            Logger.debug(`JWT authentication error for table '${tableName}': ${error.message}`);
+            // Only throw on the first table to avoid spamming the user
+            if (tableName === 'accounts') {
+              const isServiceRole = this.supabaseKey && this.isServiceRoleKey(this.supabaseKey);
+              const keyType = isServiceRole ? 'service role key' : 'authentication key';
+              
+              throw new JWTAuthenticationError(`
+${keyType} authentication failed in local environment.
+
+This commonly occurs with service role keys in local Supabase development.
+Try using the anon key instead:
+
+1. Get your anon key: supabase status | grep "anon key"
+2. Use anon key for detection: npx supa-seed detect --url "${this.supabaseUrl}" --key "[ANON_KEY]"
+
+Anon keys have sufficient permissions for schema detection and often work better in local environments.
+
+Technical details: ${error.message}
+              `.trim());
+            }
+            return false;
+          }
           Logger.debug(`Table '${tableName}' not found in local environment: ${error?.message || 'Unknown error'}`);
         }
         return exists;
@@ -296,6 +340,10 @@ export class SchemaAdapter {
         return !error;
       }
     } catch (error: any) {
+      // Re-throw JWT authentication errors with helpful message
+      if (error instanceof JWTAuthenticationError) {
+        throw error;
+      }
       Logger.debug(`Table existence check failed for '${tableName}': ${error.message}`);
       return false;
     }

@@ -16,8 +16,8 @@ export class ConfigManager {
   /**
    * Detect current database schema and suggest configuration
    */
-  async detectAndSuggestConfig(client: SupabaseClient, configOverride?: any, supabaseUrl?: string): Promise<ConfigDetectionResult> {
-    const schemaAdapter = new SchemaAdapter(client, configOverride, supabaseUrl);
+  async detectAndSuggestConfig(client: SupabaseClient, configOverride?: any, supabaseUrl?: string, supabaseKey?: string): Promise<ConfigDetectionResult> {
+    const schemaAdapter = new SchemaAdapter(client, configOverride, supabaseUrl, supabaseKey);
     const schemaInfo = await schemaAdapter.detectSchema();
     
     const missingTables: string[] = [];

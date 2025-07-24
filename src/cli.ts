@@ -288,7 +288,7 @@ async function main() {
         }
         
         spinner.text = 'Detecting schema structure...';
-        const detection = await configManager.detectAndSuggestConfig(client as any, configOverride, supabaseUrl);
+        const detection = await configManager.detectAndSuggestConfig(client as any, configOverride, supabaseUrl, supabaseKey);
         
         spinner.succeed('Schema analysis complete');
         
@@ -354,7 +354,18 @@ async function main() {
         
       } catch (error: any) {
         spinner.fail('Schema detection failed');
-        Logger.error('Error details:', error);
+        
+        // Handle JWT authentication errors with helpful guidance
+        if (error.name === 'JWTAuthenticationError') {
+          console.log('\n❌ Authentication Issue Detected\n');
+          console.log(error.message);
+          console.log('\n💡 Quick Fix:');
+          console.log('   1. Get anon key: supabase status | grep "anon key"');
+          console.log(`   2. Retry with anon key: npx supa-seed detect --url "${options.url || process.env.SUPABASE_URL || 'http://127.0.0.1:54321'}" --key "[ANON_KEY]"`);
+          console.log('\n✅ Framework detection works perfectly with anon keys in local environments!');
+        } else {
+          Logger.error('Error details:', error);
+        }
         process.exit(1);
       }
     });
