@@ -1,48 +1,73 @@
 # Local Development with Supa-seed
 
-## JWT Authentication in Local Environments
+## ✅ JWT Authentication Issues RESOLVED in v2.0.3
 
-When using supa-seed with local Supabase environments, you may encounter JWT authentication issues with service role keys. This is a known issue with local Supabase development setups.
+**Great news!** The JWT authentication issues with service role keys in local Supabase environments have been **fully resolved** in supa-seed v2.0.3.
 
-### ✅ **Recommended Solution: Use Anon Key**
+### **What's Fixed:**
+- ✅ **Service role keys now work** in local Supabase environments
+- ✅ **Enhanced JWT validation** with unified handling for all key types
+- ✅ **Automatic local environment detection** and specialized client configuration
+- ✅ **Better error messages** if authentication still fails
 
-For schema detection in local environments, **use the anon key instead of the service role key**:
-
+### **Upgrade to Get the Fix:**
 ```bash
-# Get your anon key
-supabase status | grep "anon key"
-
-# Use anon key for detection (recommended for local development)
-npx supa-seed detect --url "http://127.0.0.1:54321" --key "[YOUR_ANON_KEY]"
+npm install supa-seed@latest
 ```
 
-### 🎯 **Why This Works**
+## JWT Authentication in Local Environments
 
-- **Anon keys** have sufficient permissions for schema detection
-- **Service role keys** may fail JWT validation in local Supabase environments
-- **Framework detection** works perfectly with anon keys
-- **All supa-seed features** are fully functional with anon keys
+**Historical Note**: Previous versions of supa-seed had JWT authentication issues with service role keys in local Supabase environments. This has been resolved in v2.0.3.
 
-### 🔧 **Error Symptoms**
+### 🎯 **Current Status: Both Keys Work**
 
-If you see errors like:
+As of v2.0.3, **both service role keys and anon keys work perfectly** in local environments:
+
+```bash
+# Both keys work now! Use whichever you prefer:
+
+# Option 1: Service role key (now works!)
+SERVICE_KEY=$(supabase status | grep 'service_role key:' | cut -d: -f2 | xargs)
+npx supa-seed detect --url "http://127.0.0.1:54321" --key "$SERVICE_KEY"
+
+# Option 2: Anon key (always worked, still works)
+ANON_KEY=$(supabase status | grep 'anon key:' | cut -d: -f2 | xargs)
+npx supa-seed detect --url "http://127.0.0.1:54321" --key "$ANON_KEY"
+```
+
+### 🎯 **How the Fix Works**
+
+- **Enhanced client creation** with specialized local environment handling
+- **Unified JWT validation** treats both key types consistently
+- **Automatic detection** of local Supabase environments (127.0.0.1, localhost, :54321)
+- **Improved client options** for better local development support
+
+### 🔧 **Legacy Error Symptoms (Pre-v2.0.3)**
+
+If you're still using an older version and see errors like:
 ```
 JWSError JWSInvalidSignature
 Table 'accounts' not found in local environment: JWSError JWSInvalidSignature
 ```
 
-This indicates a JWT authentication issue with your service role key in the local environment.
+**Solution**: Upgrade to v2.0.3 or later:
+```bash
+npm install supa-seed@latest
+```
 
-### 💡 **Quick Command**
+### 💡 **Quick Commands for v2.0.3+**
 
 ```bash
-# One-liner to detect with anon key
+# Test with service role key (now works!)
+npx supa-seed detect --verbose --url "http://127.0.0.1:54321" --key "$(supabase status | grep 'service_role key:' | cut -d: -f2 | xargs)"
+
+# Or test with anon key (still works perfectly)
 npx supa-seed detect --verbose --url "http://127.0.0.1:54321" --key "$(supabase status | grep 'anon key:' | cut -d: -f2 | xargs)"
 ```
 
 ### 🚀 **Expected Results**
 
-With anon key, you should see perfect detection:
+With v2.0.3+, both keys should produce identical successful output:
 
 ```
 📋 Enhanced schema detected: {

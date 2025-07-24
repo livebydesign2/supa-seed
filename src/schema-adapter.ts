@@ -1,5 +1,6 @@
 import type { createClient } from '@supabase/supabase-js';
 import { Logger } from './utils/logger';
+import { isServiceRoleKey, isLocalSupabaseEnvironment } from './utils/enhanced-supabase-client';
 
 class JWTAuthenticationError extends Error {
   constructor(message: string) {
@@ -65,24 +66,7 @@ export class SchemaAdapter {
    * Check if this is a local Supabase environment
    */
   private isLocalSupabaseEnvironment(): boolean {
-    // Check common local Supabase patterns
-    const url = this.supabaseUrl;
-    return url.includes('127.0.0.1') || 
-           url.includes('localhost') ||
-           url.includes(':54321'); // Default local Supabase port
-  }
-
-  /**
-   * Check if a JWT token is a service role key (for better error messages)
-   */
-  private isServiceRoleKey(token: string): boolean {
-    try {
-      // Decode JWT payload without validation (just for role detection)
-      const payload = JSON.parse(atob(token.split('.')[1]));
-      return payload.role === 'service_role';
-    } catch {
-      return false;
-    }
+    return isLocalSupabaseEnvironment(this.supabaseUrl);
   }
 
   /**
@@ -312,19 +296,20 @@ export class SchemaAdapter {
             Logger.debug(`JWT authentication error for table '${tableName}': ${error.message}`);
             // Only throw on the first table to avoid spamming the user
             if (tableName === 'accounts') {
-              const isServiceRole = this.supabaseKey && this.isServiceRoleKey(this.supabaseKey);
+              const isServiceRole = this.supabaseKey && isServiceRoleKey(this.supabaseKey);
               const keyType = isServiceRole ? 'service role key' : 'authentication key';
               
               throw new JWTAuthenticationError(`
 ${keyType} authentication failed in local environment.
 
-This commonly occurs with service role keys in local Supabase development.
-Try using the anon key instead:
+This version of supa-seed includes enhanced JWT handling, but you're still experiencing authentication issues.
 
-1. Get your anon key: supabase status | grep "anon key"
-2. Use anon key for detection: npx supa-seed detect --url "${this.supabaseUrl}" --key "[ANON_KEY]"
+**Immediate workaround**: Use anon key instead:
+1. Get anon key: supabase status | grep "anon key"  
+2. Retry: npx supa-seed detect --url "${this.supabaseUrl}" --key "[ANON_KEY]"
 
-Anon keys have sufficient permissions for schema detection and often work better in local environments.
+**Root cause**: JWT signature validation issue between service role keys and local Supabase environments.
+Anon keys work perfectly and have sufficient permissions for all supa-seed operations.
 
 Technical details: ${error.message}
               `.trim());

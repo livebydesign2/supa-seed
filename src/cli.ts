@@ -7,13 +7,14 @@ import { ConfigManager } from './config-manager';
 import { createClient } from '@supabase/supabase-js';
 import { loadConfiguration } from './config';
 import { Logger } from './utils/logger';
+import { createEnhancedSupabaseClient } from './utils/enhanced-supabase-client';
 import type { SeedConfig } from './types';
 
 async function main() {
   program
     .name('supa-seed')
     .description('🌱 Modern Database Seeding Framework for Supabase')
-    .version('1.0.0');
+    .version('2.0.3');
 
   program
     .command('seed')
@@ -182,7 +183,7 @@ async function main() {
           
           // Create client for schema detection
           spinner.text = 'Connecting to database...';
-          const client = createClient(supabaseUrl, supabaseKey);
+          const client = createEnhancedSupabaseClient(supabaseUrl, supabaseKey);
           
           spinner.text = 'Analyzing database schema...';
           const detection = await configManager.detectAndSuggestConfig(client as any);
@@ -266,7 +267,7 @@ async function main() {
         }
         
         spinner.text = 'Connecting to database...';
-        const client = createClient(supabaseUrl, supabaseKey);
+        const client = createEnhancedSupabaseClient(supabaseUrl, supabaseKey);
         const configManager = new ConfigManager();
         
         // Try to load existing configuration for overrides

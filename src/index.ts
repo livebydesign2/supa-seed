@@ -10,15 +10,16 @@ import { MediaSeeder } from './seeders/media-seeder';
 import { SchemaAdapter } from './schema-adapter';
 import { Logger } from './utils/logger';
 import { SchemaValidator } from './validation/schema-validator';
+import { createEnhancedSupabaseClient } from './utils/enhanced-supabase-client';
 
 export class SupaSeedFramework {
-  private client: ReturnType<typeof createClient>;
+  private client: any; // Use any to avoid type conflicts with enhanced client
   private context: SeedContext;
   
   constructor(private config: SeedConfig) {
     this.validateConfig(config);
     
-    this.client = createClient(
+    this.client = createEnhancedSupabaseClient(
       config.supabaseUrl,
       config.supabaseServiceKey
     );
@@ -241,7 +242,7 @@ export class SupaSeedFramework {
         return;
       }
 
-      const testAccountIds = testAccounts.map(acc => acc.id);
+      const testAccountIds = testAccounts.map((acc: any) => acc.id);
 
       // Clean setup_gear_items first (if table exists)
       try {
@@ -253,7 +254,7 @@ export class SupaSeedFramework {
               .from('setups')
               .select('id')
               .in('account_id', testAccountIds)
-            ).data?.map(s => s.id) || []
+            ).data?.map((s: any) => s.id) || []
           );
       } catch {
         console.log('ℹ️  setup_gear_items table not found, skipping');
@@ -290,14 +291,14 @@ export class SupaSeedFramework {
       const { data: setups } = await this.client
         .from('setups')
         .select('id, title, account_id')
-        .in('account_id', testAccounts?.map(acc => acc.id) || []);
+        .in('account_id', testAccounts?.map((acc: any) => acc.id) || []);
 
       console.log(`👥 Test accounts: ${testAccounts?.length || 0}`);
       console.log(`🏕️  Test setups: ${setups?.length || 0}`);
       
       if (testAccounts?.length) {
         console.log('\n📋 Test accounts:');
-        testAccounts.forEach(acc => {
+        testAccounts.forEach((acc: any) => {
           console.log(`   • ${acc.email}`);
         });
       }

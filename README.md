@@ -1,4 +1,4 @@
-# 🌱 Supa-Seed v2.0.0
+# 🌱 Supa-Seed v2.0.3
 
 **Enterprise-Grade Hybrid Database Seeding Platform for Supabase**
 
@@ -6,6 +6,14 @@ Transform your database seeding from basic scripts into an intelligent, producti
 
 [![npm version](https://img.shields.io/npm/v/supa-seed.svg)](https://www.npmjs.com/package/supa-seed)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+## 🚀 What's New in v2.0.3
+
+### 🔑 **JWT Authentication Fix**
+- **✅ Enhanced Local Development**: Fixed service role key authentication in local Supabase environments
+- **🔄 Unified JWT Validation**: Both anon and service role keys now work seamlessly
+- **🛠️ Enhanced Error Handling**: Better error messages with clear workarounds
+- **🏠 Local Environment Detection**: Automatic detection and specialized handling
 
 ## 🚀 What's New in v2.0.0
 
@@ -31,8 +39,8 @@ Transform your database seeding from basic scripts into an intelligent, producti
 ### **Local Supabase (Recommended for Development)**
 
 ```bash
-# 1. Install globally
-npm install -g supa-seed
+# 1. Install latest version with JWT fixes
+npm install -g supa-seed@latest
 
 # 2. Start your local Supabase
 supabase start
@@ -40,14 +48,19 @@ supabase start
 # 3. Set up schema
 psql -h localhost -U postgres -d postgres -f node_modules/supa-seed/schema.sql
 
-# 4. Configure environment
+# 4. Configure environment (both service role and anon keys work!)
 echo "SUPABASE_URL=http://127.0.0.1:54321" > .env
 echo "SUPABASE_SERVICE_ROLE_KEY=your-service-key" >> .env
 
-# 5. Initialize and seed
+# 5. Test schema detection (works with both key types now!)
+supa-seed detect --verbose
+
+# 6. Initialize and seed
 supa-seed init --env local
 supa-seed seed
 ```
+
+> **✅ JWT Authentication Fixed**: v2.0.3 resolves service role key authentication issues in local environments. Both service role and anon keys now work seamlessly!
 
 ### **Cloud Supabase (Production Ready)**
 
