@@ -5,7 +5,7 @@
 
 import { Command } from 'commander';
 import chalk from 'chalk';
-import ora from 'ora';
+import ora, { Ora } from 'ora';
 import inquirer from 'inquirer';
 import { Logger } from '../utils/logger';
 import { ErrorHandler } from '../utils/error-handler';
@@ -26,7 +26,7 @@ export interface CLIConfig {
 export class ProductionCLI {
   private program: Command;
   private config: CLIConfig;
-  private spinner: ora.Ora | null = null;
+  private spinner: Ora | null = null;
 
   constructor() {
     this.program = new Command();
@@ -451,13 +451,13 @@ export class ProductionCLI {
         type: 'input',
         name: 'databaseUrl',
         message: 'Enter your Supabase database URL:',
-        validate: (input) => input.includes('supabase.co') || 'Please enter a valid Supabase URL'
+        validate: (input: string) => input.includes('supabase.co') || 'Please enter a valid Supabase URL'
       },
       {
         type: 'password',
         name: 'databaseKey',
         message: 'Enter your Supabase API key:',
-        validate: (input) => input.length > 20 || 'API key seems too short'
+        validate: (input: string) => input.length > 20 || 'API key seems too short'
       },
       {
         type: 'confirm',
@@ -470,7 +470,7 @@ export class ProductionCLI {
         name: 'ollamaUrl',
         message: 'Enter Ollama service URL:',
         default: 'http://localhost:11434',
-        when: (answers) => answers.enableAI
+        when: (answers: any) => answers.enableAI
       },
       {
         type: 'list',

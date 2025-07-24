@@ -15,6 +15,9 @@ export interface SeedConfig {
   emailDomain?: string; // Domain for test emails (default: supaseed.test)
   domain?: string; // Domain configuration (generic, outdoor, ecommerce, saas, etc.)
   createStandardTestEmails?: boolean; // Create MakerKit standard test emails (default: false)
+  customTestEmails?: string[]; // Custom test email addresses
+  createTeamAccounts?: boolean; // Create team accounts for testing
+  testUserPassword?: string; // Password for test users
   schema?: {
     framework?: 'makerkit' | 'simple' | 'custom';
     primaryUserTable?: 'accounts' | 'profiles' | 'users';
