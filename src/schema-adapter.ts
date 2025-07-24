@@ -46,9 +46,23 @@ export class SchemaAdapter {
     primaryUserTable?: 'accounts' | 'profiles' | 'users';
     schema?: any;
   };
+  private supabaseUrl: string;
 
-  constructor(private client: SupabaseClient, configOverride?: any) {
+  constructor(private client: SupabaseClient, configOverride?: any, supabaseUrl?: string) {
     this.configOverride = configOverride;
+    // Store the URL for local environment detection
+    this.supabaseUrl = supabaseUrl || process.env.SUPABASE_URL || 'http://127.0.0.1:54321';
+  }
+
+  /**
+   * Check if this is a local Supabase environment
+   */
+  private isLocalSupabaseEnvironment(): boolean {
+    // Check common local Supabase patterns
+    const url = this.supabaseUrl;
+    return url.includes('127.0.0.1') || 
+           url.includes('localhost') ||
+           url.includes(':54321'); // Default local Supabase port
   }
 
   /**
@@ -60,6 +74,12 @@ export class SchemaAdapter {
     }
 
     console.log('🔍 Detecting database schema...');
+    
+    // Check if this is a local Supabase environment
+    const isLocalSupabase = this.isLocalSupabaseEnvironment();
+    if (isLocalSupabase) {
+      Logger.debug('Local Supabase environment detected, using enhanced local detection patterns');
+    }
 
     const schemaInfo: SchemaInfo = {
       hasAccounts: false,
@@ -101,6 +121,12 @@ export class SchemaAdapter {
     const hasInvitations = await this.tableExists('invitations');
     const hasNotifications = await this.tableExists('notifications');
     
+    // Additional MakerKit v2/v3 tables mentioned in beta test bug report
+    const hasRolePermissions = await this.tableExists('role_permissions');
+    const hasBillingCustomers = await this.tableExists('billing_customers');
+    const hasGearItems = await this.tableExists('gear_items');
+    const hasReviews = await this.tableExists('reviews');
+    
     // Check for content and media tables
     const hasPosts = await this.tableExists('posts');
     const hasMediaAttachments = await this.tableExists('media_attachments');
@@ -125,7 +151,11 @@ export class SchemaAdapter {
       hasSubscriptions,
       hasRoles,
       hasInvitations,
-      hasNotifications
+      hasNotifications,
+      hasRolePermissions,
+      hasBillingCustomers,
+      hasGearItems,
+      hasReviews
     });
     
     // Determine account table structure with enhanced detection
@@ -243,9 +273,30 @@ export class SchemaAdapter {
 
   private async tableExists(tableName: string): Promise<boolean> {
     try {
-      const { error } = await this.client.from(tableName).select('*').limit(1);
-      return !error;
-    } catch {
+      // For local Supabase environments, add extra timeout and retry logic
+      const isLocal = this.isLocalSupabaseEnvironment();
+      
+      if (isLocal) {
+        // Local environments might be slower, provide better error details
+        const { error } = await this.client
+          .from(tableName)
+          .select('id')
+          .limit(1);
+        
+        const exists = !error;
+        if (exists) {
+          Logger.debug(`Table '${tableName}' found in local environment`);
+        } else {
+          Logger.debug(`Table '${tableName}' not found in local environment: ${error?.message || 'Unknown error'}`);
+        }
+        return exists;
+      } else {
+        // Cloud environments use standard detection
+        const { error } = await this.client.from(tableName).select('*').limit(1);
+        return !error;
+      }
+    } catch (error: any) {
+      Logger.debug(`Table existence check failed for '${tableName}': ${error.message}`);
       return false;
     }
   }
@@ -562,8 +613,12 @@ export class SchemaAdapter {
     hasRoles: boolean;
     hasInvitations: boolean;
     hasNotifications: boolean;
+    hasRolePermissions: boolean;
+    hasBillingCustomers: boolean;
+    hasGearItems: boolean;
+    hasReviews: boolean;
   }): Promise<'v1' | 'v2' | 'v3' | 'custom' | 'none'> {
-    const { hasAccounts, hasMemberships, hasSubscriptions, hasRoles, hasInvitations, hasNotifications } = tables;
+    const { hasAccounts, hasMemberships, hasSubscriptions, hasRoles, hasInvitations, hasNotifications, hasRolePermissions, hasBillingCustomers, hasGearItems, hasReviews } = tables;
     
     // No MakerKit if no accounts table
     if (!hasAccounts) {
@@ -571,26 +626,27 @@ export class SchemaAdapter {
     }
     
     // Check for v3 indicators (latest MakerKit with comprehensive feature set)
-    if (hasAccounts && hasMemberships && hasSubscriptions && hasRoles && hasInvitations && hasNotifications) {
+    if (hasAccounts && hasMemberships && hasSubscriptions && hasRoles && hasInvitations && hasNotifications && hasRolePermissions && hasBillingCustomers) {
       // Check for v3-specific account structure
       const hasAdvancedAccountFields = await this.checkAccountFields([
         'primary_owner_user_id', 'slug', 'is_personal_account', 'public_data'
       ]);
       
       if (hasAdvancedAccountFields) {
-        Logger.debug('Detected MakerKit v3 pattern with full feature set');
+        Logger.debug('Detected MakerKit v3 pattern with full feature set including role_permissions and billing_customers');
         return 'v3';
       }
     }
     
     // Check for v2 indicators (mid-version with core multi-tenancy)
-    if (hasAccounts && hasMemberships && hasSubscriptions && hasRoles) {
+    // Enhanced detection for MakerKit v2 based on bug report patterns
+    if (hasAccounts && hasMemberships && hasSubscriptions && hasRoles && (hasRolePermissions || hasInvitations)) {
       const hasV2AccountFields = await this.checkAccountFields([
         'primary_owner_user_id', 'is_personal_account'
       ]);
       
       if (hasV2AccountFields) {
-        Logger.debug('Detected MakerKit v2 pattern with multi-tenancy');
+        Logger.debug('Detected MakerKit v2 pattern with multi-tenancy and role permissions');
         return 'v2';
       }
     }

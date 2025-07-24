@@ -16,29 +16,34 @@ export class ConfigManager {
   /**
    * Detect current database schema and suggest configuration
    */
-  async detectAndSuggestConfig(client: SupabaseClient): Promise<ConfigDetectionResult> {
-    const schemaAdapter = new SchemaAdapter(client);
+  async detectAndSuggestConfig(client: SupabaseClient, configOverride?: any, supabaseUrl?: string): Promise<ConfigDetectionResult> {
+    const schemaAdapter = new SchemaAdapter(client, configOverride, supabaseUrl);
     const schemaInfo = await schemaAdapter.detectSchema();
     
     const missingTables: string[] = [];
     const suggestedConfig: Partial<FlexibleSeedConfig> = {};
 
-    // Detect framework type using improved detection
+    // Check for manual framework configuration override first
     let framework: 'simple' | 'makerkit' | 'custom' = 'simple';
     
-    // Check for additional Makerkit-specific tables
-    const hasMemberships = await this.tableExists(client, 'memberships');
-    const hasSubscriptions = await this.tableExists(client, 'subscriptions');
-    
-    // Check for MakerKit patterns first
-    if (schemaInfo.hasAccounts && hasMemberships) {
-      framework = 'makerkit';
-    } else if (schemaInfo.hasProfiles && (schemaInfo.hasOrganizations || schemaInfo.hasTeams)) {
-      framework = 'makerkit';
-    } else if (schemaInfo.hasProfiles && !schemaInfo.hasAccounts) {
-      framework = 'simple';
+    if (configOverride?.database?.framework) {
+      const overrideFramework = configOverride.database.framework;
+      if (overrideFramework === 'makerkit-v2' || overrideFramework === 'makerkit-v3' || overrideFramework === 'makerkit') {
+        framework = 'makerkit';
+      } else if (overrideFramework === 'simple') {
+        framework = 'simple';
+      } else {
+        framework = 'custom';
+      }
     } else {
-      framework = 'custom';
+      // Use enhanced framework detection from SchemaAdapter
+      if (schemaInfo.frameworkType === 'makerkit' || schemaInfo.frameworkType === 'wildernest') {
+        framework = 'makerkit';
+      } else if (schemaInfo.frameworkType === 'simple') {
+        framework = 'simple';
+      } else {
+        framework = 'custom';
+      }
     }
 
     // Suggest schema configuration based on detected tables
@@ -143,7 +148,20 @@ export class ConfigManager {
       hasSetups: schemaInfo.hasSetups,
       hasCategories: schemaInfo.hasCategories,
       missingTables,
-      suggestedConfig
+      suggestedConfig,
+      // Enhanced detection results from SchemaAdapter
+      enhancedDetection: {
+        makerkitVersion: schemaInfo.makerkitVersion,
+        frameworkType: schemaInfo.frameworkType,
+        primaryUserTable: schemaInfo.primaryUserTable,
+        customTables: schemaInfo.customTables.length,
+        relationships: schemaInfo.detectedRelationships.length,
+        assetCompatibility: {
+          images: schemaInfo.assetCompatibility.supportsImages,
+          markdown: schemaInfo.assetCompatibility.supportsMarkdown,
+          storage: schemaInfo.assetCompatibility.mediaStoragePattern
+        }
+      }
     };
   }
 

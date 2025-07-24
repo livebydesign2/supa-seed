@@ -13,6 +13,9 @@ export interface FlexibleSeedConfig {
   emailDomain?: string;
   domain?: string; // Domain configuration (generic, outdoor, ecommerce, saas, etc.)
   createStandardTestEmails?: boolean; // Create MakerKit standard test emails (default: false)
+  customTestEmails?: string[]; // Custom test email addresses
+  createTeamAccounts?: boolean; // Create team accounts for testing
+  testUserPassword?: string; // Password for test users
   
   // Schema configuration
   schema: {
@@ -123,4 +126,16 @@ export interface ConfigDetectionResult {
   hasCategories: boolean;
   missingTables: string[];
   suggestedConfig: Partial<FlexibleSeedConfig>;
+  enhancedDetection?: {
+    makerkitVersion: 'v1' | 'v2' | 'v3' | 'custom' | 'none';
+    frameworkType: 'makerkit' | 'simple' | 'wildernest' | 'custom';
+    primaryUserTable: 'accounts' | 'profiles' | 'users';
+    customTables: number;
+    relationships: number;
+    assetCompatibility: {
+      images: boolean;
+      markdown: boolean;
+      storage: 'supabase_storage' | 'url_only' | 'base64' | 'custom';
+    };
+  };
 }

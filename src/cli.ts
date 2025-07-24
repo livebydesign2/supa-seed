@@ -246,6 +246,7 @@ async function main() {
     .option('--url <url>', 'Supabase URL (overrides env var)')
     .option('--key <key>', 'Supabase service role key (overrides env var)')
     .option('--verbose', 'Enable verbose logging')
+    .option('--debug', 'Enable debug mode for detailed analysis')
     .action(async (options) => {
       const spinner = ora('Analyzing database schema...').start();
       
@@ -268,23 +269,71 @@ async function main() {
         const client = createClient(supabaseUrl, supabaseKey);
         const configManager = new ConfigManager();
         
+        // Try to load existing configuration for overrides
+        let configOverride;
+        try {
+          const existingConfig = configManager.loadConfig();
+          configOverride = {
+            database: existingConfig.schema ? { framework: existingConfig.schema.framework } : undefined,
+            schema: existingConfig.schema
+          };
+          if (options.verbose) {
+            Logger.debug('Loaded existing configuration for detection overrides');
+          }
+        } catch {
+          // No existing config, proceed with auto-detection
+          if (options.verbose) {
+            Logger.debug('No existing configuration found, using auto-detection');
+          }
+        }
+        
         spinner.text = 'Detecting schema structure...';
-        const detection = await configManager.detectAndSuggestConfig(client as any);
+        const detection = await configManager.detectAndSuggestConfig(client as any, configOverride, supabaseUrl);
         
         spinner.succeed('Schema analysis complete');
         
+        // Display enhanced detection results if available
+        if (detection.enhancedDetection && (options.verbose || options.debug)) {
+          console.log('\n📋 Enhanced schema detected:', {
+            primaryUserTable: detection.enhancedDetection.primaryUserTable,
+            structure: detection.framework,
+            makerkitVersion: detection.enhancedDetection.makerkitVersion,
+            frameworkType: detection.enhancedDetection.frameworkType,
+            customTables: detection.enhancedDetection.customTables,
+            relationships: detection.enhancedDetection.relationships,
+            assetCompatibility: detection.enhancedDetection.assetCompatibility
+          });
+        }
+        
         console.log('\n📊 Database Schema Analysis:');
-        console.log(`   🏗️  Framework detected: ${detection.framework}`);
+        console.log(`   🏗️  Framework detected: ${detection.enhancedDetection?.frameworkType || detection.framework}`);
+        
+        if (detection.enhancedDetection?.makerkitVersion && detection.enhancedDetection.makerkitVersion !== 'none') {
+          console.log(`   📦 MakerKit version: ${detection.enhancedDetection.makerkitVersion}`);
+        }
+        
         console.log(`   👤 Has profiles table: ${detection.hasProfiles ? '✅' : '❌'}`);
         console.log(`   👤 Has accounts table: ${detection.hasAccounts ? '✅' : '❌'}`);
         console.log(`   📝 Has setups table: ${detection.hasSetups ? '✅' : '❌'}`);
         console.log(`   🏷️  Has categories table: ${detection.hasCategories ? '✅' : '❌'}`);
         
+        if (detection.enhancedDetection) {
+          console.log(`   📋 Primary user table: ${detection.enhancedDetection.primaryUserTable}`);
+          console.log(`   🔗 Custom tables found: ${detection.enhancedDetection.customTables}`);
+          console.log(`   🔄 Relationships detected: ${detection.enhancedDetection.relationships}`);
+          
+          if (detection.enhancedDetection.assetCompatibility.images) {
+            console.log(`   🖼️  Image support: ✅ (${detection.enhancedDetection.assetCompatibility.storage})`);
+          } else {
+            console.log(`   🖼️  Image support: ❌`);
+          }
+        }
+        
         if (detection.missingTables.length > 0) {
           Logger.warn(`Missing tables: ${detection.missingTables.join(', ')}`);
           Logger.info('Run the appropriate schema file:');
           
-          if (detection.framework === 'makerkit') {
+          if (detection.framework === 'makerkit' || detection.enhancedDetection?.frameworkType === 'makerkit') {
             Logger.info('   psql -f schema-wildernest.sql');
           } else {
             Logger.info('   psql -f schema.sql');
@@ -294,8 +343,14 @@ async function main() {
         }
         
         console.log('\n🚀 Next steps:');
-        console.log('   1. Run "supa-seed init" to create a configuration file');
-        console.log('   2. Run "supa-seed seed" to start seeding your database');
+        if (configOverride) {
+          console.log('   Configuration file detected and used for framework detection');
+          console.log('   1. Run "supa-seed seed" to start seeding your database');
+          console.log('   2. Use "supa-seed detect --verbose" for detailed analysis');
+        } else {
+          console.log('   1. Run "supa-seed init" to create a configuration file');
+          console.log('   2. Run "supa-seed seed" to start seeding your database');
+        }
         
       } catch (error: any) {
         spinner.fail('Schema detection failed');
