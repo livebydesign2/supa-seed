@@ -329,6 +329,92 @@ export class ConfigManager {
   }
 
   /**
+   * Validate column mappings against actual database schema
+   */
+  async validateColumnMappings(client: SupabaseClient, config: FlexibleSeedConfig): Promise<{
+    valid: boolean;
+    warnings: string[];
+    suggestions: string[];
+  }> {
+    const warnings: string[] = [];
+    const suggestions: string[] = [];
+    
+    if (!config.schema?.userTable) {
+      return { valid: true, warnings, suggestions };
+    }
+    
+    try {
+      // Create SchemaAdapter for column validation
+      const schemaAdapter = new SchemaAdapter(client, config);
+      
+      // Validate profiles table column mappings
+      const profilesValidation = await schemaAdapter.validateTableSchema('profiles', {
+        email: [config.schema.userTable.emailField || 'email'],
+        name: [config.schema.userTable.nameField || 'name'],
+        picture: [config.schema.userTable.pictureField || 'picture_url'],
+        bio: [config.schema.userTable.bioField || 'bio'],
+        id: [config.schema.userTable.idField || 'id']
+      });
+      
+      if (!profilesValidation.valid) {
+        profilesValidation.missingFields.forEach(field => {
+          warnings.push(`Profiles table: '${field}' column mapping may be incorrect`);
+        });
+        
+        suggestions.push(...profilesValidation.suggestions);
+        
+        if (profilesValidation.availableColumns.length > 0) {
+          suggestions.push(`Available columns in profiles table: ${profilesValidation.availableColumns.join(', ')}`);
+        }
+      }
+      
+      // Validate setups table if configured
+      if (config.schema.setupTable) {
+        const setupsValidation = await schemaAdapter.validateTableSchema(config.schema.setupTable.name || 'setups', {
+          title: [config.schema.setupTable.titleField || 'title'],
+          description: [config.schema.setupTable.descriptionField || 'description'],
+          user_field: [config.schema.setupTable.userField || 'user_id']
+        });
+        
+        if (!setupsValidation.valid) {
+          setupsValidation.missingFields.forEach(field => {
+            warnings.push(`Setups table: '${field}' column mapping may be incorrect`);
+          });
+          
+          suggestions.push(...setupsValidation.suggestions);
+        }
+      }
+      
+      // Validate base templates if configured  
+      if (config.schema.baseTemplateTable) {
+        const templatesValidation = await schemaAdapter.validateTableSchema(config.schema.baseTemplateTable.name || 'base_templates', {
+          type: [config.schema.baseTemplateTable.typeField || 'type'],
+          make: [config.schema.baseTemplateTable.makeField || 'make'],
+          model: [config.schema.baseTemplateTable.modelField || 'model'],
+          description: [config.schema.baseTemplateTable.descriptionField || 'description']
+        });
+        
+        if (!templatesValidation.valid) {
+          templatesValidation.missingFields.forEach(field => {
+            warnings.push(`Base templates table: '${field}' column mapping may be incorrect`);
+          });
+          
+          suggestions.push(...templatesValidation.suggestions);
+        }
+      }
+      
+    } catch (error: any) {
+      warnings.push(`Unable to validate column mappings against database: ${error.message}`);
+    }
+    
+    return {
+      valid: warnings.length === 0,
+      warnings,
+      suggestions
+    };
+  }
+
+  /**
    * Create multiple environment profiles
    */
   createProfiles(): ConfigProfile[] {

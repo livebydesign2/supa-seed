@@ -306,6 +306,7 @@ export class SchemaAdapter {
     // Map expected fields to config field names
     const fieldMappings: Record<string, string> = {
       // Profile/user table mappings
+      'email': 'emailField',
       'picture_url': 'pictureField',
       'avatar_url': 'pictureField',
       'bio': 'bioField',
@@ -571,18 +572,31 @@ Technical details: ${error.message}
     }
 
     // Dynamically determine profile column mappings (config-aware)
+    const emailColumn = await this.getColumnMapping('profiles', 'email', ['email_address', 'user_email']);
     const pictureColumn = await this.getColumnMapping('profiles', 'picture_url', ['avatar_url', 'profile_image_url', 'image_url']);
     const bioColumn = await this.getColumnMapping('profiles', 'bio', ['about', 'description']);
     const usernameColumn = await this.getColumnMapping('profiles', 'username', ['handle', 'user_name']);
+    const nameColumn = await this.getColumnMapping('profiles', 'name', ['display_name', 'full_name', 'username']);
 
     // Build profile data with only columns that exist
     const profileData: any = {
       id: userId,
-      email: userData.email,
-      display_name: userData.name,
-      full_name: userData.name,
       updated_at: new Date().toISOString(),
     };
+
+    // Add email field if column exists and data provided
+    if (emailColumn && userData.email) {
+      profileData[emailColumn] = userData.email;
+    } else if (userData.email) {
+      Logger.debug(`Email field not found in profiles table - skipping email`);
+    }
+
+    // Add name field if column exists and data provided
+    if (nameColumn && userData.name) {
+      profileData[nameColumn] = userData.name;
+    } else if (userData.name) {
+      Logger.debug(`Name field not found in profiles table - skipping name`);
+    }
 
     // Add optional fields only if columns exist and data provided
     if (pictureColumn && userData.picture_url) {
@@ -614,22 +628,31 @@ Technical details: ${error.message}
       let errorMsg = `Profile creation failed: ${profileError.message}`;
       
       if (profileError.message.includes('column')) {
-        errorMsg += `\n\nColumn mapping suggestions:`;
-        if (pictureColumn) {
-          errorMsg += `\n  - Picture field: '${pictureColumn}' (mapped)`;
-        } else {
-          errorMsg += `\n  - Picture field: none found (tried: picture_url, avatar_url, profile_image_url, image_url)`;
+        // Use comprehensive schema validation for better error messages
+        const schemaValidation = await this.validateTableSchema('profiles', {
+          email: ['email', 'email_address', 'user_email'],
+          name: ['name', 'display_name', 'full_name', 'username'],
+          picture: ['picture_url', 'avatar_url', 'profile_image_url', 'image_url'],
+          bio: ['bio', 'about', 'description'],
+          username: ['username', 'handle', 'user_name']
+        });
+        
+        errorMsg += `\n\nSchema Analysis:`;
+        errorMsg += `\n  Available columns: ${schemaValidation.availableColumns.join(', ')}`;
+        
+        if (schemaValidation.suggestions.length > 0) {
+          errorMsg += `\n\nMapping suggestions:`;
+          schemaValidation.suggestions.forEach(suggestion => {
+            errorMsg += `\n  - ${suggestion}`;
+          });
         }
-        if (bioColumn) {
-          errorMsg += `\n  - Bio field: '${bioColumn}' (mapped)`;
-        } else {
-          errorMsg += `\n  - Bio field: none found (tried: bio, about, description)`;
-        }
-        if (usernameColumn) {
-          errorMsg += `\n  - Username field: '${usernameColumn}' (mapped)`;
-        } else {
-          errorMsg += `\n  - Username field: none found (tried: username, handle, user_name)`;
-        }
+        
+        errorMsg += `\n\nCurrent mappings:`;
+        if (emailColumn) errorMsg += `\n  - Email: '${emailColumn}' ✅`;
+        if (nameColumn) errorMsg += `\n  - Name: '${nameColumn}' ✅`;
+        if (pictureColumn) errorMsg += `\n  - Picture: '${pictureColumn}' ✅`;
+        if (bioColumn) errorMsg += `\n  - Bio: '${bioColumn}' ✅`;
+        if (usernameColumn) errorMsg += `\n  - Username: '${usernameColumn}' ✅`;
         
         errorMsg += `\n\nTo fix: Update your config schema.userTable fields to match your database columns.`;
       }
@@ -689,6 +712,7 @@ Technical details: ${error.message}
     }
 
     // Dynamically determine profile column mappings (config-aware)
+    const emailColumn = await this.getColumnMapping('profiles', 'email', ['email_address', 'user_email']);
     const pictureColumn = await this.getColumnMapping('profiles', 'picture_url', ['avatar_url', 'profile_image_url', 'image_url']);
     const bioColumn = await this.getColumnMapping('profiles', 'bio', ['about', 'description']);
     const usernameColumn = await this.getColumnMapping('profiles', 'username', ['handle', 'user_name']);
@@ -697,10 +721,16 @@ Technical details: ${error.message}
     // Build profile data with only columns that exist
     const profileData: any = {
       id: userId,
-      email: userData.email,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
+
+    // Add email field if column exists and data provided
+    if (emailColumn && userData.email) {
+      profileData[emailColumn] = userData.email;
+    } else if (userData.email) {
+      Logger.debug(`Email field not found in profiles table - skipping email`);
+    }
 
     // Add required fields with fallbacks
     if (nameColumn) {
@@ -739,22 +769,31 @@ Technical details: ${error.message}
       let errorMsg = `Profile creation failed: ${profileError.message}`;
       
       if (profileError.message.includes('column')) {
-        errorMsg += `\n\nColumn mapping suggestions:`;
-        if (pictureColumn) {
-          errorMsg += `\n  - Picture field: '${pictureColumn}' (mapped)`;
-        } else {
-          errorMsg += `\n  - Picture field: none found (tried: picture_url, avatar_url, profile_image_url, image_url)`;
+        // Use comprehensive schema validation for better error messages
+        const schemaValidation = await this.validateTableSchema('profiles', {
+          email: ['email', 'email_address', 'user_email'],
+          name: ['name', 'display_name', 'full_name', 'username'],
+          picture: ['picture_url', 'avatar_url', 'profile_image_url', 'image_url'],
+          bio: ['bio', 'about', 'description'],
+          username: ['username', 'handle', 'user_name']
+        });
+        
+        errorMsg += `\n\nSchema Analysis:`;
+        errorMsg += `\n  Available columns: ${schemaValidation.availableColumns.join(', ')}`;
+        
+        if (schemaValidation.suggestions.length > 0) {
+          errorMsg += `\n\nMapping suggestions:`;
+          schemaValidation.suggestions.forEach(suggestion => {
+            errorMsg += `\n  - ${suggestion}`;
+          });
         }
-        if (bioColumn) {
-          errorMsg += `\n  - Bio field: '${bioColumn}' (mapped)`;
-        } else {
-          errorMsg += `\n  - Bio field: none found (tried: bio, about, description)`;
-        }
-        if (usernameColumn) {
-          errorMsg += `\n  - Username field: '${usernameColumn}' (mapped)`;
-        } else {
-          errorMsg += `\n  - Username field: none found (tried: username, handle, user_name)`;
-        }
+        
+        errorMsg += `\n\nCurrent mappings:`;
+        if (emailColumn) errorMsg += `\n  - Email: '${emailColumn}' ✅`;
+        if (nameColumn) errorMsg += `\n  - Name: '${nameColumn}' ✅`;
+        if (pictureColumn) errorMsg += `\n  - Picture: '${pictureColumn}' ✅`;
+        if (bioColumn) errorMsg += `\n  - Bio: '${bioColumn}' ✅`;
+        if (usernameColumn) errorMsg += `\n  - Username: '${usernameColumn}' ✅`;
         
         errorMsg += `\n\nTo fix: Update your config schema.userTable fields to match your database columns.`;
       }
@@ -970,6 +1009,79 @@ Technical details: ${error.message}
     } catch {
       return false;
     }
+  }
+
+  /**
+   * Get actual column names from database schema
+   */
+  private async getTableColumns(tableName: string): Promise<string[]> {
+    try {
+      const { data, error } = await this.client
+        .from('information_schema.columns')
+        .select('column_name')
+        .eq('table_name', tableName)
+        .eq('table_schema', 'public');
+      
+      if (error) {
+        // Fallback: try to get columns by doing a select with limit 0
+        const { error: selectError } = await this.client
+          .from(tableName)
+          .select('*')
+          .limit(0);
+        
+        if (selectError && selectError.message.includes('column')) {
+          Logger.debug(`Unable to introspect ${tableName} columns: ${selectError.message}`);
+          return [];
+        }
+        
+        return [];
+      }
+      
+      return data?.map(row => row.column_name as string) || [];
+    } catch (error) {
+      Logger.debug(`Schema introspection failed for ${tableName}: ${error}`);
+      return [];
+    }
+  }
+
+  /**
+   * Validate that required columns exist for a table and provide helpful error messages
+   */
+  async validateTableSchema(tableName: string, requiredFields: Record<string, string[]>): Promise<{
+    valid: boolean;
+    missingFields: string[];
+    availableColumns: string[];
+    suggestions: string[];
+  }> {
+    const availableColumns = await this.getTableColumns(tableName);
+    const missingFields: string[] = [];
+    const suggestions: string[] = [];
+    
+    for (const [fieldName, possibleColumns] of Object.entries(requiredFields)) {
+      const foundColumn = possibleColumns.find(col => availableColumns.includes(col));
+      if (!foundColumn) {
+        missingFields.push(fieldName);
+        
+        // Find similar column names as suggestions
+        const similarCols = availableColumns.filter(col => 
+          possibleColumns.some(possible => 
+            col.toLowerCase().includes(possible.toLowerCase()) || 
+            possible.toLowerCase().includes(col.toLowerCase())
+          )
+        );
+        
+        if (similarCols.length > 0) {
+          suggestions.push(`For ${fieldName}, consider mapping to: ${similarCols.join(', ')}`);
+        }
+      }
+    }
+    
+    return {
+      valid: missingFields.length === 0,
+      missingFields,
+      availableColumns,
+      suggestions
+    };
   }
   
   /**

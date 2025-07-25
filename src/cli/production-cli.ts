@@ -13,6 +13,11 @@ import { PerformanceMonitor } from '../utils/performance-monitor';
 import { MemoryManager } from '../utils/memory-manager';
 import { GracefulDegradation } from '../utils/graceful-degradation';
 import { ConfigValidator } from '../utils/config-validator';
+import * as fs from 'fs';
+import * as path from 'path';
+
+// Read version from package.json
+const packageJson = JSON.parse(fs.readFileSync(path.join(__dirname, '../../package.json'), 'utf8'));
 
 export interface CLIConfig {
   verbose: boolean;
@@ -49,7 +54,7 @@ export class ProductionCLI {
     this.program
       .name('supa-seed')
       .description('🌱 Advanced Hybrid Database Seeding Platform for Supabase')
-      .version('1.3.0');
+      .version(packageJson.version);
 
     // Global options
     this.program

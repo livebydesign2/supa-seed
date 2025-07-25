@@ -9,12 +9,17 @@ import { loadConfiguration } from './config';
 import { Logger } from './utils/logger';
 import { createEnhancedSupabaseClient } from './utils/enhanced-supabase-client';
 import type { SeedConfig } from './types';
+import * as fs from 'fs';
+import * as path from 'path';
+
+// Read version from package.json
+const packageJson = JSON.parse(fs.readFileSync(path.join(__dirname, '../package.json'), 'utf8'));
 
 async function main() {
   program
     .name('supa-seed')
     .description('🌱 Modern Database Seeding Framework for Supabase')
-    .version('2.0.3');
+    .version(packageJson.version);
 
   program
     .command('seed')
@@ -81,6 +86,42 @@ async function main() {
         
         spinner.text = 'Connecting to database...';
         const seeder = new SupaSeedFramework(config);
+        
+        // Validate column mappings if schema configuration is present
+        if (config.schema && configResult.source === 'config-file' && configResult.flexConfig) {
+          try {
+            spinner.text = 'Validating column mappings...';
+            const client = createEnhancedSupabaseClient(config.supabaseUrl, config.supabaseServiceKey);
+            const configManager = new ConfigManager();
+            const validation = await configManager.validateColumnMappings(client as any, configResult.flexConfig);
+            
+            if (validation.warnings.length > 0) {
+              spinner.warn('Column mapping validation warnings');
+              console.log('\n⚠️  Configuration Warnings:');
+              validation.warnings.forEach(warning => {
+                console.log(`   • ${warning}`);
+              });
+            }
+            
+            if (validation.suggestions.length > 0) {
+              console.log('\n💡 Suggestions:');
+              validation.suggestions.forEach(suggestion => {
+                console.log(`   • ${suggestion}`);
+              });
+              console.log('');
+            }
+            
+            if (validation.warnings.length > 0) {
+              console.log('These warnings may cause seeding issues. Continue anyway? Press Enter to proceed...');
+              await new Promise(resolve => process.stdin.once('data', resolve));
+            }
+            
+            spinner.text = 'Connecting to database...';
+          } catch (error) {
+            // Don't fail seeding if validation fails, just warn
+            console.log(`\n⚠️  Could not validate column mappings: ${error}`);
+          }
+        }
         
         if (options.cleanup) {
           spinner.text = 'Cleaning up existing seed data...';
