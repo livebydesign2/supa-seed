@@ -18,7 +18,15 @@ import {
 } from '../strategy-interface';
 import { ConstraintDiscoveryEngine } from '../../schema/constraint-discovery-engine';
 import { ConstraintRegistry } from '../../schema/constraint-registry';
+import { BusinessLogicAnalyzer } from '../../schema/business-logic-analyzer';
+import { RLSCompliantSeeder } from '../../schema/rls-compliant-seeder';
 import { Logger } from '../../utils/logger';
+import type {
+  BusinessLogicAnalysisResult,
+  RLSComplianceOptions,
+  RLSComplianceResult,
+  UserContext
+} from '../../schema/business-logic-types';
 
 type SupabaseClient = ReturnType<typeof createClient>;
 
@@ -28,6 +36,8 @@ export class GenericStrategy implements SeedingStrategy {
   private discoveredConstraints: Map<string, any[]> = new Map();
   private constraintEngine?: ConstraintDiscoveryEngine;
   private constraintRegistry?: ConstraintRegistry;
+  private businessLogicAnalyzer?: BusinessLogicAnalyzer;
+  private rlsCompliantSeeder?: RLSCompliantSeeder;
 
   async initialize(client: SupabaseClient): Promise<void> {
     this.client = client;
@@ -36,6 +46,19 @@ export class GenericStrategy implements SeedingStrategy {
       enablePriorityHandling: false,
       enableFallbackHandlers: true,
       logHandlerSelection: false
+    });
+
+    // Initialize business logic analyzer for generic patterns
+    this.businessLogicAnalyzer = new BusinessLogicAnalyzer(client, {
+      frameworkHints: [],
+      expectedPatterns: ['direct_insertion']
+    });
+
+    // Initialize RLS compliant seeder with service role preference for generic
+    this.rlsCompliantSeeder = new RLSCompliantSeeder(client, undefined, {
+      enableRLSCompliance: true,
+      createUserContext: false,
+      useServiceRole: true // Generic strategy prefers service role bypass
     });
     
     // Register generic handlers
@@ -534,5 +557,90 @@ export class GenericStrategy implements SeedingStrategy {
         bypassRequired: true
       };
     }
+  }
+
+  /**
+   * Analyze business logic patterns for generic strategy
+   */
+  async analyzeBusinessLogic(): Promise<BusinessLogicAnalysisResult> {
+    if (!this.businessLogicAnalyzer) {
+      throw new Error('Business logic analyzer not initialized');
+    }
+
+    try {
+      Logger.debug('Analyzing generic business logic patterns');
+      
+      const analysis = await this.businessLogicAnalyzer.analyzeBusinessLogic();
+      
+      // Add generic-specific enhancements to the analysis
+      if (analysis.success) {
+        analysis.framework = 'generic';
+        
+        // Generic strategy typically has lower confidence for business logic
+        analysis.confidence = Math.min(analysis.confidence, 0.7);
+
+        // Add generic-specific recommendations
+        const genericRecommendations = [
+          'Consider framework-specific strategy for better business logic compliance',
+          'Use service role for RLS bypass when needed',
+          'Enable constraint discovery for better data integrity'
+        ];
+        
+        analysis.warnings.push(...genericRecommendations);
+      }
+
+      return analysis;
+
+    } catch (error: any) {
+      Logger.error('Generic business logic analysis failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Seed data with RLS compliance for generic strategy
+   */
+  async seedWithRLSCompliance(
+    table: string, 
+    data: any[], 
+    userContext?: UserContext
+  ): Promise<RLSComplianceResult> {
+    if (!this.rlsCompliantSeeder) {
+      throw new Error('RLS compliant seeder not initialized');
+    }
+
+    try {
+      Logger.debug(`Generic RLS-compliant seeding for table: ${table}`);
+
+      // For generic strategy, we often prefer service role bypass
+      const result = await this.rlsCompliantSeeder.seedWithRLSCompliance(table, data, userContext);
+      
+      // Add generic-specific context to the result
+      if (result.success && result.bypassesUsed.length > 0) {
+        result.warnings = result.warnings || [];
+        result.warnings.push('Used service role bypass for generic seeding');
+      }
+
+      return result;
+
+    } catch (error: any) {
+      Logger.error(`Generic RLS-compliant seeding failed for ${table}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get RLS compliance options for generic strategy
+   */
+  getRLSComplianceOptions(): RLSComplianceOptions {
+    return {
+      enableRLSCompliance: true,
+      useServiceRole: true, // Generic strategy prefers service role bypass
+      createUserContext: false,
+      bypassOnFailure: true, // More permissive for generic use
+      validateAfterInsert: false,
+      logPolicyViolations: true,
+      maxRetries: 1
+    };
   }
 }

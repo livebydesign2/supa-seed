@@ -11,6 +11,12 @@ import type {
   TableConstraints,
   ConstraintDiscoveryResult 
 } from '../schema/constraint-types';
+import type {
+  BusinessLogicAnalysisResult,
+  RLSComplianceOptions,
+  RLSComplianceResult,
+  UserContext
+} from '../schema/business-logic-types';
 
 type SupabaseClient = ReturnType<typeof createClient>;
 
@@ -144,6 +150,21 @@ export interface SeedingStrategy {
    * Apply constraint-aware data transformation
    */
   applyConstraintFixes?(table: string, data: any, constraints: TableConstraints): Promise<ConstraintHandlingResult>;
+
+  /**
+   * Analyze business logic patterns for this strategy
+   */
+  analyzeBusinessLogic?(): Promise<BusinessLogicAnalysisResult>;
+
+  /**
+   * Seed data with RLS compliance
+   */
+  seedWithRLSCompliance?(table: string, data: any[], userContext?: UserContext): Promise<RLSComplianceResult>;
+
+  /**
+   * Get RLS compliance options for this strategy
+   */
+  getRLSComplianceOptions?(): RLSComplianceOptions;
 
   /**
    * Get recommendations for using this strategy

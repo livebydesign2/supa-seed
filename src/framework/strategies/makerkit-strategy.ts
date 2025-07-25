@@ -18,7 +18,15 @@ import {
 } from '../strategy-interface';
 import { ConstraintDiscoveryEngine } from '../../schema/constraint-discovery-engine';
 import { ConstraintRegistry } from '../../schema/constraint-registry';
+import { BusinessLogicAnalyzer } from '../../schema/business-logic-analyzer';
+import { RLSCompliantSeeder } from '../../schema/rls-compliant-seeder';
 import { Logger } from '../../utils/logger';
+import type {
+  BusinessLogicAnalysisResult,
+  RLSComplianceOptions,
+  RLSComplianceResult,
+  UserContext
+} from '../../schema/business-logic-types';
 
 type SupabaseClient = ReturnType<typeof createClient>;
 
@@ -29,6 +37,8 @@ export class MakerKitStrategy implements SeedingStrategy {
   private detectedFeatures: string[] = [];
   private constraintEngine?: ConstraintDiscoveryEngine;
   private constraintRegistry?: ConstraintRegistry;
+  private businessLogicAnalyzer?: BusinessLogicAnalyzer;
+  private rlsCompliantSeeder?: RLSCompliantSeeder;
 
   async initialize(client: SupabaseClient): Promise<void> {
     this.client = client;
@@ -37,6 +47,19 @@ export class MakerKitStrategy implements SeedingStrategy {
       enablePriorityHandling: true,
       enableFallbackHandlers: true,
       logHandlerSelection: true
+    });
+    
+    // Initialize business logic analyzer
+    this.businessLogicAnalyzer = new BusinessLogicAnalyzer(client, {
+      frameworkHints: ['makerkit'],
+      expectedPatterns: ['auth_triggered', 'personal_account_constraint']
+    });
+
+    // Initialize RLS compliant seeder
+    this.rlsCompliantSeeder = new RLSCompliantSeeder(client, undefined, {
+      enableRLSCompliance: true,
+      createUserContext: true,
+      useServiceRole: false // MakerKit prefers auth-based approach
     });
     
     // Register MakerKit-specific handlers
@@ -555,6 +578,93 @@ export class MakerKitStrategy implements SeedingStrategy {
         bypassRequired: true
       };
     }
+  }
+
+  /**
+   * Analyze business logic patterns for MakerKit
+   */
+  async analyzeBusinessLogic(): Promise<BusinessLogicAnalysisResult> {
+    if (!this.businessLogicAnalyzer) {
+      throw new Error('Business logic analyzer not initialized');
+    }
+
+    try {
+      Logger.debug('Analyzing MakerKit business logic patterns');
+      
+      const analysis = await this.businessLogicAnalyzer.analyzeBusinessLogic();
+      
+      // Add MakerKit-specific enhancements to the analysis
+      if (analysis.success) {
+        analysis.framework = 'makerkit';
+        
+        // Boost confidence if MakerKit patterns are detected
+        if (analysis.triggerAnalysis.userCreationFlow?.usesAuthTriggers) {
+          analysis.confidence = Math.min(analysis.confidence + 0.1, 1.0);
+        }
+
+        // Add MakerKit-specific recommendations
+        const makerKitRecommendations = [
+          'Use auth.admin.createUser() for proper MakerKit workflow',
+          'Ensure is_personal_account=true for personal profiles',
+          'Let triggers handle account and profile creation'
+        ];
+        
+        analysis.warnings.push(...makerKitRecommendations);
+      }
+
+      return analysis;
+
+    } catch (error: any) {
+      Logger.error('MakerKit business logic analysis failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Seed data with RLS compliance for MakerKit
+   */
+  async seedWithRLSCompliance(
+    table: string, 
+    data: any[], 
+    userContext?: UserContext
+  ): Promise<RLSComplianceResult> {
+    if (!this.rlsCompliantSeeder) {
+      throw new Error('RLS compliant seeder not initialized');
+    }
+
+    try {
+      Logger.debug(`MakerKit RLS-compliant seeding for table: ${table}`);
+
+      // For MakerKit, we prefer auth-triggered workflows
+      const result = await this.rlsCompliantSeeder.seedWithRLSCompliance(table, data, userContext);
+      
+      // Add MakerKit-specific context to the result
+      if (result.success && result.userContext) {
+        result.warnings = result.warnings || [];
+        result.warnings.push('Used MakerKit auth-triggered workflow');
+      }
+
+      return result;
+
+    } catch (error: any) {
+      Logger.error(`MakerKit RLS-compliant seeding failed for ${table}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get RLS compliance options for MakerKit
+   */
+  getRLSComplianceOptions(): RLSComplianceOptions {
+    return {
+      enableRLSCompliance: true,
+      useServiceRole: false, // MakerKit prefers auth-based approach
+      createUserContext: true,
+      bypassOnFailure: false, // Strict compliance for business logic
+      validateAfterInsert: true,
+      logPolicyViolations: true,
+      maxRetries: 2
+    };
   }
 
   private detectMakerKitVersion(schema: DatabaseSchema): string | undefined {
