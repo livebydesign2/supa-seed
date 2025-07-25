@@ -16,6 +16,13 @@ import {
   TableConstraints,
   StrategyConstraintResult
 } from '../strategy-interface';
+import { IdentityManager } from '../../auth/identity-manager';
+import type { 
+  CompleteUserData, 
+  CompleteUserResult, 
+  IdentityProviderType,
+  AuthFlowConfig 
+} from '../../auth/auth-types';
 import { ConstraintDiscoveryEngine } from '../../schema/constraint-discovery-engine';
 import { ConstraintRegistry } from '../../schema/constraint-registry';
 import { BusinessLogicAnalyzer } from '../../schema/business-logic-analyzer';
@@ -72,10 +79,18 @@ export class MakerKitStrategy implements SeedingStrategy {
   private junctionTableHandler?: JunctionTableHandler;
   private multiTenantManager?: MultiTenantManager;
   private storageIntegrationManager?: StorageIntegrationManager;
+  private identityManager?: IdentityManager;
+  private authFlowConfig!: AuthFlowConfig;
 
   async initialize(client: SupabaseClient): Promise<void> {
     this.client = client;
     this.constraintEngine = new ConstraintDiscoveryEngine(client);
+    
+    // Initialize identity manager for complete auth flows
+    this.identityManager = new IdentityManager(client);
+    
+    // Set default auth flow configuration for MakerKit
+    this.authFlowConfig = this.getDefaultAuthFlowConfig();
     this.constraintRegistry = new ConstraintRegistry({
       enablePriorityHandling: true,
       enableFallbackHandlers: true,
@@ -266,14 +281,63 @@ export class MakerKitStrategy implements SeedingStrategy {
   }
 
   async createUser(data: UserData): Promise<User> {
-    try {
-      Logger.debug(`Creating MakerKit user: ${data.email}`);
+    // Convert UserData to CompleteUserData for new auth flow
+    const completeUserData: CompleteUserData = {
+      email: data.email,
+      password: data.password,
+      name: data.name,
+      username: data.username,
+      avatar: data.avatar,
+      bio: data.bio,
+      metadata: data.metadata,
+      identityProviders: ['email'], // Default to email provider
+      primaryProvider: 'email',
+      isPersonalAccount: true,
+      emailConfirmed: true
+    };
 
-      // Use MakerKit's intended flow: auth.admin.createUser() + triggers
+    const result = await this.createCompleteUser(completeUserData);
+    
+    if (!result.success || !result.authUser) {
+      throw new Error(`User creation failed: ${result.errors.join(', ')}`);
+    }
+
+    return {
+      id: result.authUser.id,
+      email: result.authUser.email,
+      name: data.name,
+      username: data.username,
+      avatar: data.avatar,
+      created_at: result.authUser.createdAt,
+      metadata: result.authUser.userMetadata
+    };
+  }
+
+  /**
+   * Create complete user with auth.users + auth.identities + accounts + profiles
+   * Implements FR-1.1: Complete authentication flow
+   */
+  async createCompleteUser(data: CompleteUserData): Promise<CompleteUserResult> {
+    if (!this.identityManager) {
+      throw new Error('Identity manager not initialized');
+    }
+
+    const result: CompleteUserResult = {
+      success: false,
+      identities: [],
+      errors: [],
+      warnings: [],
+      recommendations: []
+    };
+
+    try {
+      Logger.debug(`Creating complete MakerKit user: ${data.email}`);
+
+      // Step 1: Create auth.users record
       const { data: authUser, error: authError } = await this.client.auth.admin.createUser({
         email: data.email,
         password: data.password || 'defaultPassword123!',
-        email_confirm: true,
+        email_confirm: data.emailConfirmed ?? true,
         user_metadata: {
           name: data.name,
           username: data.username,
@@ -284,86 +348,102 @@ export class MakerKitStrategy implements SeedingStrategy {
       });
 
       if (authError) {
-        throw new Error(`Auth user creation failed: ${authError.message}`);
+        result.errors.push(`Auth user creation failed: ${authError.message}`);
+        return result;
       }
 
       if (!authUser.user) {
-        throw new Error('Auth user creation returned no user');
+        result.errors.push('Auth user creation returned no user');
+        return result;
       }
 
-      // Wait for MakerKit triggers to create account and profile
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // Verify account was created
-      const { data: account, error: accountError } = await this.client
-        .from('accounts')
-        .select('*')
-        .eq('id', authUser.user.id)
-        .single();
-
-      if (accountError || !account) {
-        Logger.warn('Account not created by trigger, creating manually');
-        
-        // Fallback: create account manually with constraint handling
-        const accountData = await this.handleConstraints('accounts', {
-          id: authUser.user.id,
-          name: data.name,
-          email: data.email,
-          is_personal_account: true,
-          slug: null, // Set to null for personal accounts
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        });
-
-        const { error: insertError } = await this.client
-          .from('accounts')
-          .insert(accountData.modifiedData);
-
-        if (insertError) {
-          throw new Error(`Manual account creation failed: ${insertError.message}`);
-        }
-      }
-
-      // Check for profile creation
-      const { data: profile } = await this.client
-        .from('profiles')
-        .select('*')
-        .eq('id', authUser.user.id)
-        .single();
-
-      if (!profile) {
-        Logger.debug('Creating profile manually');
-        
-        const { error: profileError } = await this.client
-          .from('profiles')
-          .insert({
-            id: authUser.user.id,
-            name: data.name,
-            username: data.username,
-            avatar_url: data.avatar,
-            bio: data.bio,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          });
-
-        if (profileError) {
-          Logger.warn(`Profile creation failed: ${profileError.message}`);
-        }
-      }
-
-      return {
+      result.authUser = {
         id: authUser.user.id,
         email: authUser.user.email!,
-        name: data.name,
-        username: data.username,
-        avatar: data.avatar,
-        created_at: authUser.user.created_at,
-        metadata: authUser.user.user_metadata
+        emailConfirmed: authUser.user.email_confirmed_at != null,
+        createdAt: authUser.user.created_at,
+        updatedAt: authUser.user.updated_at || authUser.user.created_at,
+        lastSignInAt: authUser.user.last_sign_in_at || undefined,
+        userMetadata: authUser.user.user_metadata,
+        appMetadata: authUser.user.app_metadata,
+        role: authUser.user.role,
+        aud: authUser.user.aud
       };
 
+      // Step 2: Create auth.identities records
+      if (this.authFlowConfig.createIdentities && data.identityProviders?.length) {
+        Logger.debug(`Creating identities for ${data.identityProviders.length} providers`);
+        
+        for (const provider of data.identityProviders) {
+          const providerData = this.identityManager.generateOAuthProviderData(provider, data.email);
+          const identityResult = await this.identityManager.createIdentity({
+            userId: authUser.user.id,
+            provider: provider,
+            providerId: providerData.providerId,
+            email: data.email,
+            providerMetadata: providerData.metadata,
+            createdAt: authUser.user.created_at,
+            updatedAt: authUser.user.created_at
+          });
+
+          if (identityResult.success && identityResult.identity) {
+            result.identities.push({
+              id: identityResult.identity.id,
+              userId: identityResult.identity.user_id,
+              identityData: identityResult.identity.identity_data,
+              provider: identityResult.identity.provider,
+              lastSignInAt: identityResult.identity.last_sign_in_at,
+              createdAt: identityResult.identity.created_at,
+              updatedAt: identityResult.identity.updated_at
+            });
+          } else {
+            result.warnings.push(`Identity creation failed for ${provider}: ${identityResult.error}`);
+          }
+
+          result.warnings.push(...identityResult.warnings);
+        }
+      }
+
+      // Step 3: Wait for MakerKit triggers and handle account creation
+      if (this.authFlowConfig.useMakerKitTriggers) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+
+      // Step 4: Verify/create account record
+      if (this.authFlowConfig.createAccountRecords) {
+        const accountResult = await this.ensureAccountExists(authUser.user.id, data);
+        if (accountResult) {
+          result.account = accountResult;
+        } else {
+          result.warnings.push('Account creation failed or not completed');
+        }
+      }
+
+      // Step 5: Verify/create profile record
+      if (this.authFlowConfig.createProfileRecords) {
+        const profileResult = await this.ensureProfileExists(authUser.user.id, data);
+        if (profileResult) {
+          result.profile = profileResult;
+        } else {
+          result.warnings.push('Profile creation failed or not completed');
+        }
+      }
+
+      // Add success recommendations
+      result.recommendations.push(
+        'Complete MakerKit auth flow successfully created',
+        `Created ${result.identities.length} identity provider${result.identities.length !== 1 ? 's' : ''}`,
+        'User ready for MakerKit application testing'
+      );
+
+      result.success = true;
+      Logger.success(`✅ Complete MakerKit user created: ${data.email}`);
+      return result;
+
     } catch (error: any) {
-      Logger.error(`MakerKit user creation failed: ${error.message}`);
-      throw error;
+      Logger.error(`Complete user creation failed for ${data.email}:`, error);
+      result.errors.push(error.message);
+      return result;
     }
   }
 
@@ -981,6 +1061,127 @@ export class MakerKitStrategy implements SeedingStrategy {
 
     // Default to v2 if MakerKit is detected but no v3 patterns
     return 'v2';
+  }
+
+  /**
+   * Get default auth flow configuration for MakerKit
+   */
+  private getDefaultAuthFlowConfig(): AuthFlowConfig {
+    return {
+      // Complete auth flow settings
+      createIdentities: true,
+      enableMFA: false, // Will be implemented in Task 1.2
+      setupDevelopmentWebhooks: false, // Will be implemented in Task 1.3
+      
+      // Provider settings
+      supportedProviders: ['email', 'google', 'github'],
+      primaryProvider: 'email',
+      allowMultipleProviders: true,
+      
+      // MakerKit integration
+      useMakerKitTriggers: true,
+      createAccountRecords: true,
+      createProfileRecords: true,
+      
+      // Testing and development
+      autoConfirmUsers: true,
+      generateTestData: true,
+      skipEmailVerification: true
+    };
+  }
+
+  /**
+   * Ensure account record exists for user
+   */
+  private async ensureAccountExists(userId: string, userData: CompleteUserData): Promise<any | null> {
+    try {
+      // Check if account already exists
+      const { data: existingAccount } = await this.client
+        .from('accounts')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (existingAccount) {
+        Logger.debug(`Account already exists for user ${userId}`);
+        return existingAccount;
+      }
+
+      // Create account manually with constraint handling
+      const accountData = await this.handleConstraints('accounts', {
+        id: userId,
+        name: userData.name,
+        email: userData.email,
+        is_personal_account: userData.isPersonalAccount ?? true,
+        slug: userData.accountSlug ?? null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      });
+
+      const { data: account, error } = await this.client
+        .from('accounts')
+        .insert(accountData.modifiedData)
+        .select()
+        .single();
+
+      if (error) {
+        Logger.warn(`Account creation failed for user ${userId}: ${error.message}`);
+        return null;
+      }
+
+      Logger.debug(`✅ Created account for user ${userId}`);
+      return account;
+
+    } catch (error: any) {
+      Logger.warn(`Error ensuring account exists for user ${userId}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Ensure profile record exists for user
+   */
+  private async ensureProfileExists(userId: string, userData: CompleteUserData): Promise<any | null> {
+    try {
+      // Check if profile already exists
+      const { data: existingProfile } = await this.client
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (existingProfile) {
+        Logger.debug(`Profile already exists for user ${userId}`);
+        return existingProfile;
+      }
+
+      // Create profile record
+      const { data: profile, error } = await this.client
+        .from('profiles')
+        .insert({
+          id: userId,
+          name: userData.name,
+          username: userData.username,
+          avatar_url: userData.avatar,
+          bio: userData.bio,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .select()
+        .single();
+
+      if (error) {
+        Logger.warn(`Profile creation failed for user ${userId}: ${error.message}`);
+        return null;
+      }
+
+      Logger.debug(`✅ Created profile for user ${userId}`);
+      return profile;
+
+    } catch (error: any) {
+      Logger.warn(`Error ensuring profile exists for user ${userId}:`, error);
+      return null;
+    }
   }
 
   /**
