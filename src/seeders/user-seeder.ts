@@ -13,34 +13,79 @@ export class UserSeeder extends SeedModule {
   private makerkitCompatibility!: MakerKitCompatibilityLayer;
 
   async seed(): Promise<void> {
-    // Initialize schema adapter with config override
-    this.schemaAdapter = new SchemaAdapter(this.context.client, this.context.config);
-    await this.schemaAdapter.detectSchema();
+    try {
+      // Initialize schema adapter with config override
+      this.schemaAdapter = new SchemaAdapter(this.context.client, this.context.config);
+      await this.schemaAdapter.detectSchema();
 
-    // Initialize MakerKit compatibility layer
-    await this.initializeMakerKitCompatibility();
+      // Initialize MakerKit compatibility layer
+      await this.initializeMakerKitCompatibility();
 
-    const users: CachedUser[] = [];
-    
-    // Create standard MakerKit test emails if enabled (enhanced)
-    if (this.context.config.createStandardTestEmails) {
-      const standardUsers = await this.createEnhancedStandardTestUsers();
-      users.push(...standardUsers);
-    }
-    
-    // Create diverse generated users
-    for (let i = 0; i < this.context.config.userCount; i++) {
-      const user = await this.createUser();
-      if (user) {
-        users.push(user);
-        this.context.stats.usersCreated++;
+      const users: CachedUser[] = [];
+      let successfulUsers = 0;
+      let failedUsers = 0;
+      
+      // Create standard MakerKit test emails if enabled (enhanced)
+      if (this.context.config.createStandardTestEmails) {
+        try {
+          const standardUsers = await this.createEnhancedStandardTestUsers();
+          users.push(...standardUsers);
+          successfulUsers += standardUsers.length;
+        } catch (error: any) {
+          console.log(`⚠️  Standard test user creation failed: ${error.message}`);
+          console.log('   Continuing with regular user creation...');
+          failedUsers++;
+        }
       }
+      
+      // Create diverse generated users with error recovery
+      console.log(`🔄 Creating ${this.context.config.userCount} users...`);
+      for (let i = 0; i < this.context.config.userCount; i++) {
+        try {
+          const user = await this.createUser();
+          if (user) {
+            users.push(user);
+            this.context.stats.usersCreated++;
+            successfulUsers++;
+          } else {
+            failedUsers++;
+          }
+        } catch (error: any) {
+          console.log(`⚠️  User ${i + 1} creation failed: ${error.message}`);
+          failedUsers++;
+          // Continue with next user instead of failing completely
+        }
+      }
+      
+      // Report results
+      console.log(`✅ User creation complete: ${successfulUsers} successful, ${failedUsers} failed`);
+      
+      // Cache users and compatibility info for other seeders (even if some failed)
+      this.context.cache.set('users', users);
+      this.context.cache.set('schemaAdapter', this.schemaAdapter);
+      this.context.cache.set('makerkitCompatibility', this.makerkitCompatibility);
+      
+      // If no users were created at all, provide helpful guidance
+      if (users.length === 0) {
+        console.log('🚨 No users were created successfully. This may cause cascade failures.');
+        console.log('💡 Check your schema configuration and column mappings.');
+        console.log('   Other seeders will be skipped to prevent errors.');
+        // Set a flag to indicate no users were created
+        this.context.cache.set('noUsersCreated', true);
+      }
+      
+    } catch (error: any) {
+      console.error('🚨 Critical error in user seeding:', error.message);
+      console.log('💡 This may be due to schema incompatibility. Please check:');
+      console.log('   1. Database connection');
+      console.log('   2. Table permissions');
+      console.log('   3. Column name mappings in config');
+      
+      // Set empty cache to prevent cascade failures
+      this.context.cache.set('users', []);
+      this.context.cache.set('noUsersCreated', true);
+      throw error;
     }
-    
-    // Cache users and compatibility info for other seeders
-    this.context.cache.set('users', users);
-    this.context.cache.set('schemaAdapter', this.schemaAdapter);
-    this.context.cache.set('makerkitCompatibility', this.makerkitCompatibility);
   }
 
   /**
@@ -183,26 +228,39 @@ export class UserSeeder extends SeedModule {
     const bio = this.generateUserBio(domainConfig);
     const name = `${firstName} ${lastName}`;
     
-    // Use schema adapter to create user with appropriate strategy
-    const result = await this.schemaAdapter.createUserForSchema({
-      email,
-      name,
-      username,
-      bio,
-      picture_url: this.generateProfileImage(firstName, lastName),
-    });
+    try {
+      // Use schema adapter to create user with appropriate strategy
+      const result = await this.schemaAdapter.createUserForSchema({
+        email,
+        name,
+        username,
+        bio,
+        picture_url: this.generateProfileImage(firstName, lastName),
+      });
 
-    if (!result.success) {
-      this.logWarning('User creation', `Failed to create user ${email}: ${result.error}`);
+      if (!result.success) {
+        // Provide detailed error information for debugging
+        const errorInfo = result.error || 'Unknown error';
+        console.log(`    ⚠️  User creation failed for ${email}: ${errorInfo}`);
+        
+        // Check if it's a column mapping issue
+        if (errorInfo.includes('column') && errorInfo.includes('does not exist')) {
+          console.log(`    💡 This appears to be a column mapping issue. Check your schema configuration.`);
+        }
+        
+        return null;
+      }
+
+      return {
+        id: result.id,
+        email,
+        username,
+        name,
+      };
+    } catch (error: any) {
+      console.log(`    ⚠️  Unexpected error creating user ${email}: ${error.message}`);
       return null;
     }
-
-    return {
-      id: result.id,
-      email,
-      username,
-      name,
-    };
   }
 
   private generateUserBio(domainConfig: any): string {

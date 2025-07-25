@@ -38,9 +38,13 @@ export class SetupSeeder extends SeedModule {
     const users = this.context.cache.get('users') as CachedUser[];
     const templates = this.context.cache.get('baseTemplates') as CachedBaseTemplate[];
     const schemaAdapter = this.context.cache.get('schemaAdapter') as SchemaAdapter;
+    const noUsersCreated = this.context.cache.get('noUsersCreated') as boolean;
     
-    if (!users?.length) {
-      console.log('⚠️  No users found in cache, skipping setup seeding');
+    if (!users?.length || noUsersCreated) {
+      const reason = noUsersCreated ? 
+        'User creation failed - check schema configuration and column mappings' :
+        'No users found in cache';
+      console.log(`⚠️  Skipping setup seeding: ${reason}`);
       return;
     }
 
