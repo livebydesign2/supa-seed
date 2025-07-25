@@ -347,24 +347,61 @@ export class ConfigManager {
       // Create SchemaAdapter for column validation
       const schemaAdapter = new SchemaAdapter(client, config);
       
-      // Validate profiles table column mappings
+      // Validate profiles table mappings with database schema
+      // Use comprehensive field lists to avoid false positives
       const profilesValidation = await schemaAdapter.validateTableSchema('profiles', {
-        email: [config.schema.userTable.emailField || 'email'],
-        name: [config.schema.userTable.nameField || 'name'],
-        picture: [config.schema.userTable.pictureField || 'picture_url'],
-        bio: [config.schema.userTable.bioField || 'bio'],
-        id: [config.schema.userTable.idField || 'id']
+        email: [
+          config.schema.userTable.emailField || 'email',
+          'email_address', 'user_email', 'email'
+        ],
+        name: [
+          config.schema.userTable.nameField || 'name',
+          'name', 'display_name', 'full_name', 'username'
+        ],
+        picture: [
+          config.schema.userTable.pictureField || 'picture_url',
+          'picture_url', 'avatar_url', 'profile_image_url', 'image_url'
+        ],
+        bio: [
+          config.schema.userTable.bioField || 'bio',
+          'bio', 'about', 'description'
+        ],
+        id: [
+          config.schema.userTable.idField || 'id',
+          'id'
+        ]
       });
       
-      if (!profilesValidation.valid) {
-        profilesValidation.missingFields.forEach(field => {
+      // Only warn about truly missing mappings, not fields that exist with different names
+      if (!profilesValidation.valid && profilesValidation.missingFields.length > 0) {
+        // Double-check each missing field against actual available columns
+        const actuallyMissingFields = profilesValidation.missingFields.filter(fieldName => {
+          const fieldOptions = {
+            email: ['email', 'email_address', 'user_email'],
+            name: ['name', 'display_name', 'full_name', 'username'],
+            picture: ['picture_url', 'avatar_url', 'profile_image_url', 'image_url'],
+            bio: ['bio', 'about', 'description'],
+            id: ['id']
+          }[fieldName] || [];
+          
+          // Check if any of the field options exist in available columns
+          return !fieldOptions.some(option => 
+            profilesValidation.availableColumns.includes(option)
+          );
+        });
+        
+        // Only show warnings for fields that are truly missing
+        actuallyMissingFields.forEach(field => {
           warnings.push(`Profiles table: '${field}' column mapping may be incorrect`);
         });
         
-        suggestions.push(...profilesValidation.suggestions);
-        
-        if (profilesValidation.availableColumns.length > 0) {
-          suggestions.push(`Available columns in profiles table: ${profilesValidation.availableColumns.join(', ')}`);
+        // Only add suggestions if there are actually missing fields
+        if (actuallyMissingFields.length > 0) {
+          suggestions.push(...profilesValidation.suggestions);
+          
+          if (profilesValidation.availableColumns.length > 0) {
+            suggestions.push(`Available columns in profiles table: ${profilesValidation.availableColumns.join(', ')}`);
+          }
         }
       }
       

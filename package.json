@@ -1,6 +1,6 @@
 {
   "name": "supa-seed",
-  "version": "2.2.0",
+  "version": "2.3.1",
   "description": "A constraint-aware, framework-agnostic database seeding framework with deep PostgreSQL business logic discovery",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

@@ -618,7 +618,31 @@ Technical details: ${error.message}
       Logger.debug(`Username field not found in profiles table - skipping username`);
     }
 
-    // Create profile
+    // CRITICAL FIX: Create account FIRST to satisfy PostgreSQL constraint
+    // "Profiles can only be created for personal accounts" requires account to exist before profile
+    if (this.schemaInfo?.hasAccounts) {
+      try {
+        const { error: accountError } = await this.client
+          .from('accounts')
+          .insert({
+            id: crypto.randomUUID(),
+            name: `${userData.name}'s Account`,
+            primary_owner_user_id: userId,
+            slug: userData.username || userData.email.split('@')[0],
+            is_personal_account: true, // CRITICAL: Must be true for profile creation to succeed
+          });
+        
+        if (accountError) {
+          return { id: '', success: false, error: `Account creation failed: ${accountError.message}` };
+        }
+        
+        Logger.debug(`✅ Account created for ${userData.email} with is_personal_account=true`);
+      } catch (error: any) {
+        return { id: '', success: false, error: `Account creation failed: ${error.message}` };
+      }
+    }
+
+    // Now create profile (after account exists with is_personal_account=true)
     const { error: profileError } = await this.client
       .from('profiles')
       .insert(profileData);
@@ -658,28 +682,6 @@ Technical details: ${error.message}
       }
       
       return { id: '', success: false, error: errorMsg };
-    }
-
-    // Try to create a personal account/team if the tables exist
-    if (this.schemaInfo?.hasAccounts) {
-      try {
-        const { error: accountError } = await this.client
-          .from('accounts')
-          .insert({
-            id: crypto.randomUUID(),
-            name: `${userData.name}'s Account`,
-            primary_owner_user_id: userId,
-            slug: userData.username || userData.email.split('@')[0],
-            is_personal_account: true,
-          });
-        
-        // Don't fail if account creation fails, as it might not be required
-        if (accountError) {
-          console.warn('Account creation failed (non-critical):', accountError.message);
-        }
-      } catch (error) {
-        console.warn('Account creation attempt failed (non-critical):', error);
-      }
     }
 
     return { id: userId, success: true };
