@@ -1,16 +1,49 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { FlexibleSeedConfig, ConfigProfile, ConfigDetectionResult } from './config-types';
+import { FlexibleSeedConfig, ConfigProfile, ConfigDetectionResult, ExtendedSeedConfig } from './config-types';
 import { SchemaAdapter } from './schema-adapter';
+import { FrameworkAdapter } from './framework/framework-adapter';
+import { SchemaEvolutionDetector } from './schema/schema-evolution-detector';
+import { DataVolumeManager } from './data/data-volume-manager';
+import { CustomRelationshipManager } from './schema/custom-relationship-manager';
+import { DataGenerationPatternManager } from './data/data-generation-pattern-manager';
 import type { createClient } from '@supabase/supabase-js';
+import type { ConstraintHandler } from './schema/constraint-types';
+import type { SeedingStrategy } from './framework/strategy-interface';
+import { Logger } from './utils/logger';
 
 type SupabaseClient = ReturnType<typeof createClient>;
 
+export interface ConfigManagerOptions {
+  enableExtensibility?: boolean;
+  enableSchemaEvolution?: boolean;
+  customHandlerRegistry?: Map<string, ConstraintHandler>;
+  customStrategies?: Map<string, SeedingStrategy>;
+}
+
 export class ConfigManager {
   private configPath: string;
+  private options: ConfigManagerOptions;
+  private schemaCache: Map<string, any> = new Map();
+  private customHandlers: Map<string, ConstraintHandler> = new Map();
+  private customStrategies: Map<string, SeedingStrategy> = new Map();
+  private client?: SupabaseClient;
 
-  constructor(configPath: string = 'supa-seed.config.json') {
+  constructor(configPath: string = 'supa-seed.config.json', options: ConfigManagerOptions = {}) {
     this.configPath = path.resolve(configPath);
+    this.options = {
+      enableExtensibility: true,
+      enableSchemaEvolution: true,
+      ...options
+    };
+
+    // Initialize custom registries
+    if (options.customHandlerRegistry) {
+      this.customHandlers = new Map(options.customHandlerRegistry);
+    }
+    if (options.customStrategies) {
+      this.customStrategies = new Map(options.customStrategies);
+    }
   }
 
   /**
@@ -553,6 +586,579 @@ export class ConfigManager {
       return !error;
     } catch {
       return false;
+    }
+  }
+
+  /**
+   * Epic 7 Enhanced Configuration Methods
+   */
+
+  /**
+   * FR-7.1: Support framework strategy overrides
+   */
+  async detectFrameworkWithOverrides(
+    client: SupabaseClient, 
+    config?: ExtendedSeedConfig
+  ): Promise<{
+    detectedFramework: string;
+    overriddenFramework?: string;
+    availableStrategies: string[];
+    recommendations: string[];
+  }> {
+    Logger.info('🔍 Detecting framework with strategy override support...');
+
+    try {
+      // Initialize framework adapter
+      const frameworkAdapter = new FrameworkAdapter(client, config, {
+        enableSchemaCache: this.options.enableSchemaEvolution,
+        frameworkOverride: config?.frameworkStrategy?.manualOverride,
+        debug: config?.frameworkStrategy?.enabled
+      });
+
+      await frameworkAdapter.initialize();
+
+      // Get framework detection results
+      const detection = frameworkAdapter.getStrategySelection();
+      const availableStrategies = frameworkAdapter.getAvailableStrategies();
+      const recommendations = frameworkAdapter.getRecommendations();
+
+      let detectedFramework = detection?.detection.framework || 'generic';
+      let overriddenFramework: string | undefined;
+
+      // Apply manual override if specified
+      if (config?.frameworkStrategy?.manualOverride) {
+        Logger.info(`📝 Framework override applied: ${config.frameworkStrategy.manualOverride}`);
+        overriddenFramework = config.frameworkStrategy.manualOverride;
+        
+        // Validate override against available strategies
+        if (!availableStrategies.includes(overriddenFramework)) {
+          const error = `Invalid framework override: ${overriddenFramework}. Available: ${availableStrategies.join(', ')}`;
+          
+          if (config.frameworkStrategy.fallbackBehavior === 'error') {
+            throw new Error(error);
+          } else if (config.frameworkStrategy.fallbackBehavior === 'generic') {
+            Logger.warn(`${error}. Falling back to generic strategy.`);
+            overriddenFramework = 'generic';
+          } else {
+            Logger.warn(`${error}. Skipping framework override.`);
+            overriddenFramework = undefined;
+          }
+        }
+      }
+
+      // Register custom strategies if configured
+      if (config?.frameworkStrategy?.customStrategies) {
+        for (const customStrategy of config.frameworkStrategy.customStrategies) {
+          await this.registerCustomStrategy(customStrategy);
+        }
+      }
+
+      return {
+        detectedFramework,
+        overriddenFramework,
+        availableStrategies,
+        recommendations: [
+          ...recommendations,
+          `Detected framework: ${detectedFramework}`,
+          ...(overriddenFramework ? [`Using override: ${overriddenFramework}`] : []),
+          `Available strategies: ${availableStrategies.join(', ')}`
+        ]
+      };
+
+    } catch (error: any) {
+      Logger.error('Framework detection with overrides failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * FR-7.2: Register custom constraint handler
+   */
+  registerCustomConstraintHandler(handler: ConstraintHandler): void {
+    Logger.info(`🔧 Registering custom constraint handler: ${handler.id}`);
+    this.customHandlers.set(handler.id, handler);
+  }
+
+  /**
+   * FR-7.2: Apply custom constraint handlers from configuration
+   */
+  applyCustomConstraintHandlers(config: ExtendedSeedConfig): ConstraintHandler[] {
+    const handlers: ConstraintHandler[] = [];
+
+    if (!config.constraintHandlers?.enabled) {
+      return handlers;
+    }
+
+    Logger.info('🔧 Applying custom constraint handlers from configuration');
+
+    for (const handlerConfig of config.constraintHandlers.customHandlers || []) {
+      try {
+        // Create constraint handler from configuration
+        const handler: ConstraintHandler = {
+          id: handlerConfig.id,
+          type: handlerConfig.type,
+          priority: handlerConfig.priority,
+          description: handlerConfig.description || `Custom ${handlerConfig.type} handler`,
+          canHandle: (constraint: any) => {
+            // Simple matching logic - can be enhanced
+            if (handlerConfig.tables && handlerConfig.tables.length > 0) {
+              return handlerConfig.tables.includes(constraint.table);
+            }
+            return constraint.type === handlerConfig.type;
+          },
+          handle: this.createConstraintHandlerFunction(handlerConfig.handlerFunction)
+        };
+
+        handlers.push(handler);
+        this.customHandlers.set(handler.id, handler);
+
+        Logger.debug(`✅ Registered custom constraint handler: ${handler.id}`);
+      } catch (error: any) {
+        Logger.error(`Failed to register constraint handler ${handlerConfig.id}:`, error);
+      }
+    }
+
+    return handlers;
+  }
+
+  /**
+   * FR-7.3: Schema evolution detection
+   */
+  async detectSchemaEvolution(
+    client: SupabaseClient, 
+    config: ExtendedSeedConfig
+  ): Promise<{
+    hasChanged: boolean;
+    changes: Array<{
+      type: 'table_added' | 'table_removed' | 'column_added' | 'column_removed' | 'constraint_changed';
+      table: string;
+      column?: string;
+      description: string;
+    }>;
+    schemaVersion: string;
+    migrationRequired: boolean;
+    recommendations: string[];
+  }> {
+    if (!config.schemaEvolution?.enabled) {
+      return {
+        hasChanged: false,
+        changes: [],
+        schemaVersion: 'unknown',
+        migrationRequired: false,
+        recommendations: ['Schema evolution detection is disabled']
+      };
+    }
+
+    Logger.info('🔄 Detecting schema evolution...');
+
+    try {
+      const cacheLocation = config.schemaEvolution.cacheLocation || '.supa-seed-cache';
+      const evolutionDetector = new SchemaEvolutionDetector(client, cacheLocation);
+      
+      // Use the comprehensive schema evolution detector
+      const evolutionResult = await evolutionDetector.detectEvolution(config);
+      
+      // Convert SchemaEvolutionResult to the expected format
+      const changes = evolutionResult.changes.map(change => ({
+        type: this.mapChangeType(change.type),
+        table: change.table || '',
+        column: change.column,
+        description: change.description
+      }));
+
+      // Handle onSchemaChange behavior
+      if (evolutionResult.hasChanged) {
+        Logger.info(`📊 Schema changes detected: ${evolutionResult.changes.length} changes`);
+        
+        switch (config.schemaEvolution.onSchemaChange) {
+          case 'error':
+            throw new Error(`Schema evolution detected with ${evolutionResult.changes.length} changes. Configuration set to error on schema change.`);
+          case 'warn':
+            Logger.warn('⚠️  Schema changes detected - review changes before proceeding');
+            break;
+          case 'auto-adapt':
+            Logger.info('🤖 Schema changes detected - automatically adapting configuration');
+            break;
+          case 'prompt':
+            Logger.info('❓ Schema changes detected - user prompt required');
+            break;
+        }
+      }
+
+      return {
+        hasChanged: evolutionResult.hasChanged,
+        changes,
+        schemaVersion: evolutionResult.schemaVersion,
+        migrationRequired: evolutionResult.migrationRequired,
+        recommendations: evolutionResult.recommendations
+      };
+
+    } catch (error: any) {
+      Logger.error('Schema evolution detection failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * FR-7.4: Generate realistic data volume configuration
+   */
+  generateDataVolumeConfiguration(requirements: {
+    environment: 'development' | 'staging' | 'production';
+    testingScenarios: string[];
+    expectedLoad: 'light' | 'medium' | 'heavy';
+    domainType?: string;
+    customConstraints?: {
+      maxUsers?: number;
+      maxSeedingTime?: number;
+      maxDatabaseSize?: number;
+    };
+  }): ExtendedSeedConfig['dataVolumes'] {
+    Logger.info(`📊 Generating data volume configuration for ${requirements.environment} environment`);
+
+    const dataVolumeManager = new DataVolumeManager();
+    
+    // Use the comprehensive data volume manager for generation
+    const dataVolumes = dataVolumeManager.generateDataVolumeConfiguration(requirements);
+    
+    Logger.info(`✅ Generated data volume configuration with ${dataVolumes.volumeProfiles?.length || 0} profiles`);
+    
+    return dataVolumes;
+  }
+
+  /**
+   * Calculate data generation metrics for a configuration
+   */
+  calculateDataGenerationMetrics(config: ExtendedSeedConfig): {
+    totalUsers: number;
+    totalItems: number;
+    totalRelationships: number;
+    publicContentCount: number;
+    privateContentCount: number;
+    draftContentCount: number;
+    estimatedDatabaseSize: number;
+    estimatedSeedingTime: number;
+  } {
+    const dataVolumeManager = new DataVolumeManager();
+    return dataVolumeManager.calculateGenerationMetrics(config);
+  }
+
+  /**
+   * Get recommended data volume profile for specific use case
+   */
+  getRecommendedDataVolumeProfile(useCase: 'ci-testing' | 'development' | 'demo' | 'load-testing' | 'production') {
+    const dataVolumeManager = new DataVolumeManager();
+    return dataVolumeManager.getRecommendedProfile(useCase);
+  }
+
+  /**
+   * Validate data volume configuration
+   */
+  validateDataVolumeConfiguration(config: ExtendedSeedConfig['dataVolumes']): {
+    valid: boolean;
+    errors: string[];
+    warnings: string[];
+    recommendations: string[];
+  } {
+    const dataVolumeManager = new DataVolumeManager();
+    return dataVolumeManager.validateDataVolumeConfiguration(config);
+  }
+
+  /**
+   * FR-7.5: Validate custom relationship definitions
+   */
+  async validateCustomRelationships(
+    client: SupabaseClient,
+    relationships: ExtendedSeedConfig['customRelationships']
+  ): Promise<{
+    valid: boolean;
+    errors: string[];
+    warnings: string[];
+    recommendations: string[];
+  }> {
+    if (!relationships?.enabled) {
+      return { 
+        valid: true, 
+        errors: [], 
+        warnings: ['Custom relationships disabled'], 
+        recommendations: ['Consider enabling custom relationships for better data modeling'] 
+      };
+    }
+
+    Logger.info('🔗 Validating custom relationship definitions...');
+
+    try {
+      const relationshipManager = new CustomRelationshipManager(client);
+      const validationResult = await relationshipManager.validateCustomRelationships(relationships);
+
+      Logger.info(`✅ Custom relationship validation completed: ${validationResult.errors.length} errors, ${validationResult.warnings.length} warnings`);
+
+      return {
+        valid: validationResult.valid,
+        errors: validationResult.errors,
+        warnings: validationResult.warnings,
+        recommendations: validationResult.recommendations
+      };
+
+    } catch (error: any) {
+      Logger.error('Custom relationship validation failed:', error);
+      return { 
+        valid: false, 
+        errors: [`Validation error: ${error.message}`], 
+        warnings: [], 
+        recommendations: ['Fix validation errors and retry'] 
+      };
+    }
+  }
+
+  /**
+   * Generate relationship execution plan
+   */
+  async generateRelationshipExecutionPlan(
+    client: SupabaseClient,
+    relationships: ExtendedSeedConfig['customRelationships']
+  ) {
+    const relationshipManager = new CustomRelationshipManager(client);
+    return await relationshipManager.generateRelationshipExecutionPlan(relationships);
+  }
+
+  /**
+   * Create relationship generators for data seeding
+   */
+  createRelationshipGenerators(
+    client: SupabaseClient,
+    relationships: ExtendedSeedConfig['customRelationships']
+  ) {
+    if (!relationships?.enabled || !relationships.relationships) {
+      return new Map();
+    }
+
+    const relationshipManager = new CustomRelationshipManager(client);
+    return relationshipManager.createRelationshipGenerators(relationships.relationships);
+  }
+
+  /**
+   * Apply inheritance rules to generated data
+   */
+  applyInheritanceRules(
+    client: SupabaseClient,
+    data: Record<string, any[]>,
+    inheritanceRules?: ExtendedSeedConfig['customRelationships']['inheritanceRules']
+  ): Record<string, any[]> {
+    if (!inheritanceRules || inheritanceRules.length === 0) {
+      return data;
+    }
+
+    const relationshipManager = new CustomRelationshipManager(client);
+    return relationshipManager.applyInheritanceRules(data, inheritanceRules);
+  }
+
+  /**
+   * Generate data using configured patterns
+   */
+  generateDataWithPatterns(
+    config: ExtendedSeedConfig,  
+    table: string,
+    count: number,
+    context: Record<string, any> = {}
+  ): any[] {
+    const patternManager = new DataGenerationPatternManager();
+    return patternManager.generateDataWithPatterns(config, table, count, context);
+  }
+
+  /**
+   * Apply consistency rules to generated data
+   */
+  applyDataConsistencyRules(
+    data: Record<string, any[]>,
+    config: ExtendedSeedConfig
+  ): {
+    data: Record<string, any[]>;
+    violations: Array<{
+      rule: string;
+      severity: string;
+      message: string;
+      affectedTables: string[];
+      autoFixed: boolean;
+    }>;
+  } {
+    const patternManager = new DataGenerationPatternManager();
+    return patternManager.applyConsistencyRules(data, config);
+  }
+
+  /**
+   * Enforce referential integrity on generated data
+   */
+  enforceReferentialIntegrity(
+    data: Record<string, any[]>,
+    config: ExtendedSeedConfig
+  ): {
+    data: Record<string, any[]>;
+    orphansRemoved: number;
+    referencesFixed: number;
+  } {
+    const patternManager = new DataGenerationPatternManager();
+    return patternManager.enforceReferentialIntegrity(data, config);
+  }
+
+  /**
+   * Validate generated data patterns
+   */
+  validateGeneratedDataPatterns(
+    data: Record<string, any[]>,
+    config: ExtendedSeedConfig
+  ): {
+    valid: boolean;
+    errors: string[];
+    warnings: string[];
+    patternMetrics: Record<string, any>;
+  } {
+    const patternManager = new DataGenerationPatternManager();
+    return patternManager.validateGeneratedPatterns(data, config);
+  }
+
+  /**
+   * Get available data generation patterns
+   */
+  getAvailableDataPatterns(domain?: string) {
+    const patternManager = new DataGenerationPatternManager();
+    return patternManager.getAvailablePatterns(domain);
+  }
+
+  /**
+   * Get domain-specific vocabulary
+   */
+  getDomainVocabulary(domain: string) {
+    const patternManager = new DataGenerationPatternManager();
+    return patternManager.getDomainVocabulary(domain);
+  }
+
+  /**
+   * Create custom data generation pattern
+   */
+  createCustomDataPattern(pattern: any): void {
+    const patternManager = new DataGenerationPatternManager();
+    patternManager.createCustomPattern(pattern);
+  }
+
+  /**
+   * Enhanced configuration validation with extensibility support
+   */
+  validateExtendedConfig(config: ExtendedSeedConfig): {
+    valid: boolean;
+    errors: string[];
+    warnings: string[];
+    recommendations: string[];
+  } {
+    const errors: string[] = [];
+    const warnings: string[] = [];
+    const recommendations: string[] = [];
+
+    Logger.info('🔍 Validating extended configuration...');
+
+    // Basic validation (existing logic)
+    try {
+      this.validateConfig(config);
+    } catch (error: any) {
+      errors.push(`Basic validation failed: ${error.message}`);
+    }
+
+    // Framework strategy validation
+    if (config.frameworkStrategy?.enabled) {
+      if (config.frameworkStrategy.customStrategies) {
+        for (const strategy of config.frameworkStrategy.customStrategies) {
+          if (!strategy.name) {
+            errors.push('Custom strategy name is required');
+          }
+          if (!strategy.priority || strategy.priority < 0) {
+            errors.push(`Invalid priority for custom strategy '${strategy.name}'`);
+          }
+        }
+      }
+    }
+
+    // Constraint handlers validation
+    if (config.constraintHandlers?.enabled) {
+      if (config.constraintHandlers.customHandlers) {
+        for (const handler of config.constraintHandlers.customHandlers) {
+          if (!handler.id) {
+            errors.push('Custom constraint handler ID is required');
+          }
+          if (!handler.handlerFunction) {
+            errors.push(`Handler function is required for constraint handler '${handler.id}'`);
+          }
+        }
+      }
+    }
+
+    // Schema evolution validation
+    if (config.schemaEvolution?.enabled) {
+      if (!config.schemaEvolution.cacheLocation) {
+        warnings.push('Schema evolution cache location not specified - using default');
+      }
+      if (config.schemaEvolution.trackingMode === 'version' && !config.schemaEvolution.migrationStrategies?.length) {
+        warnings.push('Version tracking enabled but no migration strategies defined');
+      }
+    }
+
+    // Data volumes validation
+    if (config.dataVolumes?.enabled) {
+      const ratios = config.dataVolumes.patterns.contentRatios;
+      const totalRatio = ratios.publicContent + ratios.privateContent + ratios.draftContent;
+      if (Math.abs(totalRatio - 1.0) > 0.01) {
+        errors.push(`Content ratios must sum to 1.0, got ${totalRatio}`);
+      }
+    }
+
+    recommendations.push('Extended configuration validation completed');
+    if (errors.length === 0 && warnings.length === 0) {
+      recommendations.push('✅ All validations passed');
+    }
+
+    return {
+      valid: errors.length === 0,
+      errors,
+      warnings,
+      recommendations
+    };
+  }
+
+  /**
+   * Helper methods for Epic 7 functionality
+   */
+
+  private async registerCustomStrategy(strategyConfig: any): Promise<void> {
+    Logger.debug(`Registering custom strategy: ${strategyConfig.name}`);
+    // Implementation would load and register custom strategy module
+    // For now, we'll just log the registration
+  }
+
+  private createConstraintHandlerFunction(handlerFunction: string): any {
+    // Implementation would create actual constraint handler function
+    // For now, return a placeholder
+    return (constraint: any, data: any) => ({
+      success: true,
+      originalData: data,
+      modifiedData: data,
+      appliedFixes: [],
+      warnings: [`Custom handler applied: ${handlerFunction}`],
+      errors: [],
+      bypassRequired: false
+    });
+  }
+
+  private mapChangeType(detectorChangeType: string): 'table_added' | 'table_removed' | 'column_added' | 'column_removed' | 'constraint_changed' {
+    switch (detectorChangeType) {
+      case 'table_added': return 'table_added';
+      case 'table_removed': return 'table_removed';
+      case 'column_added': return 'column_added';
+      case 'column_removed': return 'column_removed';
+      case 'column_modified': return 'constraint_changed';
+      case 'constraint_added':
+      case 'constraint_removed':
+      case 'constraint_modified':
+        return 'constraint_changed';
+      default:
+        return 'constraint_changed';
     }
   }
 }

@@ -189,3 +189,149 @@ export interface ConfigDetectionResult {
     };
   };
 }
+
+/**
+ * Extended configuration interface for Epic 7: Configuration Extensibility Framework
+ * Supports framework strategy overrides, custom constraint handlers, and schema evolution
+ */
+export interface ExtendedSeedConfig extends FlexibleSeedConfig {
+  // Framework Strategy Configuration (FR-7.1)
+  frameworkStrategy?: {
+    enabled: boolean;
+    manualOverride?: string; // Override framework detection
+    customStrategies?: Array<{
+      name: string;
+      priority: number;
+      moduleUrl?: string; // For external strategy modules
+      config?: Record<string, any>;
+    }>;
+    fallbackBehavior: 'error' | 'generic' | 'skip';
+    enableStrategyValidation: boolean;
+  };
+
+  // Custom Constraint Handlers (FR-7.2)
+  constraintHandlers?: {
+    enabled: boolean;
+    customHandlers?: Array<{
+      id: string;
+      type: 'check' | 'foreign_key' | 'unique' | 'not_null';
+      priority: number;
+      tables?: string[]; // Specific tables or undefined for all
+      handlerFunction: string; // Function name or code reference
+      description?: string;
+    }>;
+    overrideDefaults: boolean;
+    enableConstraintLogging: boolean;
+  };
+
+  // Schema Evolution Detection (FR-7.3)
+  schemaEvolution?: {
+    enabled: boolean;
+    trackingMode: 'hash' | 'timestamp' | 'version';
+    cacheLocation: string; // Path to cache schema snapshots
+    autoMigration: boolean;
+    migrationStrategies: Array<{
+      fromVersion: string;
+      toVersion: string;
+      migrationSteps: Array<{
+        type: 'add_table' | 'modify_column' | 'add_constraint' | 'custom';
+        description: string;
+        sql?: string;
+        handler?: string;
+      }>;
+    }>;
+    onSchemaChange: 'warn' | 'error' | 'auto-adapt' | 'prompt';
+  };
+
+  // Realistic Data Volume Configuration (FR-7.4)
+  dataVolumes?: {
+    enabled: boolean;
+    patterns: {
+      userDistribution: 'linear' | 'realistic' | 'exponential' | 'custom';
+      contentRatios: {
+        publicContent: number; // 0-1
+        privateContent: number; // 0-1
+        draftContent: number; // 0-1
+      };
+      relationshipDensity: {
+        userToContent: number; // Average items per user
+        crossReferences: number; // Cross-table relationship density
+        tagConnections: number; // Tag/category connections per item
+      };
+      seasonalVariation: boolean; // Simulate seasonal content patterns
+      activityCycles: boolean; // Simulate user activity cycles
+    };
+    volumeProfiles: Array<{
+      name: string;
+      description: string;
+      userCount: number;
+      avgItemsPerUser: number;
+      avgRelationshipsPerItem: number;
+      dataQualityLevel: 'basic' | 'rich' | 'production';
+    }>;
+  };
+
+  // Custom Table Relationship Definitions (FR-7.5)
+  customRelationships?: {
+    enabled: boolean;
+    relationships: Array<{
+      id: string;
+      fromTable: string;
+      toTable: string;
+      relationshipType: 'one_to_one' | 'one_to_many' | 'many_to_many';
+      fromColumn: string;
+      toColumn: string;
+      isRequired: boolean;
+      cascadeDelete: boolean;
+      generationStrategy: 'sequential' | 'random' | 'weighted' | 'custom';
+      customGenerator?: string; // Function reference for custom generation
+      metadata?: {
+        description?: string;
+        businessRule?: string;
+        validationRules?: string[];
+      };
+    }>;
+    junctionTables?: Array<{
+      tableName: string;
+      leftTable: string;
+      rightTable: string;
+      leftColumn: string;
+      rightColumn: string;
+      additionalColumns?: Array<{
+        name: string;
+        type: string;
+        defaultValue?: any;
+      }>;
+    }>;
+    inheritanceRules?: Array<{
+      parentTable: string;
+      childTable: string;
+      inheritedFields: string[];
+      overrideStrategy: 'extend' | 'replace' | 'merge';
+    }>;
+  };
+
+  // Advanced Data Generation Patterns
+  dataGenerationPatterns?: {
+    enabled: boolean;
+    domainSpecific: {
+      [domain: string]: {
+        enabled: boolean;
+        patterns: Record<string, any>;
+        vocabularies: string[];
+        templates: Record<string, string>;
+      };
+    };
+    consistencyRules: Array<{
+      tables: string[];
+      rule: string; // Description of consistency requirement
+      validator?: string; // Function to validate consistency
+      fixer?: string; // Function to fix inconsistencies
+    }>;
+    referencialIntegrity: {
+      enforceStrict: boolean;
+      allowOrphans: boolean;
+      cleanupStrategy: 'cascade' | 'nullify' | 'preserve';
+    };
+  };
+}
