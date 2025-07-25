@@ -23,6 +23,7 @@ import { RLSCompliantSeeder } from '../../schema/rls-compliant-seeder';
 import { RelationshipAnalyzer } from '../../schema/relationship-analyzer';
 import { JunctionTableHandler } from '../../schema/junction-table-handler';
 import { MultiTenantManager } from '../../schema/multi-tenant-manager';
+import { StorageIntegrationManager } from '../../storage/storage-integration-manager';
 import { Logger } from '../../utils/logger';
 import type {
   BusinessLogicAnalysisResult,
@@ -47,6 +48,13 @@ import type {
   TenantInfo,
   TenantScopeInfo
 } from '../../schema/tenant-types';
+import type {
+  StorageIntegrationResult,
+  StorageConfig,
+  StoragePermissionCheck,
+  StorageQuotaInfo,
+  MediaAttachment
+} from '../../storage/storage-types';
 
 type SupabaseClient = ReturnType<typeof createClient>;
 
@@ -61,6 +69,7 @@ export class GenericStrategy implements SeedingStrategy {
   private relationshipAnalyzer?: RelationshipAnalyzer;
   private junctionTableHandler?: JunctionTableHandler;
   private multiTenantManager?: MultiTenantManager;
+  private storageIntegrationManager?: StorageIntegrationManager;
 
   async initialize(client: SupabaseClient): Promise<void> {
     this.client = client;
@@ -122,6 +131,17 @@ export class GenericStrategy implements SeedingStrategy {
         respectTenantPlans: false,
         enforceTenantLimits: false
       }
+    });
+
+    // Initialize storage integration manager with generic defaults
+    this.storageIntegrationManager = new StorageIntegrationManager(client, {
+      bucketName: 'media', // Generic default bucket
+      domain: 'general',
+      respectRLS: true, // Generic strategy respects RLS by default
+      enableRealImages: false, // Use mock images for generic
+      imagesPerSetup: 5,
+      categories: ['general', 'placeholder'],
+      storageRootPath: 'uploads'
     });
     
     // Register generic handlers
@@ -1064,5 +1084,155 @@ export class GenericStrategy implements SeedingStrategy {
 
     const scopeInfo = this.multiTenantManager.getTenantScopeInfo(tableName);
     return scopeInfo || null;
+  }
+
+  /**
+   * Storage Integration Methods (Basic Generic Support)
+   */
+
+  /**
+   * Integrate with Supabase Storage for file uploads
+   */
+  async integrateWithStorage(
+    setupId: string,
+    accountId?: string,
+    config?: Partial<StorageConfig>
+  ): Promise<StorageIntegrationResult> {
+    if (!this.storageIntegrationManager) {
+      throw new Error('Storage integration manager not initialized');
+    }
+
+    Logger.info(`🗂️  Generic storage integration for setup: ${setupId} (basic support)`);
+    
+    try {
+      // Generic strategy uses conservative settings
+      const genericConfig: Partial<StorageConfig> = {
+        domain: 'general',
+        enableRealImages: false, // Use mock images for generic compatibility
+        imagesPerSetup: 3, // Conservative count for generic
+        respectRLS: true,
+        categories: ['general', 'placeholder', 'mock'],
+        ...config
+      };
+
+      const result = await this.storageIntegrationManager.seedWithStorageFiles(
+        setupId, 
+        accountId, 
+        genericConfig
+      );
+      
+      // Add generic strategy context
+      if (result.success) {
+        result.warnings = result.warnings || [];
+        result.warnings.push('Generic strategy: Basic storage integration only');
+        result.recommendations.push('Consider framework-specific strategy for advanced storage features');
+      }
+
+      return result;
+    } catch (error: any) {
+      Logger.error(`Generic storage integration failed for ${setupId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Check storage permissions (basic generic implementation)
+   */
+  async checkStoragePermissions(bucketName: string): Promise<StoragePermissionCheck> {
+    if (!this.storageIntegrationManager) {
+      throw new Error('Storage integration manager not initialized');
+    }
+
+    Logger.debug(`🔒 Generic storage permission check for: ${bucketName} (basic support)`);
+    
+    try {
+      const result = await this.storageIntegrationManager.checkStoragePermissions(bucketName);
+      
+      // Add generic strategy notes
+      result.recommendations.push('Generic strategy: Basic permission checking only');
+      result.recommendations.push('Framework-specific strategies provide more comprehensive permission validation');
+      
+      return result;
+    } catch (error: any) {
+      Logger.error(`Generic storage permission check failed for ${bucketName}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get storage quota information (basic generic implementation)
+   */
+  async getStorageQuota(bucketName: string): Promise<StorageQuotaInfo> {
+    if (!this.storageIntegrationManager) {
+      throw new Error('Storage integration manager not initialized');
+    }
+
+    Logger.debug(`📊 Generic storage quota check for: ${bucketName} (basic support)`);
+    
+    try {
+      const result = await this.storageIntegrationManager.getStorageQuota(bucketName);
+      
+      // Add generic strategy notes
+      result.recommendations = result.recommendations || [];
+      result.recommendations.push('Generic strategy: Basic quota monitoring only');
+      result.recommendations.push('Consider monitoring tools for production usage');
+      
+      return result;
+    } catch (error: any) {
+      Logger.error(`Generic storage quota check failed for ${bucketName}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Generate media attachments (basic generic implementation)
+   */
+  async generateMediaAttachments(
+    entityId: string,
+    entityType: string,
+    count: number = 2,
+    config?: Partial<StorageConfig>
+  ): Promise<MediaAttachment[]> {
+    Logger.info(`🖼️  Generic media generation for ${entityType}:${entityId} (basic support)`);
+    
+    try {
+      // Generic strategy generates minimal media attachments
+      const setupId = `${entityType}_${entityId}_${Date.now()}`;
+      
+      const result = await this.integrateWithStorage(setupId, entityId, {
+        imagesPerSetup: Math.min(count, 3), // Limit for generic use
+        domain: 'general',
+        enableRealImages: false,
+        categories: ['general', 'placeholder'],
+        ...config
+      });
+      
+      if (result.success) {
+        Logger.success(`✅ Generated ${result.mediaAttachments.length} media attachments (generic)`);
+        Logger.info('💡 Note: Generic strategy provides basic media generation only');
+        return result.mediaAttachments;
+      } else {
+        Logger.warn('⚠️  Generic media generation completed with errors');
+        return [];
+      }
+    } catch (error: any) {
+      Logger.error(`Generic media generation failed for ${entityType}:${entityId}:`, error);
+      return [];
+    }
+  }
+
+  /**
+   * Get storage configuration for generic strategy
+   */
+  getStorageConfig(): Partial<StorageConfig> {
+    return {
+      bucketName: 'media',
+      domain: 'general',
+      respectRLS: true,
+      enableRealImages: false, // Generic uses mock images for compatibility
+      imagesPerSetup: 3,
+      categories: ['general', 'placeholder', 'mock'],
+      storageRootPath: 'uploads'
+    };
   }
 }

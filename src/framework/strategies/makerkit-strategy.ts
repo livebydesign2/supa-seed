@@ -23,6 +23,7 @@ import { RLSCompliantSeeder } from '../../schema/rls-compliant-seeder';
 import { RelationshipAnalyzer } from '../../schema/relationship-analyzer';
 import { JunctionTableHandler } from '../../schema/junction-table-handler';
 import { MultiTenantManager } from '../../schema/multi-tenant-manager';
+import { StorageIntegrationManager } from '../../storage/storage-integration-manager';
 import { Logger } from '../../utils/logger';
 import type {
   BusinessLogicAnalysisResult,
@@ -47,6 +48,14 @@ import type {
   TenantInfo,
   TenantScopeInfo
 } from '../../schema/tenant-types';
+import type {
+  StorageIntegrationResult,
+  StorageConfig,
+  StoragePermissionCheck,
+  StorageQuotaInfo,
+  MediaAttachment,
+  DOMAIN_CONFIGURATIONS
+} from '../../storage/storage-types';
 
 type SupabaseClient = ReturnType<typeof createClient>;
 
@@ -62,6 +71,7 @@ export class MakerKitStrategy implements SeedingStrategy {
   private relationshipAnalyzer?: RelationshipAnalyzer;
   private junctionTableHandler?: JunctionTableHandler;
   private multiTenantManager?: MultiTenantManager;
+  private storageIntegrationManager?: StorageIntegrationManager;
 
   async initialize(client: SupabaseClient): Promise<void> {
     this.client = client;
@@ -142,6 +152,21 @@ export class MakerKitStrategy implements SeedingStrategy {
         respectTenantPlans: true,
         enforceTenantLimits: true
       }
+    });
+
+    // Initialize storage integration manager with MakerKit-specific configuration
+    this.storageIntegrationManager = new StorageIntegrationManager(client, {
+      bucketName: 'media',
+      domain: 'outdoor-adventure', // MakerKit default theme
+      categories: ['camping', 'hiking', 'outdoor-gear'],
+      imagesPerSetup: 3,
+      enableRealImages: false, // Default to mock for safety
+      imageService: 'mock',
+      maxFileSize: 5 * 1024 * 1024, // 5MB
+      allowedFileTypes: ['image/jpeg', 'image/png', 'image/webp'],
+      generateThumbnails: true,
+      respectRLS: true, // MakerKit uses RLS heavily
+      storageRootPath: 'supa-seed/makerkit'
     });
     
     // Register MakerKit-specific handlers
@@ -1315,5 +1340,185 @@ export class MakerKitStrategy implements SeedingStrategy {
 
     const scopeInfo = this.multiTenantManager.getTenantScopeInfo(tableName);
     return scopeInfo || null;
+  }
+
+  /**
+   * Storage Integration Methods Implementation
+   */
+
+  /**
+   * Integrate with Supabase Storage for file uploads and media management
+   */
+  async integrateWithStorage(
+    setupId: string, 
+    accountId?: string, 
+    config?: Partial<StorageConfig>
+  ): Promise<StorageIntegrationResult> {
+    if (!this.storageIntegrationManager) {
+      throw new Error('Storage integration manager not initialized');
+    }
+
+    Logger.info(`🗂️  MakerKit storage integration for setup: ${setupId}`);
+
+    try {
+      // Apply MakerKit-specific configuration overrides
+      const makerkitConfig = {
+        ...config,
+        respectRLS: true, // Always respect RLS in MakerKit
+        storageRootPath: `supa-seed/makerkit/${accountId || 'shared'}`,
+        domain: config?.domain || 'outdoor-adventure'
+      };
+
+      const result = await this.storageIntegrationManager.seedWithStorageFiles(
+        setupId,
+        accountId,
+        makerkitConfig
+      );
+
+      // Add MakerKit-specific recommendations
+      if (result.success) {
+        result.recommendations.push(
+          'MakerKit: Storage respects RLS policies and tenant boundaries',
+          'Files are organized by account for multi-tenant isolation',
+          'Consider enabling real images for production-like testing'
+        );
+      }
+
+      return result;
+
+    } catch (error: any) {
+      Logger.error('MakerKit storage integration failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Check storage permissions and RLS compliance
+   */
+  async checkStoragePermissions(bucketName: string): Promise<StoragePermissionCheck> {
+    if (!this.storageIntegrationManager) {
+      throw new Error('Storage integration manager not initialized');
+    }
+
+    Logger.info(`🔒 MakerKit storage permission check for bucket: ${bucketName}`);
+
+    try {
+      const permissionCheck = await this.storageIntegrationManager.checkStoragePermissions(bucketName);
+
+      // Add MakerKit-specific context
+      permissionCheck.recommendations.push(
+        'MakerKit: Ensure storage bucket has proper RLS policies',
+        'Verify tenant-scoped access patterns for media files',
+        'Consider using separate buckets for different account types'
+      );
+
+      return permissionCheck;
+
+    } catch (error: any) {
+      Logger.error('MakerKit storage permission check failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get storage quota and usage information
+   */
+  async getStorageQuota(bucketName: string): Promise<StorageQuotaInfo> {
+    if (!this.storageIntegrationManager) {
+      throw new Error('Storage integration manager not initialized');
+    }
+
+    Logger.info(`📊 MakerKit storage quota check for bucket: ${bucketName}`);
+
+    try {
+      const quotaInfo = await this.storageIntegrationManager.getStorageQuota(bucketName);
+
+      // Add MakerKit-specific recommendations
+      quotaInfo.recommendations.push(
+        'MakerKit: Monitor storage usage per tenant/account',
+        'Consider implementing storage limits per plan type',
+        'Regular cleanup of old media files recommended'
+      );
+
+      return quotaInfo;
+
+    } catch (error: any) {
+      Logger.error('MakerKit storage quota check failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Generate and upload media attachments for a specific entity
+   */
+  async generateMediaAttachments(
+    entityId: string,
+    entityType: string,
+    count: number = 3,
+    config?: Partial<StorageConfig>
+  ): Promise<MediaAttachment[]> {
+    if (!this.storageIntegrationManager) {
+      throw new Error('Storage integration manager not initialized');
+    }
+
+    Logger.info(`🖼️  Generating ${count} MakerKit media attachments for ${entityType}: ${entityId}`);
+
+    try {
+      // Determine account ID from entity context if possible
+      let accountId: string | undefined;
+      
+      // For MakerKit, try to extract account_id from context
+      if (entityType === 'setup' || entityType === 'profile') {
+        // Would query database to get account_id for the entity
+        // For now, we'll use a placeholder approach
+        accountId = `account_${entityId.split('_')[0]}`;
+      }
+
+      // Apply MakerKit-specific configuration
+      const makerkitConfig = {
+        ...config,
+        domain: config?.domain || 'outdoor-adventure',
+        categories: config?.categories || ['camping', 'hiking', 'outdoor-gear'],
+        imagesPerSetup: count,
+        respectRLS: true,
+        storageRootPath: `supa-seed/makerkit/${accountId || 'shared'}`
+      };
+
+      const result = await this.storageIntegrationManager.seedWithStorageFiles(
+        entityId,
+        accountId,
+        makerkitConfig
+      );
+
+      if (result.success) {
+        Logger.success(`✅ Generated ${result.mediaAttachments.length} media attachments for ${entityType}`);
+        return result.mediaAttachments;
+      } else {
+        throw new Error(`Media generation failed: ${result.errors.join(', ')}`);
+      }
+
+    } catch (error: any) {
+      Logger.error(`MakerKit media generation failed for ${entityType} ${entityId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get framework-specific storage configuration
+   */
+  getStorageConfig(): Partial<StorageConfig> {
+    return {
+      bucketName: 'media',
+      domain: 'outdoor-adventure',
+      categories: ['camping', 'hiking', 'climbing', 'backpacking', 'outdoor-gear'],
+      imagesPerSetup: 3,
+      enableRealImages: false,
+      imageService: 'mock',
+      maxFileSize: 5 * 1024 * 1024, // 5MB
+      allowedFileTypes: ['image/jpeg', 'image/png', 'image/webp'],
+      generateThumbnails: true,
+      respectRLS: true,
+      storageRootPath: 'supa-seed/makerkit'
+    };
   }
 }

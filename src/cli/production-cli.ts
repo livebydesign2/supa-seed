@@ -13,6 +13,8 @@ import { PerformanceMonitor } from '../utils/performance-monitor';
 import { MemoryManager } from '../utils/memory-manager';
 import { GracefulDegradation } from '../utils/graceful-degradation';
 import { ConfigValidator } from '../utils/config-validator';
+import { StorageCommands } from './storage-commands';
+import { FrameworkCommands } from './framework-commands';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -220,6 +222,142 @@ export class ProductionCLI {
           await this.exportData(options.type, options.output);
         });
       });
+
+    // Framework commands
+    this.program
+      .command('framework')
+      .description('Framework strategy operations')
+      .addCommand(
+        new Command('detect')
+          .description('Detect framework and show strategy information')
+          .option('--framework <name>', 'Override framework detection')
+          .action(async (options) => {
+            await this.handleCommand('framework-detect', async () => {
+              await FrameworkCommands.detectFramework({
+                ...this.getConnectionOptions(),
+                verbose: this.config.verbose,
+                framework: options.framework
+              });
+            });
+          })
+      )
+      .addCommand(
+        new Command('test <strategy>')
+          .description('Test a specific strategy')
+          .action(async (strategy, options) => {
+            await this.handleCommand('framework-test', async () => {
+              await FrameworkCommands.testStrategy(strategy, {
+                ...this.getConnectionOptions(),
+                verbose: this.config.verbose
+              });
+            });
+          })
+      )
+      .addCommand(
+        new Command('list')
+          .description('List all available strategies')
+          .action(async () => {
+            await this.handleCommand('framework-list', async () => {
+              await FrameworkCommands.listStrategies({
+                ...this.getConnectionOptions(),
+                verbose: this.config.verbose
+              });
+            });
+          })
+      );
+
+    // Storage commands
+    this.program
+      .command('storage')
+      .description('Storage integration operations')
+      .addCommand(
+        new Command('test')
+          .description('Test storage connectivity and permissions')
+          .option('--framework <name>', 'Override framework detection')
+          .option('--bucket <name>', 'Specify bucket name')
+          .action(async (options) => {
+            await this.handleCommand('storage-test', async () => {
+              await StorageCommands.testStorage({
+                ...this.getConnectionOptions(),
+                verbose: this.config.verbose,
+                framework: options.framework,
+                bucket: options.bucket
+              });
+            });
+          })
+      )
+      .addCommand(
+        new Command('generate')
+          .description('Generate and upload test media files')
+          .option('--setup-id <id>', 'Setup ID for media generation')
+          .option('--account-id <id>', 'Account ID for media generation')
+          .option('--count <number>', 'Number of media files to generate', '3')
+          .option('--domain <name>', 'Domain for image categories')
+          .option('--bucket <name>', 'Specify bucket name')
+          .option('--real-images', 'Enable real image generation from APIs')
+          .option('--framework <name>', 'Override framework detection')
+          .action(async (options) => {
+            await this.handleCommand('storage-generate', async () => {
+              await StorageCommands.generateMedia({
+                ...this.getConnectionOptions(),
+                verbose: this.config.verbose,
+                setupId: options.setupId,
+                accountId: options.accountId,
+                count: parseInt(options.count) || 3,
+                domain: options.domain,
+                bucket: options.bucket,
+                enableRealImages: options.realImages,
+                framework: options.framework
+              });
+            });
+          })
+      )
+      .addCommand(
+        new Command('config')
+          .description('Show storage configuration for framework')
+          .option('--framework <name>', 'Override framework detection')
+          .action(async (options) => {
+            await this.handleCommand('storage-config', async () => {
+              await StorageCommands.showConfig({
+                ...this.getConnectionOptions(),
+                verbose: this.config.verbose,
+                framework: options.framework
+              });
+            });
+          })
+      )
+      .addCommand(
+        new Command('list')
+          .description('List media attachments')
+          .option('--setup-id <id>', 'Filter by setup ID')
+          .option('--account-id <id>', 'Filter by account ID')
+          .action(async (options) => {
+            await this.handleCommand('storage-list', async () => {
+              await StorageCommands.listMedia({
+                ...this.getConnectionOptions(),
+                verbose: this.config.verbose,
+                setupId: options.setupId,
+                accountId: options.accountId
+              });
+            });
+          })
+      )
+      .addCommand(
+        new Command('cleanup')
+          .description('Clean up media attachments and storage files')
+          .option('--setup-id <id>', 'Setup ID to clean up (required)')
+          .option('--bucket <name>', 'Specify bucket name')
+          .action(async (options) => {
+            await this.handleCommand('storage-cleanup', async () => {
+              await StorageCommands.cleanupMedia({
+                ...this.getConnectionOptions(),
+                verbose: this.config.verbose,
+                setupId: options.setupId,
+                bucket: options.bucket
+              });
+            });
+          })
+      );
 
     // Error handling for unknown commands
     this.program.on('command:*', () => {
@@ -642,6 +780,16 @@ export class ProductionCLI {
       this.info(`🔧 Attempting to fix: ${check.name}`);
       // Auto-fix implementations would go here
     }
+  }
+
+  /**
+   * Get connection options from environment or CLI
+   */
+  private getConnectionOptions(): { url?: string; key?: string } {
+    return {
+      url: process.env.SUPABASE_URL,
+      key: process.env.SUPABASE_SERVICE_ROLE_KEY
+    };
   }
 
   /**

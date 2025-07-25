@@ -34,6 +34,13 @@ import type {
   TenantInfo,
   TenantScopeInfo
 } from '../schema/tenant-types';
+import type {
+  StorageIntegrationResult,
+  StorageConfig,
+  StoragePermissionCheck,
+  StorageQuotaInfo,
+  MediaAttachment
+} from '../storage/storage-types';
 
 type SupabaseClient = ReturnType<typeof createClient>;
 
@@ -237,6 +244,31 @@ export interface SeedingStrategy {
    * Get tenant scope information for a table
    */
   getTenantScopeInfo?(tableName: string): Promise<TenantScopeInfo | null>;
+
+  /**
+   * Integrate with Supabase Storage for file uploads and media management
+   */
+  integrateWithStorage?(setupId: string, accountId?: string, config?: Partial<StorageConfig>): Promise<StorageIntegrationResult>;
+
+  /**
+   * Check storage permissions and RLS compliance
+   */
+  checkStoragePermissions?(bucketName: string): Promise<StoragePermissionCheck>;
+
+  /**
+   * Get storage quota and usage information
+   */
+  getStorageQuota?(bucketName: string): Promise<StorageQuotaInfo>;
+
+  /**
+   * Generate and upload media attachments for a specific entity
+   */
+  generateMediaAttachments?(entityId: string, entityType: string, count?: number, config?: Partial<StorageConfig>): Promise<MediaAttachment[]>;
+
+  /**
+   * Get framework-specific storage configuration
+   */
+  getStorageConfig?(): Partial<StorageConfig>;
 
   /**
    * Get recommendations for using this strategy

@@ -14,12 +14,21 @@ export interface TableFieldMapping {
   makeField?: string;
   modelField?: string;
   yearField?: string;
+  // Storage-related fields
+  filePathField?: string;
+  fileNameField?: string;
+  fileSizeField?: string;
+  fileTypeField?: string;
+  altTextField?: string;
+  storageBucketField?: string;
+  uploadStatusField?: string;
 }
 
 export interface SchemaMapping {
   userTable: TableFieldMapping;
   setupTable?: TableFieldMapping;
   baseTemplateTable?: TableFieldMapping;
+  mediaAttachmentsTable?: TableFieldMapping;
 }
 
 export const SCHEMA_MAPPINGS: Record<string, SchemaMapping> = {
@@ -48,6 +57,20 @@ export const SCHEMA_MAPPINGS: Record<string, SchemaMapping> = {
       makeField: 'make',
       modelField: 'model',
       yearField: 'year'
+    },
+    mediaAttachmentsTable: {
+      name: 'media_attachments',
+      idField: 'id',
+      userField: 'account_id',
+      filePathField: 'file_path',
+      fileNameField: 'file_name',
+      fileSizeField: 'file_size',
+      fileTypeField: 'file_type',
+      altTextField: 'alt_text',
+      descriptionField: 'description',
+      storageBucketField: 'storage_bucket',
+      uploadStatusField: 'upload_status',
+      publicField: 'is_public'
     }
   },
   
@@ -68,6 +91,20 @@ export const SCHEMA_MAPPINGS: Record<string, SchemaMapping> = {
       descriptionField: 'description',
       categoryField: 'category',
       publicField: 'is_public'
+    },
+    mediaAttachmentsTable: {
+      name: 'media_attachments',
+      idField: 'id',
+      userField: 'user_id',
+      filePathField: 'file_path',
+      fileNameField: 'file_name',
+      fileSizeField: 'file_size',
+      fileTypeField: 'file_type',
+      altTextField: 'alt_text',
+      descriptionField: 'description',
+      storageBucketField: 'storage_bucket',
+      uploadStatusField: 'upload_status',
+      publicField: 'is_public'
     }
   },
   
@@ -84,6 +121,20 @@ export const SCHEMA_MAPPINGS: Record<string, SchemaMapping> = {
       idField: 'id',
       titleField: 'title',
       descriptionField: 'description'
+    },
+    mediaAttachmentsTable: {
+      name: 'media_attachments',
+      idField: 'id',
+      userField: 'profile_id',
+      filePathField: 'file_path',
+      fileNameField: 'file_name',
+      fileSizeField: 'file_size',
+      fileTypeField: 'file_type',
+      altTextField: 'alt_text',
+      descriptionField: 'description',
+      storageBucketField: 'storage_bucket',
+      uploadStatusField: 'upload_status',
+      publicField: 'is_public'
     }
   },
   
@@ -100,6 +151,20 @@ export const SCHEMA_MAPPINGS: Record<string, SchemaMapping> = {
       idField: 'id',
       titleField: 'title',
       descriptionField: 'content'
+    },
+    mediaAttachmentsTable: {
+      name: 'media_attachments',
+      idField: 'id',
+      userField: 'user_id',
+      filePathField: 'file_path',
+      fileNameField: 'file_name',
+      fileSizeField: 'file_size',
+      fileTypeField: 'file_type',
+      altTextField: 'alt_text',
+      descriptionField: 'description',
+      storageBucketField: 'storage_bucket',
+      uploadStatusField: 'upload_status',
+      publicField: 'is_public'
     }
   }
 };
@@ -148,6 +213,10 @@ export function mergeSchemaMapping(
     baseTemplateTable: customMapping.baseTemplateTable ? {
       ...defaultMapping.baseTemplateTable,
       ...customMapping.baseTemplateTable
-    } : defaultMapping.baseTemplateTable
+    } : defaultMapping.baseTemplateTable,
+    mediaAttachmentsTable: customMapping.mediaAttachmentsTable ? {
+      ...defaultMapping.mediaAttachmentsTable,
+      ...customMapping.mediaAttachmentsTable
+    } : defaultMapping.mediaAttachmentsTable
   };
 }
