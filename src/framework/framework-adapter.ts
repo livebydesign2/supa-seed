@@ -328,4 +328,11 @@ export class FrameworkAdapter {
     const schema = await this.convertSchemaInfo(await this.getSchemaInfo());
     return await this.strategyRegistry.getAllDetectionResults(schema);
   }
+
+  /**
+   * Get the currently active strategy
+   */
+  getActiveStrategy(): SeedingStrategy | undefined {
+    return this.currentStrategy;
+  }
 }

@@ -17,6 +17,15 @@ import type {
   RLSComplianceResult,
   UserContext
 } from '../schema/business-logic-types';
+import type {
+  RelationshipAnalysisResult
+} from '../schema/relationship-analyzer';
+import type {
+  JunctionTableDetectionResult,
+  JunctionSeedingOptions,
+  JunctionSeedingResult
+} from '../schema/junction-table-handler';
+import type { DependencyGraph } from '../schema/dependency-graph';
 
 type SupabaseClient = ReturnType<typeof createClient>;
 
@@ -165,6 +174,31 @@ export interface SeedingStrategy {
    * Get RLS compliance options for this strategy
    */
   getRLSComplianceOptions?(): RLSComplianceOptions;
+
+  /**
+   * Analyze database relationships for dependency-aware seeding
+   */
+  analyzeRelationships?(): Promise<RelationshipAnalysisResult>;
+
+  /**
+   * Get dependency graph for seeding order optimization
+   */
+  getDependencyGraph?(): Promise<DependencyGraph>;
+
+  /**
+   * Detect and handle junction tables for many-to-many relationships
+   */
+  detectJunctionTables?(): Promise<JunctionTableDetectionResult>;
+
+  /**
+   * Seed junction tables with proper relationship data
+   */
+  seedJunctionTable?(tableName: string, options?: Partial<JunctionSeedingOptions>): Promise<JunctionSeedingResult>;
+
+  /**
+   * Get optimal seeding order based on dependencies
+   */
+  getSeedingOrder?(): Promise<string[]>;
 
   /**
    * Get recommendations for using this strategy

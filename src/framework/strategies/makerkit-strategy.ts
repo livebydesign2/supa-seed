@@ -20,6 +20,8 @@ import { ConstraintDiscoveryEngine } from '../../schema/constraint-discovery-eng
 import { ConstraintRegistry } from '../../schema/constraint-registry';
 import { BusinessLogicAnalyzer } from '../../schema/business-logic-analyzer';
 import { RLSCompliantSeeder } from '../../schema/rls-compliant-seeder';
+import { RelationshipAnalyzer } from '../../schema/relationship-analyzer';
+import { JunctionTableHandler } from '../../schema/junction-table-handler';
 import { Logger } from '../../utils/logger';
 import type {
   BusinessLogicAnalysisResult,
@@ -27,6 +29,15 @@ import type {
   RLSComplianceResult,
   UserContext
 } from '../../schema/business-logic-types';
+import type {
+  RelationshipAnalysisResult
+} from '../../schema/relationship-analyzer';
+import type {
+  JunctionTableDetectionResult,
+  JunctionSeedingOptions,
+  JunctionSeedingResult
+} from '../../schema/junction-table-handler';
+import type { DependencyGraph } from '../../schema/dependency-graph';
 
 type SupabaseClient = ReturnType<typeof createClient>;
 
@@ -39,6 +50,8 @@ export class MakerKitStrategy implements SeedingStrategy {
   private constraintRegistry?: ConstraintRegistry;
   private businessLogicAnalyzer?: BusinessLogicAnalyzer;
   private rlsCompliantSeeder?: RLSCompliantSeeder;
+  private relationshipAnalyzer?: RelationshipAnalyzer;
+  private junctionTableHandler?: JunctionTableHandler;
 
   async initialize(client: SupabaseClient): Promise<void> {
     this.client = client;
@@ -61,6 +74,19 @@ export class MakerKitStrategy implements SeedingStrategy {
       createUserContext: true,
       useServiceRole: false // MakerKit prefers auth-based approach
     });
+
+    // Initialize relationship analyzer with MakerKit-specific options
+    this.relationshipAnalyzer = new RelationshipAnalyzer(client, {
+      schemas: ['public'],
+      detectJunctionTables: true,
+      analyzeTenantScoping: true, // Important for MakerKit multi-tenant
+      includeOptionalRelationships: true,
+      enableCaching: true,
+      generateRecommendations: true
+    });
+
+    // Initialize junction table handler for many-to-many relationships
+    this.junctionTableHandler = new JunctionTableHandler(client);
     
     // Register MakerKit-specific handlers
     const handlers = this.getConstraintHandlers();
@@ -665,6 +691,201 @@ export class MakerKitStrategy implements SeedingStrategy {
       logPolicyViolations: true,
       maxRetries: 2
     };
+  }
+
+  /**
+   * Analyze database relationships for MakerKit-aware seeding
+   */
+  async analyzeRelationships(): Promise<RelationshipAnalysisResult> {
+    if (!this.relationshipAnalyzer) {
+      throw new Error('Relationship analyzer not initialized');
+    }
+
+    try {
+      Logger.debug('Analyzing relationships for MakerKit strategy');
+      
+      const analysis = await this.relationshipAnalyzer.analyzeRelationships();
+      
+      // Add MakerKit-specific enhancements to the analysis
+      if (analysis.success) {
+        // Boost confidence if MakerKit tenant patterns are detected
+        const tenantTables = analysis.analysisMetadata.tenantScopedTables;
+        if (tenantTables.length > 0) {
+          analysis.analysisMetadata.confidence = Math.min(analysis.analysisMetadata.confidence + 0.1, 1.0);
+          analysis.recommendations.push('Detected multi-tenant MakerKit schema - ensure account_id consistency');
+        }
+
+        // Add MakerKit-specific relationship recommendations
+        if (analysis.analysisMetadata.junctionTablesDetected.length > 0) {
+          analysis.recommendations.push('Use MakerKit junction table patterns for many-to-many relationships');
+        }
+      }
+
+      return analysis;
+
+    } catch (error: any) {
+      Logger.error('MakerKit relationship analysis failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get dependency graph optimized for MakerKit seeding order
+   */
+  async getDependencyGraph(): Promise<DependencyGraph> {
+    if (!this.relationshipAnalyzer) {
+      throw new Error('Relationship analyzer not initialized');
+    }
+
+    try {
+      Logger.debug('Building MakerKit dependency graph');
+      
+      const analysis = await this.relationshipAnalyzer.analyzeRelationships();
+      if (!analysis.success) {
+        throw new Error('Failed to analyze relationships for dependency graph');
+      }
+
+      return analysis.dependencyGraph;
+
+    } catch (error: any) {
+      Logger.error('MakerKit dependency graph creation failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Detect junction tables with MakerKit-specific patterns
+   */
+  async detectJunctionTables(): Promise<JunctionTableDetectionResult> {
+    if (!this.junctionTableHandler || !this.relationshipAnalyzer) {
+      throw new Error('Junction table handler or relationship analyzer not initialized');
+    }
+
+    try {
+      Logger.debug('Detecting junction tables for MakerKit');
+      
+      const dependencyGraph = await this.getDependencyGraph();
+      const result = await this.junctionTableHandler.detectJunctionTables(dependencyGraph);
+      
+      // Add MakerKit-specific recommendations
+      if (result.success && result.junctionTables.length > 0) {
+        result.recommendations.push('Ensure junction tables respect MakerKit tenant boundaries with account_id');
+        result.recommendations.push('Use auth-triggered flows for junction table relationships where possible');
+      }
+
+      return result;
+
+    } catch (error: any) {
+      Logger.error('MakerKit junction table detection failed:', error);
+      return {
+        success: false,
+        junctionTables: [],
+        relationshipPatterns: [],
+        totalRelationships: 0,
+        confidence: 0,
+        warnings: [],
+        errors: [error.message],
+        recommendations: []
+      };
+    }
+  }
+
+  /**
+   * Seed junction table with MakerKit-specific options
+   */
+  async seedJunctionTable(
+    tableName: string, 
+    options: Partial<JunctionSeedingOptions> = {}
+  ): Promise<JunctionSeedingResult> {
+    if (!this.junctionTableHandler) {
+      throw new Error('Junction table handler not initialized');
+    }
+
+    try {
+      Logger.debug(`Seeding MakerKit junction table: ${tableName}`);
+      
+      // MakerKit-specific junction seeding options
+      const makerKitOptions: Partial<JunctionSeedingOptions> = {
+        generateRelationships: true,
+        relationshipDensity: 0.4, // Moderate density for realistic MakerKit data
+        respectCardinality: true,
+        avoidOrphans: true,
+        distributionStrategy: 'even', // Even distribution works well for MakerKit
+        generateMetadata: true,
+        includeTimestamps: true,
+        validateForeignKeys: true,
+        ...options
+      };
+
+      const result = await this.junctionTableHandler.seedJunctionTable(tableName, makerKitOptions);
+      
+      // Add MakerKit-specific context to the result
+      if (result.success) {
+        result.warnings = result.warnings || [];
+        result.warnings.push('Used MakerKit-optimized junction table seeding');
+      }
+
+      return result;
+
+    } catch (error: any) {
+      Logger.error(`MakerKit junction table seeding failed for ${tableName}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get optimal seeding order for MakerKit schemas
+   */
+  async getSeedingOrder(): Promise<string[]> {
+    if (!this.relationshipAnalyzer) {
+      throw new Error('Relationship analyzer not initialized');
+    }
+
+    try {
+      Logger.debug('Calculating MakerKit seeding order');
+      
+      const analysis = await this.relationshipAnalyzer.analyzeRelationships();
+      if (!analysis.success) {
+        throw new Error('Failed to analyze relationships for seeding order');
+      }
+
+      const seedingOrder = analysis.seedingOrder.seedingOrder;
+      
+      // MakerKit-specific order adjustments
+      // Ensure auth tables come first, then accounts, then everything else
+      const adjustedOrder = this.adjustSeedingOrderForMakerKit(seedingOrder);
+      
+      Logger.info(`MakerKit seeding order: ${adjustedOrder.join(' → ')}`);
+      return adjustedOrder;
+
+    } catch (error: any) {
+      Logger.error('MakerKit seeding order calculation failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Adjust seeding order for MakerKit-specific requirements
+   */
+  private adjustSeedingOrderForMakerKit(originalOrder: string[]): string[] {
+    const priorityTables = ['users', 'accounts', 'profiles']; // MakerKit core tables
+    const adjustedOrder: string[] = [];
+    
+    // Add priority tables first (if they exist)
+    for (const table of priorityTables) {
+      if (originalOrder.includes(table) && !adjustedOrder.includes(table)) {
+        adjustedOrder.push(table);
+      }
+    }
+    
+    // Add remaining tables
+    for (const table of originalOrder) {
+      if (!adjustedOrder.includes(table)) {
+        adjustedOrder.push(table);
+      }
+    }
+    
+    return adjustedOrder;
   }
 
   private detectMakerKitVersion(schema: DatabaseSchema): string | undefined {

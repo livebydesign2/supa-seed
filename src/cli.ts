@@ -3,6 +3,7 @@
 import { program } from 'commander';
 import ora from 'ora';
 import { SupaSeedFramework, createDefaultConfig } from './index';
+import { FrameworkAdapter } from './framework/framework-adapter';
 import { ConfigManager } from './config-manager';
 import { createClient } from '@supabase/supabase-js';
 import { loadConfiguration } from './config';
@@ -895,6 +896,335 @@ async function main() {
       } catch (error: any) {
         spinner.fail('AI cache clear failed');
         Logger.error('Error:', error.message);
+        process.exit(1);
+      }
+    });
+
+  program
+    .command('analyze-relationships')
+    .description('Analyze database relationships and dependencies')
+    .option('--url <url>', 'Supabase URL (overrides env var)')
+    .option('--key <key>', 'Supabase service role key (overrides env var)')
+    .option('--verbose', 'Enable verbose logging')
+    .option('--show-graph', 'Show complete dependency graph')
+    .option('--tables <tables>', 'Comma-separated list of specific tables to analyze')
+    .action(async (options) => {
+      const spinner = ora('Analyzing database relationships...').start();
+      
+      try {
+        if (options.verbose) {
+          Logger.setVerbose(true);
+        }
+        
+        const supabaseUrl = options.url || process.env.SUPABASE_URL;
+        const supabaseKey = options.key || process.env.SUPABASE_SERVICE_ROLE_KEY;
+        
+        if (!supabaseUrl || !supabaseKey) {
+          spinner.fail('Missing required credentials');
+          Logger.error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required');
+          Logger.info('Set environment variables or use --url and --key options');
+          process.exit(1);
+        }
+        
+        spinner.text = 'Connecting to database...';
+        const client = createEnhancedSupabaseClient(supabaseUrl, supabaseKey);
+        
+        spinner.text = 'Initializing SupaSeed with strategy detection...';
+        const frameworkAdapter = new FrameworkAdapter(client as any);
+        await frameworkAdapter.initialize();
+        
+        const strategy = frameworkAdapter.getActiveStrategy();
+        if (!strategy) {
+          throw new Error('No strategy available for relationship analysis');
+        }
+        
+        // Check if strategy supports relationship analysis
+        if (!strategy.analyzeRelationships) {
+          spinner.fail('Current strategy does not support relationship analysis');
+          console.log('🔄 Try updating to a framework-specific strategy or enable relationship features');
+          process.exit(1);
+        }
+        
+        spinner.text = 'Analyzing relationships and building dependency graph...';
+        const analysis = await strategy.analyzeRelationships();
+        
+        if (!analysis.success) {
+          spinner.fail('Relationship analysis failed');
+          console.log('\n❌ Errors:');
+          analysis.errors.forEach(error => console.log(`   • ${error}`));
+          process.exit(1);
+        }
+        
+        spinner.succeed('Relationship analysis complete');
+        
+        // Display relationship analysis results
+        console.log('\n🔗 Database Relationship Analysis:');
+        console.log(`   📊 Tables analyzed: ${analysis.analysisMetadata.tablesAnalyzed}`);
+        console.log(`   🔗 Relationships found: ${analysis.analysisMetadata.relationshipsFound}`);
+        console.log(`   📈 Analysis confidence: ${(analysis.analysisMetadata.confidence * 100).toFixed(1)}%`);
+        console.log(`   🔄 Circular dependencies: ${analysis.analysisMetadata.circularDependencies}`);
+        console.log(`   📏 Max dependency depth: ${analysis.analysisMetadata.maxDependencyDepth}`);
+        
+        if (analysis.analysisMetadata.junctionTablesDetected.length > 0) {
+          console.log(`   🔗 Junction tables: ${analysis.analysisMetadata.junctionTablesDetected.join(', ')}`);
+        }
+        
+        if (analysis.analysisMetadata.tenantScopedTables.length > 0) {
+          console.log(`   🏢 Tenant-scoped tables: ${analysis.analysisMetadata.tenantScopedTables.join(', ')}`);
+        }
+        
+        // Show seeding order
+        console.log('\n📋 Recommended Seeding Order:');
+        analysis.seedingOrder.seedingOrder.forEach((table, index) => {
+          console.log(`   ${index + 1}. ${table}`);
+        });
+        
+        // Show seeding phases if available
+        if (analysis.seedingOrder.phases.length > 0) {
+          console.log('\n🚀 Seeding Phases:');
+          analysis.seedingOrder.phases.forEach(phase => {
+            console.log(`   Phase ${phase.phase}: ${phase.tables.join(', ')}`);
+            console.log(`     📝 ${phase.description}`);
+            if (phase.canRunInParallel) {
+              console.log(`     ⚡ Can run in parallel`);
+            }
+          });
+        }
+        
+        // Show dependency graph if requested
+        if (options.showGraph) {
+          console.log('\n🕸️ Dependency Graph:');
+          analysis.dependencyGraph.nodes.forEach(node => {
+            console.log(`   📦 ${node.table}:`);
+            if (node.dependencies.length > 0) {
+              console.log(`     ⬅️  Depends on: ${node.dependencies.join(', ')}`);
+            }
+            if (node.dependents.length > 0) {
+              console.log(`     ➡️  Depended on by: ${node.dependents.join(', ')}`);
+            }
+            if (node.metadata.isJunctionTable) {
+              console.log(`     🔗 Junction table for many-to-many relationships`);
+            }
+            if (node.metadata.isTenantScoped) {
+              console.log(`     🏢 Tenant-scoped table`);
+            }
+          });
+        }
+        
+        // Show recommendations
+        if (analysis.recommendations.length > 0) {
+          console.log('\n💡 Recommendations:');
+          analysis.recommendations.forEach(rec => console.log(`   • ${rec}`));
+        }
+        
+        // Show warnings
+        if (analysis.warnings.length > 0) {
+          console.log('\n⚠️  Warnings:');
+          analysis.warnings.forEach(warning => console.log(`   • ${warning}`));
+        }
+        
+      } catch (error: any) {
+        spinner.fail('Relationship analysis failed');
+        Logger.error('Error:', error.message);
+        if (options.verbose) {
+          console.error(error.stack);
+        }
+        process.exit(1);
+      }
+    });
+
+  program
+    .command('detect-junction-tables')
+    .description('Detect and analyze junction tables for many-to-many relationships')
+    .option('--url <url>', 'Supabase URL (overrides env var)')
+    .option('--key <key>', 'Supabase service role key (overrides env var)')
+    .option('--verbose', 'Enable verbose logging')
+    .option('--show-patterns', 'Show detected relationship patterns')
+    .action(async (options) => {
+      const spinner = ora('Detecting junction tables...').start();
+      
+      try {
+        if (options.verbose) {
+          Logger.setVerbose(true);
+        }
+        
+        const supabaseUrl = options.url || process.env.SUPABASE_URL;
+        const supabaseKey = options.key || process.env.SUPABASE_SERVICE_ROLE_KEY;
+        
+        if (!supabaseUrl || !supabaseKey) {
+          spinner.fail('Missing required credentials');
+          Logger.error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required');
+          Logger.info('Set environment variables or use --url and --key options');
+          process.exit(1);
+        }
+        
+        spinner.text = 'Connecting to database...';
+        const client = createEnhancedSupabaseClient(supabaseUrl, supabaseKey);
+        
+        spinner.text = 'Initializing SupaSeed with strategy detection...';
+        const frameworkAdapter = new FrameworkAdapter(client as any);
+        await frameworkAdapter.initialize();
+        
+        const strategy = frameworkAdapter.getActiveStrategy();
+        if (!strategy?.detectJunctionTables) {
+          spinner.fail('Current strategy does not support junction table detection');
+          console.log('🔄 Try updating to a framework-specific strategy or enable relationship features');
+          process.exit(1);
+        }
+        
+        spinner.text = 'Analyzing junction tables and many-to-many relationships...';
+        const result = await strategy.detectJunctionTables();
+        
+        if (!result.success) {
+          spinner.fail('Junction table detection failed');
+          console.log('\n❌ Errors:');
+          result.errors.forEach(error => console.log(`   • ${error}`));
+          process.exit(1);
+        }
+        
+        spinner.succeed('Junction table detection complete');
+        
+        // Display junction table results
+        console.log('\n🔗 Junction Table Analysis:');
+        console.log(`   📊 Junction tables found: ${result.junctionTables.length}`);
+        console.log(`   🔗 Total relationships: ${result.totalRelationships}`);
+        console.log(`   📈 Detection confidence: ${(result.confidence * 100).toFixed(1)}%`);
+        
+        if (result.junctionTables.length > 0) {
+          console.log('\n📋 Detected Junction Tables:');
+          result.junctionTables.forEach((junction, index) => {
+            console.log(`   ${index + 1}. ${junction.tableName}:`);
+            console.log(`      🔗 Connects: ${junction.leftTable} ↔ ${junction.rightTable}`);
+            console.log(`      📈 Confidence: ${(junction.confidence * 100).toFixed(1)}%`);
+            console.log(`      🔑 Left key: ${junction.leftColumn}`);
+            console.log(`      🔑 Right key: ${junction.rightColumn}`);
+            console.log(`      📊 Relationship: ${junction.cardinality.relationshipType}`);
+            
+            if (junction.additionalColumns.length > 0) {
+              console.log(`      📋 Additional columns: ${junction.additionalColumns.map(c => c.name).join(', ')}`);
+            }
+          });
+        } else {
+          console.log('\n📋 No junction tables detected in your schema.');
+          console.log('   This is normal if your application doesn\'t use many-to-many relationships.');
+        }
+        
+        // Show relationship patterns if requested
+        if (options.showPatterns && result.relationshipPatterns.length > 0) {
+          console.log('\n🎯 Detected Relationship Patterns:');
+          result.relationshipPatterns.forEach(pattern => {
+            console.log(`   • ${pattern.name}: ${pattern.description}`);
+            console.log(`     📈 Confidence: ${(pattern.confidence * 100).toFixed(1)}%`);
+            console.log(`     🔗 Pattern: ${pattern.leftTable} ↔ ${pattern.rightTable}`);
+          });
+        }
+        
+        // Show recommendations
+        if (result.recommendations.length > 0) {
+          console.log('\n💡 Recommendations:');
+          result.recommendations.forEach(rec => console.log(`   • ${rec}`));
+        }
+        
+        // Show warnings
+        if (result.warnings.length > 0) {
+          console.log('\n⚠️  Warnings:');
+          result.warnings.forEach(warning => console.log(`   • ${warning}`));
+        }
+        
+      } catch (error: any) {
+        spinner.fail('Junction table detection failed');
+        Logger.error('Error:', error.message);
+        if (options.verbose) {
+          console.error(error.stack);
+        }
+        process.exit(1);
+      }
+    });
+
+  program
+    .command('seeding-order')
+    .description('Calculate optimal seeding order based on dependencies')
+    .option('--url <url>', 'Supabase URL (overrides env var)')
+    .option('--key <key>', 'Supabase service role key (overrides env var)')
+    .option('--verbose', 'Enable verbose logging')
+    .option('--show-phases', 'Show seeding phases for parallel execution')
+    .action(async (options) => {
+      const spinner = ora('Calculating seeding order...').start();
+      
+      try {
+        if (options.verbose) {
+          Logger.setVerbose(true);
+        }
+        
+        const supabaseUrl = options.url || process.env.SUPABASE_URL;
+        const supabaseKey = options.key || process.env.SUPABASE_SERVICE_ROLE_KEY;
+        
+        if (!supabaseUrl || !supabaseKey) {
+          spinner.fail('Missing required credentials');
+          Logger.error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required');
+          Logger.info('Set environment variables or use --url and --key options');
+          process.exit(1);
+        }
+        
+        spinner.text = 'Connecting to database...';
+        const client = createEnhancedSupabaseClient(supabaseUrl, supabaseKey);
+        
+        spinner.text = 'Initializing SupaSeed with strategy detection...';
+        const frameworkAdapter = new FrameworkAdapter(client as any);
+        await frameworkAdapter.initialize();
+        
+        const strategy = frameworkAdapter.getActiveStrategy();
+        if (!strategy?.getSeedingOrder) {
+          spinner.fail('Current strategy does not support seeding order calculation');
+          console.log('🔄 Try updating to a framework-specific strategy or enable relationship features');
+          process.exit(1);
+        }
+        
+        spinner.text = 'Analyzing dependencies and calculating optimal order...';
+        const seedingOrder = await strategy.getSeedingOrder();
+        
+        spinner.succeed('Seeding order calculation complete');
+        
+        // Display seeding order
+        console.log('\n📋 Optimal Seeding Order:');
+        seedingOrder.forEach((table, index) => {
+          console.log(`   ${index + 1}. ${table}`);
+        });
+        
+        // Show phases if requested and available
+        if (options.showPhases && strategy.analyzeRelationships) {
+          spinner.start('Calculating seeding phases...');
+          const analysis = await strategy.analyzeRelationships();
+          spinner.succeed('Seeding phases calculated');
+          
+          if (analysis.success && analysis.seedingOrder.phases.length > 0) {
+            console.log('\n🚀 Seeding Phases (for parallel execution):');
+            analysis.seedingOrder.phases.forEach(phase => {
+              console.log(`   Phase ${phase.phase}: ${phase.tables.join(', ')}`);
+              console.log(`     📝 ${phase.description}`);
+              console.log(`     ⏱️  Estimated time: ${(phase.estimatedTime / 1000).toFixed(1)}s`);
+              if (phase.canRunInParallel) {
+                console.log(`     ⚡ Can run in parallel`);
+              }
+              console.log('');
+            });
+            
+            console.log(`📊 Total estimated seeding time: ${(analysis.seedingOrder.metadata.estimatedSeedingTime / 1000).toFixed(1)}s`);
+            console.log(`📈 Complexity: ${analysis.seedingOrder.metadata.complexity}`);
+          }
+        }
+        
+        console.log('\n💡 Usage Tips:');
+        console.log('   • Seed tables in the order shown to maintain referential integrity');
+        console.log('   • Use --show-phases to see opportunities for parallel seeding');
+        console.log('   • Junction tables are typically seeded after their parent tables');
+        
+      } catch (error: any) {
+        spinner.fail('Seeding order calculation failed');
+        Logger.error('Error:', error.message);
+        if (options.verbose) {
+          console.error(error.stack);
+        }
         process.exit(1);
       }
     });

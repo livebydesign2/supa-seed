@@ -20,6 +20,8 @@ import { ConstraintDiscoveryEngine } from '../../schema/constraint-discovery-eng
 import { ConstraintRegistry } from '../../schema/constraint-registry';
 import { BusinessLogicAnalyzer } from '../../schema/business-logic-analyzer';
 import { RLSCompliantSeeder } from '../../schema/rls-compliant-seeder';
+import { RelationshipAnalyzer } from '../../schema/relationship-analyzer';
+import { JunctionTableHandler } from '../../schema/junction-table-handler';
 import { Logger } from '../../utils/logger';
 import type {
   BusinessLogicAnalysisResult,
@@ -27,6 +29,15 @@ import type {
   RLSComplianceResult,
   UserContext
 } from '../../schema/business-logic-types';
+import type {
+  RelationshipAnalysisResult
+} from '../../schema/relationship-analyzer';
+import type {
+  JunctionTableDetectionResult,
+  JunctionSeedingOptions,
+  JunctionSeedingResult
+} from '../../schema/junction-table-handler';
+import type { DependencyGraph } from '../../schema/dependency-graph';
 
 type SupabaseClient = ReturnType<typeof createClient>;
 
@@ -38,6 +49,8 @@ export class GenericStrategy implements SeedingStrategy {
   private constraintRegistry?: ConstraintRegistry;
   private businessLogicAnalyzer?: BusinessLogicAnalyzer;
   private rlsCompliantSeeder?: RLSCompliantSeeder;
+  private relationshipAnalyzer?: RelationshipAnalyzer;
+  private junctionTableHandler?: JunctionTableHandler;
 
   async initialize(client: SupabaseClient): Promise<void> {
     this.client = client;
@@ -60,6 +73,19 @@ export class GenericStrategy implements SeedingStrategy {
       createUserContext: false,
       useServiceRole: true // Generic strategy prefers service role bypass
     });
+
+    // Initialize relationship analyzer with generic options
+    this.relationshipAnalyzer = new RelationshipAnalyzer(client, {
+      schemas: ['public'],
+      detectJunctionTables: true,
+      analyzeTenantScoping: false, // Generic strategy doesn't assume tenant scoping
+      includeOptionalRelationships: true,
+      enableCaching: true,
+      generateRecommendations: true
+    });
+
+    // Initialize junction table handler
+    this.junctionTableHandler = new JunctionTableHandler(client);
     
     // Register generic handlers
     const handlers = this.getConstraintHandlers();
@@ -642,5 +668,167 @@ export class GenericStrategy implements SeedingStrategy {
       logPolicyViolations: true,
       maxRetries: 1
     };
+  }
+
+  /**
+   * Analyze database relationships for generic strategy
+   */
+  async analyzeRelationships(): Promise<RelationshipAnalysisResult> {
+    if (!this.relationshipAnalyzer) {
+      throw new Error('Relationship analyzer not initialized');
+    }
+
+    try {
+      Logger.debug('Analyzing relationships for generic strategy');
+      
+      const analysis = await this.relationshipAnalyzer.analyzeRelationships();
+      
+      // Add generic-specific enhancements to the analysis
+      if (analysis.success) {
+        // Generic strategy has lower confidence since it doesn't know framework specifics
+        analysis.analysisMetadata.confidence = Math.min(analysis.analysisMetadata.confidence, 0.8);
+        
+        // Add generic-specific recommendations
+        analysis.recommendations.push('Consider using framework-specific strategy for better relationship handling');
+        analysis.recommendations.push('Verify tenant boundaries if using multi-tenant architecture');
+      }
+
+      return analysis;
+
+    } catch (error: any) {
+      Logger.error('Generic relationship analysis failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get dependency graph for generic strategy
+   */
+  async getDependencyGraph(): Promise<DependencyGraph> {
+    if (!this.relationshipAnalyzer) {
+      throw new Error('Relationship analyzer not initialized');
+    }
+
+    try {
+      Logger.debug('Building generic dependency graph');
+      
+      const analysis = await this.relationshipAnalyzer.analyzeRelationships();
+      if (!analysis.success) {
+        throw new Error('Failed to analyze relationships for dependency graph');
+      }
+
+      return analysis.dependencyGraph;
+
+    } catch (error: any) {
+      Logger.error('Generic dependency graph creation failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Detect junction tables with generic patterns
+   */
+  async detectJunctionTables(): Promise<JunctionTableDetectionResult> {
+    if (!this.junctionTableHandler || !this.relationshipAnalyzer) {
+      throw new Error('Junction table handler or relationship analyzer not initialized');
+    }
+
+    try {
+      Logger.debug('Detecting junction tables for generic strategy');
+      
+      const dependencyGraph = await this.getDependencyGraph();
+      const result = await this.junctionTableHandler.detectJunctionTables(dependencyGraph);
+      
+      // Add generic-specific recommendations
+      if (result.success && result.junctionTables.length > 0) {
+        result.recommendations.push('Verify junction table patterns match your application architecture');
+        result.recommendations.push('Consider framework-specific strategy for optimized junction table handling');
+      }
+
+      return result;
+
+    } catch (error: any) {
+      Logger.error('Generic junction table detection failed:', error);
+      return {
+        success: false,
+        junctionTables: [],
+        relationshipPatterns: [],
+        totalRelationships: 0,
+        confidence: 0,
+        warnings: [],
+        errors: [error.message],
+        recommendations: []
+      };
+    }
+  }
+
+  /**
+   * Seed junction table with generic options
+   */
+  async seedJunctionTable(
+    tableName: string, 
+    options: Partial<JunctionSeedingOptions> = {}
+  ): Promise<JunctionSeedingResult> {
+    if (!this.junctionTableHandler) {
+      throw new Error('Junction table handler not initialized');
+    }
+
+    try {
+      Logger.debug(`Seeding generic junction table: ${tableName}`);
+      
+      // Generic-specific junction seeding options
+      const genericOptions: Partial<JunctionSeedingOptions> = {
+        generateRelationships: true,
+        relationshipDensity: 0.3, // Conservative density for generic use
+        respectCardinality: true,
+        avoidOrphans: true,
+        distributionStrategy: 'random', // Random distribution works well generically
+        generateMetadata: false, // Less metadata assumption for generic
+        includeTimestamps: true,
+        validateForeignKeys: true,
+        ...options
+      };
+
+      const result = await this.junctionTableHandler.seedJunctionTable(tableName, genericOptions);
+      
+      // Add generic-specific context to the result
+      if (result.success) {
+        result.warnings = result.warnings || [];
+        result.warnings.push('Used generic junction table seeding - consider framework-specific optimization');
+      }
+
+      return result;
+
+    } catch (error: any) {
+      Logger.error(`Generic junction table seeding failed for ${tableName}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get optimal seeding order for generic schemas
+   */
+  async getSeedingOrder(): Promise<string[]> {
+    if (!this.relationshipAnalyzer) {
+      throw new Error('Relationship analyzer not initialized');
+    }
+
+    try {
+      Logger.debug('Calculating generic seeding order');
+      
+      const analysis = await this.relationshipAnalyzer.analyzeRelationships();
+      if (!analysis.success) {
+        throw new Error('Failed to analyze relationships for seeding order');
+      }
+
+      const seedingOrder = analysis.seedingOrder.seedingOrder;
+      
+      Logger.info(`Generic seeding order: ${seedingOrder.join(' → ')}`);
+      return seedingOrder;
+
+    } catch (error: any) {
+      Logger.error('Generic seeding order calculation failed:', error);
+      throw error;
+    }
   }
 }
