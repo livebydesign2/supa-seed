@@ -97,6 +97,7 @@ export interface CompleteUserData {
   username?: string;
   avatar?: string;
   bio?: string;
+  phone?: string; // For MFA phone factors
   metadata?: Record<string, any>;
   
   // Identity provider configuration

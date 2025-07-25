@@ -17,12 +17,18 @@ import {
   StrategyConstraintResult
 } from '../strategy-interface';
 import { IdentityManager } from '../../auth/identity-manager';
+import { MFAManager } from '../../auth/mfa-manager';
 import type { 
   CompleteUserData, 
   CompleteUserResult, 
   IdentityProviderType,
   AuthFlowConfig 
 } from '../../auth/auth-types';
+import type { 
+  MFAFactorData, 
+  MFAFactorCreationResult,
+  ArchetypeMFAPreferences 
+} from '../../auth/mfa-types';
 import { ConstraintDiscoveryEngine } from '../../schema/constraint-discovery-engine';
 import { ConstraintRegistry } from '../../schema/constraint-registry';
 import { BusinessLogicAnalyzer } from '../../schema/business-logic-analyzer';
@@ -80,6 +86,7 @@ export class MakerKitStrategy implements SeedingStrategy {
   private multiTenantManager?: MultiTenantManager;
   private storageIntegrationManager?: StorageIntegrationManager;
   private identityManager?: IdentityManager;
+  private mfaManager?: MFAManager;
   private authFlowConfig!: AuthFlowConfig;
 
   async initialize(client: SupabaseClient): Promise<void> {
@@ -88,6 +95,9 @@ export class MakerKitStrategy implements SeedingStrategy {
     
     // Initialize identity manager for complete auth flows
     this.identityManager = new IdentityManager(client);
+    
+    // Initialize MFA manager for multi-factor authentication support
+    this.mfaManager = new MFAManager(client);
     
     // Set default auth flow configuration for MakerKit
     this.authFlowConfig = this.getDefaultAuthFlowConfig();
@@ -375,10 +385,10 @@ export class MakerKitStrategy implements SeedingStrategy {
         Logger.debug(`Creating identities for ${data.identityProviders.length} providers`);
         
         for (const provider of data.identityProviders) {
-          const providerData = this.identityManager.generateOAuthProviderData(provider, data.email);
+          const providerData = this.identityManager.generateOAuthProviderData(provider as any, data.email);
           const identityResult = await this.identityManager.createIdentity({
             userId: authUser.user.id,
-            provider: provider,
+            provider: provider as any,
             providerId: providerData.providerId,
             email: data.email,
             providerMetadata: providerData.metadata,
@@ -401,6 +411,19 @@ export class MakerKitStrategy implements SeedingStrategy {
           }
 
           result.warnings.push(...identityResult.warnings);
+        }
+      }
+
+      // Step 2.5: Create MFA factors if enabled (FR-1.2: Add MFA Factor Support)
+      if (this.authFlowConfig.enableMFA && this.mfaManager) {
+        Logger.debug('Creating MFA factors for complete auth flow');
+        
+        const mfaFactors = await this.createMFAFactorsForUser(authUser.user.id, data);
+        if (mfaFactors.length > 0) {
+          result.mfaFactors = mfaFactors;
+          result.recommendations.push(`Created ${mfaFactors.length} MFA factor${mfaFactors.length !== 1 ? 's' : ''} for enhanced security`);
+        } else {
+          result.warnings.push('MFA enabled but no factors were created');
         }
       }
 
@@ -562,10 +585,78 @@ export class MakerKitStrategy implements SeedingStrategy {
       'rls_compliance',
       'business_logic_respect',
       'constraint_discovery',
-      'framework_specific_handlers'
+      'framework_specific_handlers',
+      'mfa_factor_support' // FR-1.2: Add MFA Factor Support
     ];
 
     return supportedFeatures.includes(feature);
+  }
+
+  /**
+   * Configure MFA settings for the strategy
+   * Implements FR-1.2: Add MFA Factor Support
+   */
+  configureMFA(enableMFA: boolean, options?: {
+    defaultSecurityLevel?: 'basic' | 'enhanced' | 'maximum';
+    supportedFactorTypes?: ('totp' | 'phone')[];
+    enforceForRoles?: string[];
+  }): void {
+    this.authFlowConfig.enableMFA = enableMFA;
+    
+    if (enableMFA) {
+      Logger.info('✅ MFA support enabled for MakerKit strategy');  
+      
+      if (options?.enforceForRoles?.length) {
+        Logger.info(`MFA will be enforced for roles: ${options.enforceForRoles.join(', ')}`);
+      }
+
+      if (options?.defaultSecurityLevel) {
+        Logger.info(`Default MFA security level: ${options.defaultSecurityLevel}`);
+      }
+    } else {
+      Logger.info('MFA support disabled');
+    }
+  }
+
+  /**
+   * Get MFA validation result for the platform
+   */
+  async validateMFASupport(): Promise<{
+    supported: boolean;
+    tableExists: boolean;
+    hasPermissions: boolean;
+    errors: string[];
+    warnings: string[];
+  }> {
+    if (!this.mfaManager) {
+      return {
+        supported: false,
+        tableExists: false,
+        hasPermissions: false,
+        errors: ['MFA manager not initialized'],
+        warnings: []
+      };
+    }
+
+    try {
+      const validation = await this.mfaManager.validateMFATableAccess();
+      
+      return {
+        supported: this.authFlowConfig.enableMFA,
+        tableExists: validation.tableExists,
+        hasPermissions: validation.hasPermissions,
+        errors: validation.errors,
+        warnings: validation.warnings
+      };
+    } catch (error: any) {
+      return {
+        supported: false,
+        tableExists: false,
+        hasPermissions: false,
+        errors: [`MFA validation failed: ${error.message}`],
+        warnings: []
+      };
+    }
   }
 
   /**
@@ -1064,13 +1155,58 @@ export class MakerKitStrategy implements SeedingStrategy {
   }
 
   /**
+   * Create MFA factors for a user based on their preferences
+   * Implements FR-1.2: Add MFA Factor Support
+   */
+  private async createMFAFactorsForUser(userId: string, userData: CompleteUserData & { mfaPreferences?: ArchetypeMFAPreferences }): Promise<any[]> {
+    if (!this.mfaManager) {
+      Logger.warn('MFA manager not initialized');
+      return [];
+    }
+
+    try {
+      // Get MFA preferences from user data or use defaults
+      const mfaPreferences = userData.mfaPreferences || {
+        securityLevel: 'basic',
+        preferredFactorTypes: ['totp'],
+        factorCount: 1,
+        backupCodesEnabled: true
+      };
+
+      // Generate archetype-based MFA factors
+      const factorResults = await this.mfaManager.generateArchetypeFactors(
+        userId,
+        mfaPreferences.securityLevel,
+        {
+          preferTOTP: mfaPreferences.preferredFactorTypes.includes('totp'),
+          preferPhone: mfaPreferences.preferredFactorTypes.includes('phone'),
+          phoneNumber: (userData as any).phone,
+          multipleFactors: mfaPreferences.factorCount > 1
+        }
+      );
+
+      // Extract successful factors
+      const mfaFactors = factorResults
+        .filter(result => result.success && result.factor)
+        .map(result => result.factor!);
+
+      Logger.success(`✅ Created ${mfaFactors.length} MFA factors for user ${userId}`);
+      return mfaFactors;
+
+    } catch (error: any) {
+      Logger.error(`MFA factor creation failed for user ${userId}:`, error);
+      return [];
+    }
+  }
+
+  /**
    * Get default auth flow configuration for MakerKit
    */
   private getDefaultAuthFlowConfig(): AuthFlowConfig {
     return {
       // Complete auth flow settings
       createIdentities: true,
-      enableMFA: false, // Will be implemented in Task 1.2
+      enableMFA: false, // Can be enabled via configuration
       setupDevelopmentWebhooks: false, // Will be implemented in Task 1.3
       
       // Provider settings

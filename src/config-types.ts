@@ -136,6 +136,40 @@ export interface FlexibleSeedConfig {
     config?: Record<string, any>;
   };
   
+  // MFA Configuration (FR-1.2: Add MFA Factor Support)
+  mfa?: {
+    enabled: boolean;
+    defaultSecurityLevel: 'basic' | 'enhanced' | 'maximum';
+    distributionBySecurityLevel: {
+      basic: number; // percentage of users with basic security (no MFA)
+      enhanced: number; // percentage with enhanced security (1 factor)
+      maximum: number; // percentage with maximum security (2+ factors)
+    };
+    factorTypeDistribution: {
+      totpOnly: number; // percentage using TOTP only
+      phoneOnly: number; // percentage using phone only
+      both: number; // percentage using both TOTP and phone
+    };
+    supportedFactorTypes: ('totp' | 'phone')[];
+    enforceForRoles: string[];
+    verificationRate: number; // percentage of factors that are pre-verified
+    backupCodeGeneration: boolean;
+    testingScenarios: {
+      includeInvalidCodes: boolean;
+      includeExpiredCodes: boolean;
+      includeRateLimitScenarios: boolean;
+    };
+    archetypeOverrides?: {
+      [userEmail: string]: {
+        securityLevel: 'basic' | 'enhanced' | 'maximum';
+        preferredFactorTypes: ('totp' | 'phone')[];
+        factorCount: number;
+        phoneNumber?: string;
+        backupCodesEnabled: boolean;
+      };
+    };
+  };
+
   // Custom data
   data?: {
     categories?: Array<{
@@ -333,5 +367,68 @@ export interface ExtendedSeedConfig extends FlexibleSeedConfig {
       allowOrphans: boolean;
       cleanupStrategy: 'cascade' | 'nullify' | 'preserve';
     };
+  };
+
+  // Enhanced MFA Configuration (FR-1.2: Add MFA Factor Support)
+  enhancedMFA?: {
+    enabled: boolean;
+    policy: {
+      enforced: boolean;
+      enforcedForRoles: string[];
+      gracePeriodDays: number;
+      maxFactorsPerUser: number;
+      allowedFactorTypes: ('totp' | 'phone')[];
+      requireBackupCodes: boolean;
+    };
+    totpSettings: {
+      issuer: string;
+      algorithm: 'SHA1' | 'SHA256' | 'SHA512';
+      digits: 6 | 8;
+      period: number; // seconds
+      window: number; // tolerance window
+    };
+    phoneSettings: {
+      allowedCountries?: string[];
+      verificationMethod: 'sms' | 'voice' | 'both';
+      rateLimitPerHour: number;
+    };
+    platformSpecificConfig?: {
+      architecture: 'individual' | 'team' | 'hybrid';
+      domain: 'outdoor' | 'saas' | 'ecommerce' | 'social' | 'generic';
+      securityRequirements: {
+        minimumSecurityLevel: 'basic' | 'enhanced' | 'maximum';
+        complianceStandards?: ('SOC2' | 'HIPAA' | 'PCI_DSS' | 'GDPR')[];
+      };
+      usagePatterns: {
+        expectedFactorTypes: ('totp' | 'phone')[];
+        userSecurityAwareness: 'low' | 'medium' | 'high';
+        deviceTrustLevel: 'low' | 'medium' | 'high';
+      };
+    };
+    seedingConfiguration: {
+      distributionBySecurityLevel: {
+        basic: number;
+        enhanced: number;
+        maximum: number;
+      };
+      factorTypeDistribution: {
+        totpOnly: number;
+        phoneOnly: number;
+        both: number;
+      };
+      verificationRate: number;
+      testingScenarios: {
+        includeInvalidCodes: boolean;
+        includeExpiredCodes: boolean;
+        includeRateLimitScenarios: boolean;
+        includeRecoveryScenarios: boolean;
+      };
+    };
+    customGenerators?: Array<{
+      name: string;
+      type: 'factor' | 'challenge' | 'recovery';
+      generatorFunction: string;
+      config?: Record<string, any>;
+    }>;
   };
 }

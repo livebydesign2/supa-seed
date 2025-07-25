@@ -12,6 +12,12 @@ import type {
   AuthSeedingResult,
   PlatformContext
 } from '../auth/auth-types';
+import type { 
+  ArchetypeMFAPreferences,
+  MFAFactorType,
+  MFASeedingConfig
+} from '../auth/mfa-types';
+import { generateTestPhoneNumber } from '../utils/crypto-utils';
 import { Logger } from '../utils/logger';
 
 export interface AuthDataGenerationOptions {
@@ -21,6 +27,7 @@ export interface AuthDataGenerationOptions {
   providerWeights?: Record<IdentityProviderType, number>;
   includeMultipleProviders?: boolean;
   domainOverride?: string;
+  mfaConfig?: MFASeedingConfig; // FR-1.2: Add MFA Factor Support
 }
 
 export class AuthDataGenerator {
@@ -211,6 +218,103 @@ export class AuthDataGenerator {
   }
 
   /**
+   * Generate MFA preferences for a user archetype
+   * Implements FR-1.2: Add MFA Factor Support
+   */
+  generateMFAPreferences(
+    archetype: UserArchetype,
+    mfaConfig?: MFASeedingConfig,
+    index: number = 0
+  ): ArchetypeMFAPreferences | undefined {
+    if (!mfaConfig?.enabled) {
+      return undefined;
+    }
+
+    // Get base security level from archetype
+    const baseSecurityLevel = archetype.authPreferences.securityLevel;
+    
+    // Apply distribution logic to determine actual security level
+    const securityLevel = this.applyMFADistribution(baseSecurityLevel, mfaConfig, index);
+    
+    // If basic security level is selected, no MFA factors
+    if (securityLevel === 'basic') {
+      return {
+        securityLevel: 'basic',
+        preferredFactorTypes: [],
+        factorCount: 0,
+        backupCodesEnabled: false
+      };
+    }
+
+    // Determine factor types based on distribution
+    const factorTypes = this.selectFactorTypes(mfaConfig, index);
+    
+    // Determine factor count based on security level
+    const factorCount = securityLevel === 'maximum' ? 
+      Math.min(factorTypes.length, 2) : 1;
+
+    // Generate phone number if phone factor is selected
+    const phoneNumber = factorTypes.includes('phone') ? 
+      generateTestPhoneNumber() : undefined;
+
+    return {
+      securityLevel,
+      preferredFactorTypes: factorTypes,
+      factorCount,
+      phoneNumber,
+      backupCodesEnabled: mfaConfig.backupCodeGeneration && (securityLevel === 'enhanced' || securityLevel === 'maximum'),
+      totpAppPreference: factorTypes.includes('totp') ? 'google_authenticator' : undefined
+    };
+  }
+
+  /**
+   * Apply MFA security level distribution
+   */
+  private applyMFADistribution(
+    baseLevel: 'basic' | 'enhanced' | 'maximum',
+    mfaConfig: MFASeedingConfig,
+    index: number
+  ): 'basic' | 'enhanced' | 'maximum' {
+    // Use deterministic random based on index for consistent results
+    const random = (index * 0.618034) % 1; // Golden ratio for good distribution
+    
+    const distribution = mfaConfig.distributionBySecurityLevel;
+    const basicThreshold = distribution.basic / 100;
+    const enhancedThreshold = basicThreshold + (distribution.enhanced / 100);
+    
+    if (random < basicThreshold) {
+      return 'basic';
+    } else if (random < enhancedThreshold) {
+      return 'enhanced';
+    } else {
+      return 'maximum';
+    }
+  }
+
+  /**
+   * Select factor types based on distribution
+   */
+  private selectFactorTypes(
+    mfaConfig: MFASeedingConfig,
+    index: number
+  ): MFAFactorType[] {
+    // Use deterministic selection based on index
+    const random = ((index + 1) * 0.1618034) % 1; // Different offset for factor selection
+    
+    const distribution = mfaConfig.factorTypeDistribution;
+    const totpOnlyThreshold = distribution.totpOnly / 100;
+    const phoneOnlyThreshold = totpOnlyThreshold + (distribution.phoneOnly / 100);
+    
+    if (random < totpOnlyThreshold) {
+      return ['totp'];
+    } else if (random < phoneOnlyThreshold) {
+      return ['phone'];
+    } else {
+      return ['totp', 'phone'];
+    }
+  }
+
+  /**
    * Private helper methods
    */
 
@@ -242,7 +346,12 @@ export class AuthDataGenerator {
     // Generate role based on archetype
     const role = options.archetype?.role || (index === 0 ? 'admin' : 'user');
 
-    return {
+    // Generate MFA preferences if configured
+    const mfaPreferences = options.archetype && options.mfaConfig ? 
+      this.generateMFAPreferences(options.archetype, options.mfaConfig, index) : 
+      undefined;
+
+    const userData: CompleteUserData & { mfaPreferences?: ArchetypeMFAPreferences } = {
       email,
       name,
       username,
@@ -250,18 +359,27 @@ export class AuthDataGenerator {
       bio: this.generateBio(name, options.archetype, options.platformContext),
       identityProviders,
       primaryProvider,
-      isPersonalAccount: options.archetype?.platformContext.accountType === 'personal' ?? true,
+      isPersonalAccount: options.archetype?.platformContext.accountType === 'personal' || true,
       accountSlug: options.archetype?.platformContext.accountType === 'team' ? 
         username.toLowerCase().replace(/[^a-z0-9]/g, '-') : null,
       role: role as any,
       emailConfirmed: true,
+      phone: mfaPreferences?.phoneNumber, // Add phone if MFA requires it
       metadata: {
         generated_by: 'supa-seed-v2.5.0',
         archetype: options.archetype?.id || 'generated',
         platform: options.platformContext?.architecture || 'individual',
-        domain: options.platformContext?.domain || 'generic'
+        domain: options.platformContext?.domain || 'generic',
+        mfa_security_level: mfaPreferences?.securityLevel || 'basic'
       }
     };
+
+    // Add MFA preferences if available
+    if (mfaPreferences) {
+      userData.mfaPreferences = mfaPreferences;
+    }
+
+    return userData;
   }
 
   private generateUsername(name: string, platformContext?: PlatformContext, index: number = 0): string {
@@ -346,11 +464,15 @@ export class AuthDataGenerator {
         featureUsage: ['admin_panel', 'user_management', 'settings', 'analytics'],
         socialInteraction: 'active'
       },
-      platformContext,
+      platformContext: {
+        architecture: platformContext.architecture,
+        domain: platformContext.domain,
+        accountType: 'personal' // Admin has personal account by default
+      },
       authPreferences: {
         providers: ['email', 'google', 'github'],
         mfaEnabled: true,
-        securityLevel: 'maximum'
+        securityLevel: 'maximum' // Admins should have maximum security
       }
     };
   }
@@ -452,7 +574,7 @@ export class AuthDataGenerator {
       authPreferences: {
         providers: ['email', 'google', 'github'],
         mfaEnabled: true,
-        securityLevel: 'enhanced'
+        securityLevel: 'enhanced' // Team managers need enhanced security
       }
     };
   }
@@ -554,7 +676,7 @@ export class AuthDataGenerator {
       authPreferences: {
         providers: ['email', 'google', 'github', 'discord'],
         mfaEnabled: true,
-        securityLevel: 'enhanced'
+        securityLevel: 'enhanced' // Power users understand security benefits
       }
     };
   }
