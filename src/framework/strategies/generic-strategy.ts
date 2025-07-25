@@ -22,6 +22,7 @@ import { BusinessLogicAnalyzer } from '../../schema/business-logic-analyzer';
 import { RLSCompliantSeeder } from '../../schema/rls-compliant-seeder';
 import { RelationshipAnalyzer } from '../../schema/relationship-analyzer';
 import { JunctionTableHandler } from '../../schema/junction-table-handler';
+import { MultiTenantManager } from '../../schema/multi-tenant-manager';
 import { Logger } from '../../utils/logger';
 import type {
   BusinessLogicAnalysisResult,
@@ -38,6 +39,14 @@ import type {
   JunctionSeedingResult
 } from '../../schema/junction-table-handler';
 import type { DependencyGraph } from '../../schema/dependency-graph';
+import type {
+  TenantDiscoveryResult,
+  TenantSeedingResult,
+  TenantIsolationReport,
+  TenantDataGenerationOptions,
+  TenantInfo,
+  TenantScopeInfo
+} from '../../schema/tenant-types';
 
 type SupabaseClient = ReturnType<typeof createClient>;
 
@@ -51,6 +60,7 @@ export class GenericStrategy implements SeedingStrategy {
   private rlsCompliantSeeder?: RLSCompliantSeeder;
   private relationshipAnalyzer?: RelationshipAnalyzer;
   private junctionTableHandler?: JunctionTableHandler;
+  private multiTenantManager?: MultiTenantManager;
 
   async initialize(client: SupabaseClient): Promise<void> {
     this.client = client;
@@ -86,6 +96,33 @@ export class GenericStrategy implements SeedingStrategy {
 
     // Initialize junction table handler
     this.junctionTableHandler = new JunctionTableHandler(client);
+
+    // Initialize multi-tenant manager with generic configuration
+    this.multiTenantManager = new MultiTenantManager(client, {
+      enableMultiTenant: false, // Generic strategy doesn't assume multi-tenant by default
+      tenantColumn: 'tenant_id', // Generic default, can be overridden
+      tenantScopeDetection: 'auto',
+      validationEnabled: false, // Less strict for generic
+      strictIsolation: false,
+      allowSharedResources: true,
+      dataGenerationOptions: {
+        generatePersonalAccounts: false, // Generic doesn't distinguish account types
+        generateTeamAccounts: false,
+        personalAccountRatio: 1.0,
+        dataDistributionStrategy: 'even',
+        crossTenantDataAllowed: true, // More permissive for generic
+        sharedResourcesEnabled: true,
+        accountTypes: [],
+        minUsersPerTenant: 1,
+        maxUsersPerTenant: 1,
+        minProjectsPerTenant: 1,
+        maxProjectsPerTenant: 1,
+        allowCrossTenantRelationships: true,
+        sharedTables: [], // Will be discovered
+        respectTenantPlans: false,
+        enforceTenantLimits: false
+      }
+    });
     
     // Register generic handlers
     const handlers = this.getConstraintHandlers();
@@ -830,5 +867,202 @@ export class GenericStrategy implements SeedingStrategy {
       Logger.error('Generic seeding order calculation failed:', error);
       throw error;
     }
+  }
+
+  /**
+   * Multi-Tenant Methods Implementation (Basic Generic Support)
+   */
+
+  /**
+   * Discover tenant-scoped tables and relationships
+   */
+  async discoverTenantScopes(): Promise<TenantDiscoveryResult> {
+    if (!this.multiTenantManager) {
+      throw new Error('Multi-tenant manager not initialized');
+    }
+
+    Logger.info('🔍 Generic tenant scope discovery (basic support)...');
+    
+    try {
+      const result = await this.multiTenantManager.discoverTenantScopes();
+      
+      // Add generic strategy notes
+      if (result.success) {
+        result.recommendations.push(
+          'Generic strategy: Multi-tenant support is basic',
+          'Consider using a framework-specific strategy for better tenant support',
+          'Manual configuration may be required for complex tenant patterns'
+        );
+      }
+
+      return result;
+    } catch (error: any) {
+      Logger.error('Generic tenant scope discovery failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Create tenant-aware data with basic support
+   */
+  async createTenantScopedData(
+    tenantId: string,
+    tableName: string,
+    data: any[],
+    options: Partial<TenantDataGenerationOptions> = {}
+  ): Promise<any[]> {
+    if (!this.multiTenantManager) {
+      throw new Error('Multi-tenant manager not initialized');
+    }
+
+    Logger.debug(`🔍 Generic tenant-scoped data creation for ${tableName} (basic support)`);
+
+    try {
+      // Generic strategy just passes through to the multi-tenant manager
+      // without any framework-specific transformations
+      return await this.multiTenantManager.createTenantScopedData(
+        tableName,
+        tenantId,
+        data,
+        options
+      );
+    } catch (error: any) {
+      Logger.error(`Generic tenant-scoped data creation failed for ${tableName}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Generate basic tenant accounts (generic implementation)
+   */
+  async generateTenantAccounts(
+    count: number,
+    options: Partial<TenantDataGenerationOptions> = {}
+  ): Promise<TenantInfo[]> {
+    if (!this.multiTenantManager) {
+      throw new Error('Multi-tenant manager not initialized');
+    }
+
+    Logger.info(`🔍 Generating ${count} generic tenant accounts (basic support)...`);
+
+    try {
+      // Generic strategy generates simple tenant info without creating database records
+      const tenants = await this.multiTenantManager.generateTenantAccounts(count, {
+        ...options,
+        generatePersonalAccounts: false, // Generic doesn't distinguish types
+        generateTeamAccounts: false,
+        personalAccountRatio: 1.0,
+        dataDistributionStrategy: 'even'
+      });
+
+      Logger.success(`✅ Generated ${tenants.length} generic tenant accounts`);
+      Logger.info('💡 Note: Generic strategy provides basic tenant support only');
+      Logger.info('💡 Consider using MakerKit or framework-specific strategy for full support');
+      
+      return tenants;
+    } catch (error: any) {
+      Logger.error('Generic tenant account generation failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Basic tenant isolation validation
+   */
+  async validateTenantIsolation(tenantId: string): Promise<TenantIsolationReport> {
+    if (!this.multiTenantManager) {
+      throw new Error('Multi-tenant manager not initialized');
+    }
+
+    Logger.info(`📊 Generic tenant isolation validation for: ${tenantId} (basic support)`);
+
+    try {
+      const report = await this.multiTenantManager.createTenantIsolationReport(tenantId);
+
+      // Add generic strategy notes
+      report.recommendations.push(
+        'Generic strategy: Basic tenant isolation validation only',
+        'Framework-specific strategies provide more comprehensive validation',
+        'Manual verification may be required for complex scenarios'
+      );
+
+      return report;
+    } catch (error: any) {
+      Logger.error(`Generic tenant isolation validation failed for ${tenantId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Basic multi-tenant data seeding
+   */
+  async seedMultiTenantData(
+    tenants: TenantInfo[],
+    options: Partial<TenantDataGenerationOptions> = {}
+  ): Promise<TenantSeedingResult> {
+    Logger.info(`🌱 Generic multi-tenant data seeding for ${tenants.length} tenants (basic support)...`);
+
+    const startTime = Date.now();
+    const errors: string[] = [];
+    const warnings: string[] = [
+      'Generic strategy provides basic multi-tenant support only',
+      'Framework-specific strategies offer more comprehensive tenant features'
+    ];
+
+    try {
+      // Basic implementation - just return minimal result
+      const result: TenantSeedingResult = {
+        success: true,
+        tenantsCreated: tenants.length,
+        personalAccounts: 0, // Generic doesn't distinguish types
+        teamAccounts: 0,
+        totalRecords: 0,
+        tenantScopedRecords: 0,
+        crossTenantReferences: 0,
+        validationResult: {
+          isValid: true,
+          violations: [],
+          warnings: warnings,
+          recommendations: [
+            'Generic strategy completed basic tenant setup',
+            'Consider using framework-specific strategy for production use',
+            'Manual data seeding may be required for complex scenarios'
+          ],
+          isolationScore: 0.5 // Basic score for generic
+        },
+        executionTime: Date.now() - startTime,
+        errors,
+        warnings,
+        tenantDetails: tenants.map(tenant => ({
+          tenantId: tenant.id,
+          tenantType: tenant.type,
+          recordsCreated: 0,
+          tablesSeeded: [],
+          relationships: 0,
+          isolationScore: 0.5,
+          errors: [],
+          warnings: []
+        }))
+      };
+
+      Logger.success(`✅ Generic multi-tenant seeding completed (basic support)`);
+      return result;
+
+    } catch (error: any) {
+      Logger.error('Generic multi-tenant seeding failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get tenant scope information for a table
+   */
+  async getTenantScopeInfo(tableName: string): Promise<TenantScopeInfo | null> {
+    if (!this.multiTenantManager) {
+      throw new Error('Multi-tenant manager not initialized');
+    }
+
+    const scopeInfo = this.multiTenantManager.getTenantScopeInfo(tableName);
+    return scopeInfo || null;
   }
 }

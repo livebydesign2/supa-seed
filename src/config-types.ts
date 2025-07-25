@@ -30,6 +30,46 @@ export interface FlexibleSeedConfig {
       enableMultiTenant?: boolean;
       debug?: boolean;
     };
+    // Multi-tenant configuration
+    multiTenant?: {
+      enabled: boolean;
+      tenantColumn: string; // Default: 'account_id'
+      tenantScopeDetection: 'auto' | 'manual';
+      manualTenantScopes?: Record<string, {
+        isTenantScoped: boolean;
+        tenantColumn?: string;
+        scopeType: 'strict' | 'optional' | 'shared';
+      }>;
+      validationEnabled: boolean;
+      strictIsolation: boolean;
+      allowSharedResources: boolean;
+      dataGeneration: {
+        generatePersonalAccounts: boolean;
+        generateTeamAccounts: boolean;
+        personalAccountRatio: number; // 0-1
+        dataDistributionStrategy: 'even' | 'realistic' | 'skewed';
+        crossTenantDataAllowed: boolean;
+        sharedResourcesEnabled: boolean;
+        accountTypes: Array<{
+          type: 'personal' | 'team' | 'organization';
+          weight: number;
+          settings: {
+            minMembers?: number;
+            maxMembers?: number;
+            defaultPlan: 'free' | 'pro' | 'enterprise';
+            features: string[];
+          };
+        }>;
+        minUsersPerTenant: number;
+        maxUsersPerTenant: number;
+        minProjectsPerTenant: number;
+        maxProjectsPerTenant: number;
+        allowCrossTenantRelationships: boolean;
+        sharedTables: string[];
+        respectTenantPlans: boolean;
+        enforceTenantLimits: boolean;
+      };
+    };
     userTable: {
       name: string;
       emailField: string;

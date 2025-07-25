@@ -26,6 +26,14 @@ import type {
   JunctionSeedingResult
 } from '../schema/junction-table-handler';
 import type { DependencyGraph } from '../schema/dependency-graph';
+import type {
+  TenantDiscoveryResult,
+  TenantSeedingResult,
+  TenantIsolationReport,
+  TenantDataGenerationOptions,
+  TenantInfo,
+  TenantScopeInfo
+} from '../schema/tenant-types';
 
 type SupabaseClient = ReturnType<typeof createClient>;
 
@@ -199,6 +207,36 @@ export interface SeedingStrategy {
    * Get optimal seeding order based on dependencies
    */
   getSeedingOrder?(): Promise<string[]>;
+
+  /**
+   * Discover tenant-scoped tables and relationships
+   */
+  discoverTenantScopes?(): Promise<TenantDiscoveryResult>;
+
+  /**
+   * Create tenant-aware data with proper tenant isolation
+   */
+  createTenantScopedData?(tenantId: string, tableName: string, data: any[], options?: Partial<TenantDataGenerationOptions>): Promise<any[]>;
+
+  /**
+   * Generate tenant accounts (personal and team)
+   */
+  generateTenantAccounts?(count: number, options?: Partial<TenantDataGenerationOptions>): Promise<TenantInfo[]>;
+
+  /**
+   * Validate tenant boundary isolation
+   */
+  validateTenantIsolation?(tenantId: string): Promise<TenantIsolationReport>;
+
+  /**
+   * Seed data across multiple tenants with proper isolation
+   */
+  seedMultiTenantData?(tenants: TenantInfo[], options?: Partial<TenantDataGenerationOptions>): Promise<TenantSeedingResult>;
+
+  /**
+   * Get tenant scope information for a table
+   */
+  getTenantScopeInfo?(tableName: string): Promise<TenantScopeInfo | null>;
 
   /**
    * Get recommendations for using this strategy

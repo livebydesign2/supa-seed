@@ -1229,6 +1229,350 @@ async function main() {
       }
     });
 
+  // Multi-Tenant Commands
+  program
+    .command('discover-tenants')
+    .description('Discover tenant-scoped tables and multi-tenant architecture')
+    .option('-c, --config <file>', 'Configuration file path', 'supa-seed.config.json')
+    .option('--verbose', 'Enable verbose logging')
+    .option('--show-details', 'Show detailed analysis for each table')
+    .action(async (options) => {
+      const spinner = ora('Discovering tenant-scoped tables...').start();
+      
+      try {
+        if (options.verbose) {
+          Logger.setVerbose(true);
+        }
+
+        // Load configuration
+        const configResult = loadConfiguration(options.config);
+        const config = configResult.source === 'config-file' && configResult.flexConfig
+          ? {
+              supabaseUrl: configResult.flexConfig.supabaseUrl,
+              supabaseServiceKey: configResult.flexConfig.supabaseServiceKey,
+              environment: configResult.flexConfig.environment
+            }
+          : configResult.config;
+
+        // Initialize framework adapter
+        const client = createEnhancedSupabaseClient(config.supabaseUrl, config.supabaseServiceKey);
+        const adapter = new FrameworkAdapter(client as any, config);
+        await adapter.initialize();
+
+        const strategy = adapter.getActiveStrategy();
+        if (!strategy) {
+          throw new Error('No active strategy found');
+        }
+
+        spinner.text = 'Analyzing tenant architecture...';
+
+        // Discover tenant scopes
+        if (!strategy.discoverTenantScopes) {
+          spinner.warn('Current strategy does not support tenant discovery');
+          console.log('\n⚠️  Multi-tenant discovery not available for this strategy');
+          console.log(`📋 Strategy: ${strategy.name}`);
+          console.log('\n💡 Tips:');
+          console.log('   • This strategy may not support multi-tenant architecture');
+          console.log('   • Consider using a framework-aware strategy like MakerKit');
+          process.exit(0);
+        }
+
+        const tenantResult = await strategy.discoverTenantScopes();
+        spinner.succeed('Tenant discovery completed');
+
+        // Display results
+        console.log('\n🏢 Multi-Tenant Architecture Analysis');
+        console.log('─'.repeat(60));
+        console.log(`📊 Analysis Status: ${tenantResult.success ? '✅ Success' : '❌ Failed'}`);
+        console.log(`🔍 Tenant Column: ${tenantResult.tenantColumn}`);
+        console.log(`📈 Detection Confidence: ${(tenantResult.confidence * 100).toFixed(1)}%`);
+        console.log(`📋 Total Tables: ${tenantResult.metadata.totalTables}`);
+        console.log(`🏢 Tenant-Scoped: ${tenantResult.tenantScopedTables.length}`);
+        console.log(`📚 Shared Tables: ${tenantResult.sharedTables.length}`);
+
+        if (tenantResult.tenantScopedTables.length > 0) {
+          console.log('\n🏢 Tenant-Scoped Tables:');
+          tenantResult.tenantScopedTables.forEach(table => {
+            const confidenceIcon = table.confidence > 0.8 ? '🟢' : table.confidence > 0.5 ? '🟡' : '🔴';
+            console.log(`   ${confidenceIcon} ${table.tableName}`);
+            console.log(`     📍 Tenant Column: ${table.tenantColumn}`);
+            console.log(`     📊 Confidence: ${(table.confidence * 100).toFixed(1)}%`);
+            console.log(`     🏷️  Scope Type: ${table.scopeType}`);
+            
+            if (options.showDetails) {
+              console.log(`     🛡️  Has RLS: ${table.metadata.hasRLS ? '✅' : '❌'}`);
+              console.log(`     🔗 Foreign Keys: ${table.metadata.foreignKeys.length}`);
+              console.log(`     ⚡ Multi-Tenant: ${table.metadata.isMultiTenant ? '✅' : '❌'}`);
+            }
+            console.log('');
+          });
+        }
+
+        if (tenantResult.sharedTables.length > 0) {
+          console.log('\n📚 Shared Tables:');
+          tenantResult.sharedTables.forEach(table => {
+            console.log(`   📋 ${table}`);
+          });
+        }
+
+        if (tenantResult.recommendations.length > 0) {
+          console.log('\n💡 Recommendations:');
+          tenantResult.recommendations.forEach(rec => {
+            console.log(`   • ${rec}`);
+          });
+        }
+
+        if (tenantResult.warnings.length > 0) {
+          console.log('\n⚠️  Warnings:');
+          tenantResult.warnings.forEach(warning => {
+            console.log(`   ⚠️  ${warning}`);
+          });
+        }
+
+        if (tenantResult.errors.length > 0) {
+          console.log('\n❌ Errors:');
+          tenantResult.errors.forEach(error => {
+            console.log(`   ❌ ${error}`);
+          });
+        }
+
+        console.log('\n📋 Detection Method:', tenantResult.metadata.detectionMethod);
+        console.log('🔍 Average Confidence:', `${(tenantResult.metadata.averageConfidence * 100).toFixed(1)}%`);
+
+      } catch (error: any) {
+        spinner.fail('Tenant discovery failed');
+        Logger.error('Error:', error.message);
+        if (options.verbose) {
+          console.error(error.stack);
+        }
+        process.exit(1);
+      }
+    });
+
+  program
+    .command('generate-tenants')
+    .description('Generate tenant accounts for multi-tenant testing')
+    .option('-c, --config <file>', 'Configuration file path', 'supa-seed.config.json')
+    .option('-n, --count <number>', 'Number of tenant accounts to generate', '4')
+    .option('--personal-ratio <ratio>', 'Ratio of personal to team accounts (0-1)', '0.6')
+    .option('--verbose', 'Enable verbose logging')
+    .option('--dry-run', 'Show what would be generated without creating records')
+    .action(async (options) => {
+      const spinner = ora('Generating tenant accounts...').start();
+      
+      try {
+        if (options.verbose) {
+          Logger.setVerbose(true);
+        }
+
+        const count = parseInt(options.count);
+        const personalRatio = parseFloat(options.personalRatio);
+
+        if (count <= 0 || personalRatio < 0 || personalRatio > 1) {
+          throw new Error('Invalid parameters: count must be > 0, personal-ratio must be 0-1');
+        }
+
+        // Load configuration
+        const configResult = loadConfiguration(options.config);
+        const config = configResult.source === 'config-file' && configResult.flexConfig
+          ? {
+              supabaseUrl: configResult.flexConfig.supabaseUrl,
+              supabaseServiceKey: configResult.flexConfig.supabaseServiceKey,
+              environment: configResult.flexConfig.environment
+            }
+          : configResult.config;
+
+        // Initialize framework adapter
+        const client = createEnhancedSupabaseClient(config.supabaseUrl, config.supabaseServiceKey);
+        const adapter = new FrameworkAdapter(client as any, config);
+        await adapter.initialize();
+
+        const strategy = adapter.getActiveStrategy();
+        if (!strategy || !strategy.generateTenantAccounts) {
+          throw new Error('Current strategy does not support tenant account generation');
+        }
+
+        spinner.text = 'Generating tenant accounts...';
+
+        const tenantOptions = {
+          generatePersonalAccounts: true,
+          generateTeamAccounts: true,
+          personalAccountRatio: personalRatio,
+          dataDistributionStrategy: 'realistic' as const
+        };
+
+        if (options.dryRun) {
+          spinner.succeed('Dry run - showing what would be generated');
+          
+          const personalCount = Math.floor(count * personalRatio);
+          const teamCount = count - personalCount;
+          
+          console.log('\n🏢 Tenant Account Generation Plan');
+          console.log('─'.repeat(50));
+          console.log(`📊 Total Accounts: ${count}`);
+          console.log(`👤 Personal Accounts: ${personalCount} (${(personalRatio * 100).toFixed(1)}%)`);
+          console.log(`👥 Team Accounts: ${teamCount} (${((1 - personalRatio) * 100).toFixed(1)}%)`);
+          console.log('\n💡 Use --dry-run=false to actually create these accounts');
+          
+        } else {
+          const tenants = await strategy.generateTenantAccounts(count, tenantOptions);
+          spinner.succeed('Tenant accounts generated successfully');
+
+          // Display results
+          console.log('\n🏢 Generated Tenant Accounts');
+          console.log('─'.repeat(50));
+          console.log(`📊 Total Generated: ${tenants.length}`);
+          
+          const personalAccounts = tenants.filter(t => t.type === 'personal');
+          const teamAccounts = tenants.filter(t => t.type === 'team');
+          
+          console.log(`👤 Personal Accounts: ${personalAccounts.length}`);
+          console.log(`👥 Team Accounts: ${teamAccounts.length}`);
+
+          if (personalAccounts.length > 0) {
+            console.log('\n👤 Personal Accounts:');
+            personalAccounts.forEach(tenant => {
+              console.log(`   • ${tenant.name} (${tenant.email})`);
+              console.log(`     🆔 ID: ${tenant.id}`);
+              console.log(`     📅 Created: ${new Date(tenant.createdAt).toLocaleString()}`);
+              console.log('');
+            });
+          }
+
+          if (teamAccounts.length > 0) {
+            console.log('\n👥 Team Accounts:');
+            teamAccounts.forEach(tenant => {
+              console.log(`   • ${tenant.name}`);
+              console.log(`     🆔 ID: ${tenant.id}`);
+              console.log(`     🔗 Slug: ${tenant.slug}`);
+              console.log(`     👥 Members: ${tenant.metadata.memberCount}`);
+              console.log(`     📋 Plan: ${tenant.metadata.plan}`);
+              console.log(`     📅 Created: ${new Date(tenant.createdAt).toLocaleString()}`);
+              console.log('');
+            });
+          }
+
+          console.log('\n💡 Next Steps:');
+          console.log('   • Use these tenant IDs for tenant-scoped data seeding');
+          console.log('   • Run "supa-seed validate-tenants" to check isolation');
+          console.log('   • Generate tenant-specific data with seeding commands');
+        }
+
+      } catch (error: any) {
+        spinner.fail('Tenant generation failed');
+        Logger.error('Error:', error.message);
+        if (options.verbose) {
+          console.error(error.stack);
+        }
+        process.exit(1);
+      }
+    });
+
+  program
+    .command('validate-tenants')
+    .description('Validate tenant data isolation and boundaries')
+    .option('-c, --config <file>', 'Configuration file path', 'supa-seed.config.json')
+    .option('-t, --tenant-id <id>', 'Specific tenant ID to validate')
+    .option('--verbose', 'Enable verbose logging')
+    .option('--show-details', 'Show detailed isolation report')
+    .action(async (options) => {
+      const spinner = ora('Validating tenant isolation...').start();
+      
+      try {
+        if (options.verbose) {
+          Logger.setVerbose(true);
+        }
+
+        // Load configuration
+        const configResult = loadConfiguration(options.config);
+        const config = configResult.source === 'config-file' && configResult.flexConfig
+          ? {
+              supabaseUrl: configResult.flexConfig.supabaseUrl,
+              supabaseServiceKey: configResult.flexConfig.supabaseServiceKey,
+              environment: configResult.flexConfig.environment
+            }
+          : configResult.config;
+
+        // Initialize framework adapter
+        const client = createEnhancedSupabaseClient(config.supabaseUrl, config.supabaseServiceKey);
+        const adapter = new FrameworkAdapter(client as any, config);
+        await adapter.initialize();
+
+        const strategy = adapter.getActiveStrategy();
+        if (!strategy || !strategy.validateTenantIsolation) {
+          throw new Error('Current strategy does not support tenant isolation validation');
+        }
+
+        if (options.tenantId) {
+          // Validate specific tenant
+          spinner.text = `Validating tenant: ${options.tenantId}`;
+          
+          const report = await strategy.validateTenantIsolation(options.tenantId);
+          spinner.succeed('Tenant isolation validation completed');
+
+          // Display report
+          console.log('\n🛡️  Tenant Isolation Report');
+          console.log('─'.repeat(50));
+          console.log(`🆔 Tenant ID: ${report.tenantId}`);
+          console.log(`🏷️  Tenant Type: ${report.tenantType}`);
+          console.log(`📊 Isolation Score: ${(report.isolationScore * 100).toFixed(1)}%`);
+          
+          const scoreIcon = report.isolationScore > 0.9 ? '🟢' : report.isolationScore > 0.7 ? '🟡' : '🔴';
+          console.log(`${scoreIcon} Status: ${report.isolationScore > 0.9 ? 'Excellent' : report.isolationScore > 0.7 ? 'Good' : 'Needs Attention'}`);
+
+          console.log('\n📊 Data Breakdown:');
+          console.log(`   📋 Total Records: ${report.dataBreakdown.totalRecords}`);
+          console.log(`   🏢 Owned Records: ${report.dataBreakdown.ownedRecords}`);
+          console.log(`   👁️  Accessible Records: ${report.dataBreakdown.accessibleRecords}`);
+          console.log(`   🔗 Cross-Tenant Records: ${report.dataBreakdown.crossTenantRecords}`);
+
+          if (options.showDetails && Object.keys(report.tableBreakdown).length > 0) {
+            console.log('\n📋 Table Breakdown:');
+            Object.entries(report.tableBreakdown).forEach(([table, breakdown]) => {
+              console.log(`   📋 ${table}:`);
+              console.log(`     📊 Total: ${breakdown.totalRecords}`);
+              console.log(`     🏢 Owned: ${breakdown.ownedRecords}`);
+              console.log(`     ⚠️  Violations: ${breakdown.violations}`);
+            });
+          }
+
+          if (report.violations.length > 0) {
+            console.log('\n⚠️  Violations:');
+            report.violations.forEach(violation => {
+              const severityIcon = violation.severity === 'error' ? '❌' : violation.severity === 'warning' ? '⚠️' : 'ℹ️';
+              console.log(`   ${severityIcon} ${violation.description}`);
+              console.log(`     🔧 Fix: ${violation.suggestedFix}`);
+            });
+          }
+
+          if (report.recommendations.length > 0) {
+            console.log('\n💡 Recommendations:');
+            report.recommendations.forEach(rec => {
+              console.log(`   • ${rec}`);
+            });
+          }
+
+        } else {
+          // Validate all tenants (would need to discover them first)
+          spinner.warn('No tenant ID specified');
+          console.log('\n⚠️  Please specify a tenant ID to validate');
+          console.log('\n💡 Usage:');
+          console.log('   supa-seed validate-tenants --tenant-id tenant_personal_1');
+          console.log('   supa-seed validate-tenants -t tenant_team_1 --show-details');
+          console.log('\n🔍 To find tenant IDs:');
+          console.log('   supa-seed discover-tenants');
+        }
+
+      } catch (error: any) {
+        spinner.fail('Tenant validation failed');
+        Logger.error('Error:', error.message);
+        if (options.verbose) {
+          console.error(error.stack);
+        }
+        process.exit(1);
+      }
+    });
+
   await program.parseAsync(process.argv);
 }
 
