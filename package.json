@@ -1,7 +1,7 @@
 {
   "name": "supa-seed",
-  "version": "2.0.5",
-  "description": "A modern TypeScript-based database seeding framework for Supabase projects",
+  "version": "2.1.0",
+  "description": "A schema-first, framework-agnostic database seeding framework for Supabase projects",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
@@ -26,6 +26,8 @@
     "seed:standard": "tsx src/cli.ts seed --users 10 --setups 3 --images 3",
     "seed:comprehensive": "tsx src/cli.ts seed --users 25 --setups 5 --images 5",
     "seed:cleanup": "tsx src/cli.ts cleanup",
+    "migrate:config": "tsx src/cli.ts migrate-config",
+    "test:architecture": "tsx src/cli.ts test-architecture",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage"
@@ -37,7 +39,12 @@
     "typescript",
     "testing",
     "fake-data",
-    "postgresql"
+    "postgresql",
+    "schema-first",
+    "framework-agnostic",
+    "constraint-aware",
+    "dynamic-mapping",
+    "makerkit"
   ],
   "author": "Tyler Barnard <tyler@livebydesign.co>",
   "license": "MIT",
