@@ -1,7 +1,7 @@
 {
   "name": "supa-seed",
-  "version": "2.1.0",
-  "description": "A schema-first, framework-agnostic database seeding framework for Supabase projects",
+  "version": "2.2.0",
+  "description": "A constraint-aware, framework-agnostic database seeding framework with deep PostgreSQL business logic discovery",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
@@ -28,6 +28,10 @@
     "seed:cleanup": "tsx src/cli.ts cleanup",
     "migrate:config": "tsx src/cli.ts migrate-config",
     "test:architecture": "tsx src/cli.ts test-architecture",
+    "migrate:v2.2.0": "tsx src/cli.ts migrate-v2.2.0",
+    "test:constraints": "tsx src/cli.ts test-constraints",
+    "discover:constraints": "tsx src/cli.ts discover-constraints",
+    "generate:workflows": "tsx src/cli.ts generate-workflows",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage"
@@ -40,11 +44,17 @@
     "testing",
     "fake-data",
     "postgresql",
+    "constraint-aware",
+    "business-logic",
+    "trigger-parsing",
     "schema-first",
     "framework-agnostic",
-    "constraint-aware",
     "dynamic-mapping",
-    "makerkit"
+    "auto-fix",
+    "workflow-generation",
+    "makerkit",
+    "constraint-discovery",
+    "database-introspection"
   ],
   "author": "Tyler Barnard <tyler@livebydesign.co>",
   "license": "MIT",

@@ -1,11 +1,17 @@
 /**
- * Schema Introspection System
+ * Schema Introspection System v2.2.0
  * Dynamically discovers database structure, constraints, and relationships
- * Replaces hardcoded framework assumptions with actual schema analysis
+ * Now includes deep PostgreSQL constraint discovery and business logic parsing
+ * Part of the constraint-aware architecture evolution
  */
 
 import type { createClient } from '@supabase/supabase-js';
 import { Logger } from '../utils/logger';
+import { 
+  ConstraintDiscoveryEngine, 
+  type ConstraintMetadata, 
+  type BusinessRule as EngineBusinessRule 
+} from './constraint-discovery-engine';
 
 type SupabaseClient = ReturnType<typeof createClient>;
 
@@ -83,6 +89,7 @@ export interface SchemaIntrospectionResult {
     userCreationConstraints: ConstraintRule[];
     dataIntegrityRules: ConstraintRule[];
     businessLogicConstraints: ConstraintRule[];
+    discoveredConstraints?: ConstraintMetadata; // v2.2.0: Deep constraint discovery
   };
   framework: {
     type: 'makerkit' | 'nextjs' | 'remix' | 'custom';
@@ -114,9 +121,11 @@ export class SchemaIntrospector {
   private client: SupabaseClient;
   private cache: Map<string, any> = new Map();
   private introspectionCache: SchemaIntrospectionResult | null = null;
+  private constraintEngine: ConstraintDiscoveryEngine; // v2.2.0: Deep constraint discovery
 
   constructor(client: SupabaseClient) {
     this.client = client;
+    this.constraintEngine = new ConstraintDiscoveryEngine(client);
   }
 
   /**
@@ -160,9 +169,25 @@ export class SchemaIntrospector {
       result.patterns = await this.identifyTablePatterns(result.tables, result.relationships);
       Logger.debug(`Identified ${result.patterns.length} table patterns`);
 
-      // Step 4: Extract constraints
+      // Step 4: Extract legacy constraints (maintained for compatibility)
       result.constraints = await this.extractConstraints(result.tables, result.relationships);
-      Logger.debug(`Extracted constraints: ${Object.values(result.constraints).flat().length} total`);
+      Logger.debug(`Extracted legacy constraints: ${Object.values(result.constraints).flat().length} total`);
+
+      // Step 4.5: v2.2.0 Deep constraint discovery
+      try {
+        const tableNames = result.tables.map(t => t.name);
+        const discoveredConstraints = await this.constraintEngine.discoverConstraints(tableNames);
+        result.constraints.discoveredConstraints = discoveredConstraints;
+        
+        // Merge discovered business rules into legacy format for compatibility
+        const discoveredRules = discoveredConstraints.businessRules.map(rule => this.convertEngineRuleToLegacy(rule));
+        result.constraints.businessLogicConstraints.push(...discoveredRules);
+        
+        Logger.success(`✅ v2.2.0 Deep constraint discovery: ${discoveredConstraints.businessRules.length} business rules found`);
+      } catch (error: any) {
+        Logger.warn(`v2.2.0 constraint discovery failed: ${error.message}`);
+        // Continue without deep discovery - maintain backward compatibility
+      }
 
       // Step 5: Detect framework
       result.framework = await this.detectFramework(result.tables, result.patterns);
@@ -206,13 +231,13 @@ export class SchemaIntrospector {
       
       try {
         const tableInfo: DatabaseTable = {
-          name: tableName,
-          schema: table.table_schema,
-          columns: await this.getTableColumns(tableName),
-          constraints: await this.getTableConstraints(tableName),
-          indexes: await this.getTableIndexes(tableName),
-          triggers: await this.getTableTriggers(tableName),
-          rowCount: await this.getTableRowCount(tableName),
+          name: tableName as string,
+          schema: table.table_schema as string,
+          columns: await this.getTableColumns(tableName as string),
+          constraints: await this.getTableConstraints(tableName as string),
+          indexes: await this.getTableIndexes(tableName as string),
+          triggers: await this.getTableTriggers(tableName as string),
+          rowCount: await this.getTableRowCount(tableName as string),
           hasData: false
         };
 
@@ -295,18 +320,18 @@ export class SchemaIntrospector {
 
     for (const col of data || []) {
       const column: DatabaseColumn = {
-        name: col.column_name,
-        type: col.data_type,
+        name: col.column_name as string,
+        type: col.data_type as string,
         isNullable: col.is_nullable === 'YES',
-        defaultValue: col.column_default,
+        defaultValue: col.column_default as string | null,
         isPrimaryKey: false, // Will be set when we analyze constraints
         isForeignKey: false,
-        maxLength: col.character_maximum_length
+        maxLength: col.character_maximum_length as number | undefined
       };
 
       // Handle enum types
       if (col.data_type === 'USER-DEFINED') {
-        column.enumValues = await this.getEnumValues(tableName, col.column_name);
+        column.enumValues = await this.getEnumValues(tableName, col.column_name as string);
       }
 
       columns.push(column);
@@ -365,7 +390,7 @@ export class SchemaIntrospector {
       if (!error && data) {
         for (const constraint of data) {
           // Get detailed constraint info (columns, references, etc.)
-          const constraintDetails = await this.getConstraintDetails(constraint.constraint_name, tableName);
+          const constraintDetails = await this.getConstraintDetails(constraint.constraint_name as string, tableName);
           if (constraintDetails) {
             constraints.push(constraintDetails);
           }
@@ -795,11 +820,46 @@ export class SchemaIntrospector {
   }
 
   /**
+   * v2.2.0: Convert engine business rule to legacy format for compatibility
+   */
+  private convertEngineRuleToLegacy(rule: EngineBusinessRule): ConstraintRule {
+    return {
+      table: rule.table,
+      rule: rule.name,
+      type: this.mapEngineRuleType(rule.type),
+      description: rule.errorMessage || rule.condition,
+      sqlCondition: rule.sqlPattern,
+      requiresValidation: rule.action !== 'allow'
+    };
+  }
+
+  /**
+   * v2.2.0: Map engine rule types to legacy types
+   */
+  private mapEngineRuleType(type: EngineBusinessRule['type']): ConstraintRule['type'] {
+    switch (type) {
+      case 'validation': return 'conditional_insert';
+      case 'dependency': return 'required_relationship';
+      case 'business_logic': return 'business_rule';
+      case 'transformation': return 'value_constraint';
+      default: return 'business_rule';
+    }
+  }
+
+  /**
+   * v2.2.0: Access discovered constraints metadata
+   */
+  getDiscoveredConstraints(): ConstraintMetadata | null {
+    return this.introspectionCache?.constraints?.discoveredConstraints || null;
+  }
+
+  /**
    * Clear the introspection cache
    */
   clearCache(): void {
     this.introspectionCache = null;
     this.cache.clear();
+    this.constraintEngine.clearCache(); // v2.2.0: Clear constraint engine cache
   }
 
   /**

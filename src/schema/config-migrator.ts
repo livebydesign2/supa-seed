@@ -215,18 +215,21 @@ export class ConfigMigrator {
    */
   async migrateConfig(
     legacyConfig: LegacyConfig,
-    options: MigrationOptions = {}
+    options: Partial<MigrationOptions> = {}
   ): Promise<MigrationResult> {
     Logger.info('🔄 Starting configuration migration to schema-first format...');
 
-    const migrationOptions: Required<MigrationOptions> = {
-      createBackup: true,
-      enableSchemaAnalysis: true,
-      preserveLegacyBehavior: false,
-      enableModernFeatures: true,
-      validateAfterMigration: true,
-      dryRun: false,
-      ...options
+    const migrationOptions = {
+      inputPath: options.inputPath,
+      outputPath: options.outputPath,
+      createBackup: options.createBackup ?? true,
+      enableSchemaAnalysis: options.enableSchemaAnalysis ?? true,
+      preserveLegacyBehavior: options.preserveLegacyBehavior ?? false,
+      enableModernFeatures: options.enableModernFeatures ?? true,
+      validateAfterMigration: options.validateAfterMigration ?? true,
+      dryRun: options.dryRun ?? false,
+      customMappings: options.customMappings,
+      frameworkHint: options.frameworkHint
     };
 
     const warnings: string[] = [];
@@ -326,10 +329,17 @@ export class ConfigMigrator {
       const legacyConfig = await this.readLegacyConfig(inputPath);
       
       // Set up migration options
-      const migrationOptions: MigrationOptions = {
+      const migrationOptions = {
         inputPath,
         outputPath: outputPath || inputPath.replace(/\.json$/, '.v2.json'),
-        ...options
+        createBackup: options.createBackup ?? true,
+        enableSchemaAnalysis: options.enableSchemaAnalysis ?? true,
+        preserveLegacyBehavior: options.preserveLegacyBehavior ?? false,
+        enableModernFeatures: options.enableModernFeatures ?? true,
+        validateAfterMigration: options.validateAfterMigration ?? true,
+        dryRun: options.dryRun ?? false,
+        customMappings: options.customMappings,
+        frameworkHint: options.frameworkHint
       };
 
       return await this.migrateConfig(legacyConfig, migrationOptions);
@@ -441,7 +451,7 @@ export class ConfigMigrator {
   private async buildModernConfig(
     legacyConfig: LegacyConfig,
     schemaAnalysis: any,
-    options: Required<MigrationOptions>,
+    options: any,
     changes: ConfigChange[],
     warnings: string[]
   ): Promise<ModernConfig> {

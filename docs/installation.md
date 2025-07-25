@@ -1,6 +1,6 @@
-# 📦 Supa-Seed v2.0.0 Installation Guide
+# 📦 Supa-Seed v2.2.0 Installation Guide
 
-Complete installation and setup guide for the enterprise-grade hybrid seeding platform.
+Complete installation and setup guide for the constraint-aware database seeding platform.
 
 ## 🎯 Prerequisites
 
@@ -28,7 +28,7 @@ psql --version    # Should be v12+
 npm install -g supa-seed
 
 # Verify installation
-supa-seed --version  # Should show v2.0.0
+supa-seed --version  # Should show v2.2.0
 
 # Check available commands
 supa-seed --help
@@ -437,7 +437,7 @@ supa-seed seed --no-ai
 
 ### **Breaking Changes**
 
-⚠️ **Important**: v2.0.0 includes breaking changes from v1.x
+⚠️ **Important**: v2.2.0 includes constraint-aware features and maintains v2.1.0 compatibility
 
 #### **Configuration Format**
 ```bash
@@ -553,4 +553,4 @@ supa-seed seed
 
 **Installation complete!** You now have a fully functional enterprise-grade database seeding platform.
 
-🌱 **Happy seeding with supa-seed v2.0.0!**
+🌱 **Happy seeding with supa-seed v2.2.0!**

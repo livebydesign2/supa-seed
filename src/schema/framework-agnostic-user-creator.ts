@@ -92,8 +92,8 @@ export class FrameworkAgnosticUserCreator {
 
     const adaptationInfo = {
       frameworkDetected: 'unknown',
-      strategiesUsed: [],
-      fallbacksTriggered: [],
+      strategiesUsed: [] as string[],
+      fallbacksTriggered: [] as string[],
       constraintsHandled: 0,
       adaptationConfidence: 0
     };

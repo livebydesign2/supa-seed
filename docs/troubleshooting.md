@@ -1,4 +1,4 @@
-# 🔧 Supa-Seed v2.0.0 Troubleshooting Guide
+# 🔧 Supa-Seed v2.2.0 Troubleshooting Guide
 
 Comprehensive troubleshooting guide for production features, common issues, and advanced debugging.
 

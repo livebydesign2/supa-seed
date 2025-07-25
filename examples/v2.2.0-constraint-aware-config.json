@@ -1,0 +1,300 @@
+{
+  "version": "2.2.0",
+  "strategy": "constraint-aware",
+  "description": "Example v2.2.0 constraint-aware configuration for MakerKit with discovered business logic",
+  
+  "supabaseUrl": "https://your-project.supabase.co",
+  "supabaseServiceKey": "your-service-role-key",
+  "environment": "development",
+  
+  "seeding": {
+    "userCount": 25,
+    "setupsPerUser": 3,
+    "imagesPerSetup": 2,
+    "enableRealImages": false,
+    "seed": "outdoor-gear-2024",
+    "emailDomain": "supaseed.test",
+    "domain": "outdoor",
+    "testUserPassword": "password123",
+    
+    "// v2.2.0 Constraint-aware settings": "Enable deep constraint discovery and business logic parsing",
+    "enableSchemaIntrospection": true,
+    "enableConstraintValidation": true,
+    "enableAutoFixes": true,
+    "enableProgressiveEnhancement": true,
+    "enableGracefulDegradation": true,
+    "enableDeepConstraintDiscovery": true,
+    "enableBusinessLogicParsing": true,
+    "enableWorkflowGeneration": true
+  },
+  
+  "schema": {
+    "autoDetectFramework": true,
+    "frameworkOverride": "makerkit",
+    "primaryUserTable": "profiles",
+    
+    "columnMapping": {
+      "enableDynamicMapping": true,
+      "enableFuzzyMatching": true,
+      "enablePatternMatching": true,
+      "minimumConfidence": 0.3,
+      "customMappings": {
+        "profiles": {
+          "email": "email",
+          "name": "display_name",
+          "avatar": "avatar_url",
+          "bio": "bio",
+          "username": "username"
+        },
+        "accounts": {
+          "email": "email",
+          "name": "name",
+          "owner": "primary_owner_user_id"
+        }
+      }
+    },
+    
+    "constraints": {
+      "enableValidation": true,
+      "enableAutoFixes": true,
+      "createDependenciesOnDemand": true,
+      "skipOptionalConstraints": false,
+      
+      "// v2.2.0 Enhanced constraint handling": "Deep PostgreSQL constraint discovery and business logic parsing",
+      "enableDeepDiscovery": true,
+      "parseTriggerFunctions": true,
+      "buildDependencyGraph": true,
+      "preValidateOperations": true,
+      "cacheConstraintMetadata": true,
+      "constraintDiscoveryTimeout": 10000
+    },
+    
+    "relationships": {
+      "enableDiscovery": true,
+      "respectForeignKeys": true,
+      "handleCircularDependencies": true,
+      "enableParallelSeeding": true,
+      "dependencyValidation": true
+    }
+  },
+  
+  "execution": {
+    "enableRollback": true,
+    "maxRetries": 3,
+    "timeoutMs": 30000,
+    "continueOnError": false,
+    "enableCaching": true,
+    "cacheTimeout": 30,
+    
+    "// v2.2.0 Constraint-aware execution": "Pre-validation and intelligent error handling",
+    "constraintValidationStrategy": "pre_execution",
+    "errorHandlingStrategy": "graceful_degradation",
+    "autoFixStrategy": "aggressive",
+    "workflowExecutionMode": "constraint_aware",
+    "enableStepValidation": true,
+    "enableAutoRecovery": true
+  },
+  
+  "// v2.2.0 Workflow Configuration": "Auto-generated workflows based on discovered constraints",
+  "workflows": {
+    "userCreation": {
+      "// Note": "This workflow is auto-generated from discovered PostgreSQL constraints",
+      "steps": [
+        {
+          "id": "create_auth_user",
+          "table": "auth.users",
+          "operation": "insert",
+          "required": true,
+          "fields": [
+            { "name": "email", "source": "input.email", "required": true },
+            { "name": "password", "source": "input.password", "required": true },
+            { "name": "email_confirmed_at", "source": "generated.now", "required": false }
+          ],
+          "onError": { "type": "fail" }
+        },
+        {
+          "id": "create_account",
+          "table": "accounts",
+          "operation": "insert",
+          "required": true,
+          "dependencies": ["create_auth_user"],
+          "conditions": [
+            {
+              "type": "exists",
+              "table": "auth.users",
+              "field": "id",
+              "description": "Auth user must exist before creating account"
+            }
+          ],
+          "fields": [
+            { "name": "id", "source": "auth_user.id", "required": true },
+            { "name": "email", "source": "input.email", "required": true },
+            { "name": "name", "source": "input.name", "required": false },
+            { 
+              "name": "is_personal_account", 
+              "source": "constraint_fix.true", 
+              "value": true,
+              "required": true,
+              "// reason": "Required by profiles.validate_profile_account trigger"
+            }
+          ],
+          "onError": { "type": "auto_fix", "maxRetries": 3 },
+          "autoFixes": [
+            {
+              "type": "set_field",
+              "description": "Set is_personal_account to true to allow profile creation",
+              "confidence": 0.9,
+              "action": {
+                "table": "accounts",
+                "field": "is_personal_account",
+                "value": true
+              }
+            }
+          ]
+        },
+        {
+          "id": "create_profile",
+          "table": "profiles",
+          "operation": "insert",
+          "required": false,
+          "dependencies": ["create_account"],
+          "conditions": [
+            {
+              "type": "business_rule",
+              "businessRuleId": "validate_personal_account_profile_constraint",
+              "description": "Profiles can only be created for personal accounts"
+            },
+            {
+              "type": "equals",
+              "table": "accounts",
+              "field": "is_personal_account",
+              "value": true,
+              "description": "Account must be personal account type"
+            }
+          ],
+          "fields": [
+            { "name": "id", "source": "auth_user.id", "required": true },
+            { "name": "email", "source": "input.email", "required": false },
+            { "name": "username", "source": "input.username", "required": false },
+            { "name": "display_name", "source": "input.name", "required": false },
+            { "name": "bio", "source": "input.bio", "required": false },
+            { "name": "avatar_url", "source": "input.picture_url", "required": false }
+          ],
+          "onError": { "type": "skip" }
+        }
+      ],
+      "errorHandling": {
+        "type": "graceful_degradation",
+        "maxFailures": 3,
+        "failureThreshold": 0.8
+      },
+      "rollback": {
+        "enabled": true,
+        "onCriticalFailure": true,
+        "preserveSuccessfulSteps": false
+      },
+      "validation": {
+        "preExecution": true,
+        "postExecution": true,
+        "dependencyValidation": true
+      }
+    }
+  },
+  
+  "// v2.2.0 Discovered Constraint Metadata": "Auto-discovered from PostgreSQL schema analysis",
+  "discoveredConstraints": {
+    "// Note": "This metadata is automatically generated by the ConstraintDiscoveryEngine",
+    "confidence": 0.92,
+    "discoveryTimestamp": "2025-07-25T10:30:00Z",
+    "businessRules": [
+      {
+        "id": "validate_personal_account_profile_constraint",
+        "name": "validate_personal_account_profile",
+        "type": "validation",
+        "table": "profiles",
+        "condition": "accounts.is_personal_account = true",
+        "action": "deny",
+        "errorMessage": "Profiles can only be created for personal accounts",
+        "confidence": 0.95,
+        "sqlPattern": "IF NOT EXISTS (SELECT 1 FROM public.accounts WHERE id = NEW.id AND is_personal_account = true) THEN RAISE EXCEPTION 'Profiles can only be created for personal accounts'",
+        "dependencies": ["accounts"],
+        "autoFix": {
+          "type": "set_field",
+          "description": "Set accounts.is_personal_account = true to allow profile creation",
+          "confidence": 0.9,
+          "action": {
+            "table": "accounts",
+            "field": "is_personal_account",
+            "value": true
+          }
+        }
+      }
+    ],
+    "dependencies": [
+      {
+        "fromTable": "profiles",
+        "toTable": "accounts",
+        "relationship": "required",
+        "condition": "accounts.is_personal_account = true",
+        "constraint": "validate_personal_account_profile"
+      }
+    ],
+    "triggers": [
+      {
+        "triggerName": "validate_profile_account",
+        "tableName": "profiles",
+        "functionName": "validate_personal_account_profile",
+        "extractedRules": ["validate_personal_account_profile_constraint"],
+        "parsedSuccessfully": true
+      }
+    ]
+  },
+  
+  "compatibility": {
+    "enableLegacyMode": false,
+    "legacyFallbacks": ["simple_profiles", "accounts_only", "auth_only"],
+    "maintainOldBehavior": false,
+    
+    "// v2.2.0 Backward compatibility": "Support for v2.1.0 schema-first mode as fallback",
+    "supportSchemaFirstMode": true,
+    "enableV2_1_0_Fallback": true,
+    "gracefulDegradationToV2_1_0": true
+  },
+  
+  "// Migration metadata": "Tracks configuration evolution",
+  "migration": {
+    "migratedFrom": "2.1.0",
+    "migrationDate": "2025-07-25T10:30:00Z",
+    "originalConfigHash": "abc123def456",
+    "migrationWarnings": [
+      "Enhanced constraint discovery may detect new business rules",
+      "Auto-fix suggestions require validation in your specific environment"
+    ],
+    "v2_2_0_enhancements": [
+      "Added deep PostgreSQL constraint discovery",
+      "Implemented business logic rule extraction",
+      "Created constraint-aware workflow execution",
+      "Built automatic constraint violation fixing",
+      "Added comprehensive dependency graph analysis"
+    ]
+  },
+  
+  "// Development and Testing": "v2.2.0 specific testing configuration",
+  "testing": {
+    "enableConstraintTesting": true,
+    "validateDiscoveredRules": true,
+    "testAutoFixes": true,
+    "constraintViolationSimulation": true,
+    "workflowValidationTests": true
+  },
+  
+  "// Performance and Monitoring": "v2.2.0 performance settings",
+  "performance": {
+    "constraintDiscoveryCache": true,
+    "businessRuleParsingTimeout": 5000,
+    "workflowExecutionTimeout": 30000,
+    "enableExecutionMetrics": true,
+    "logConstraintViolations": true,
+    "logAutoFixes": true
+  }
+}
