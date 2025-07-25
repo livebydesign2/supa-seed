@@ -1,8 +1,80 @@
 import { BaseSeeder } from './base-seeder';
 import { Logger } from '../utils/logger';
 import { getDomainConfig } from '../domains';
+import { SchemaAdapter } from '../schema-adapter';
 
 export class BaseDataSeeder extends BaseSeeder {
+  
+  /**
+   * Check if a column exists in a table (helper method)
+   */
+  private async columnExists(tableName: string, columnName: string): Promise<boolean> {
+    try {
+      const { error } = await this.context.client
+        .from(tableName)
+        .select(columnName)
+        .limit(1);
+      
+      return !error;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Get the correct column name for a field, checking config and existence
+   */
+  private async getColumnMapping(tableName: string, expectedField: string, fallbacks: string[] = []): Promise<string | null> {
+    // First check if config override specifies a mapping
+    const configMapping = this.getConfigColumnMapping(tableName, expectedField);
+    if (configMapping && await this.columnExists(tableName, configMapping)) {
+      return configMapping;
+    }
+    
+    // Fall back to checking all options
+    const allOptions = [expectedField, ...fallbacks];
+    
+    for (const option of allOptions) {
+      if (await this.columnExists(tableName, option)) {
+        return option;
+      }
+    }
+    
+    return null;
+  }
+
+  /**
+   * Get column mapping from configuration with enhanced support
+   */
+  private getConfigColumnMapping(tableName: string, expectedField: string): string | null {
+    if (!this.context.config?.schema) return null;
+    
+    // Handle base_templates table mappings
+    if (tableName === 'base_templates' && this.context.config.schema?.baseTemplateTable) {
+      const table = this.context.config.schema.baseTemplateTable;
+      switch (expectedField) {
+        case 'description': return table.descriptionField || null;
+        case 'type': return table.typeField || null;
+        case 'make': return table.makeField || null;
+        case 'model': return table.modelField || null;
+        case 'year': return table.yearField || null;
+      }
+    }
+    
+    // Handle profiles table mappings
+    if (tableName === 'profiles' && this.context.config.schema?.userTable) {
+      const table = this.context.config.schema.userTable;
+      switch (expectedField) {
+        case 'picture_url':
+        case 'avatar_url': return table.pictureField || null;
+        case 'bio': return (table as any).bioField || null;
+        case 'name':
+        case 'display_name': return table.nameField || null;
+      }
+    }
+    
+    return null;
+  }
   async seed(): Promise<void> {
     console.log('🗂️  Seeding base data...');
     
@@ -56,7 +128,14 @@ export class BaseDataSeeder extends BaseSeeder {
   }
 
   private async seedBaseTemplates(): Promise<void> {
-    const templates = [
+    // Get schema adapter to check column existence
+    const schemaAdapter = this.context.cache.get('schemaAdapter') as SchemaAdapter;
+    
+    // Check what description column to use based on config and existence
+    const descriptionColumn = await this.getColumnMapping('base_templates', 'description', ['info', 'details', 'notes']);
+    const hasDescriptionColumn = descriptionColumn !== null;
+    
+    const baseTemplateData = [
         // Vehicle Templates
         {
           type: 'Vehicle' as const,
@@ -125,6 +204,18 @@ export class BaseDataSeeder extends BaseSeeder {
         description: 'European-style pack with excellent ventilation'
       },
     ];
+    
+    // Use correct description column or remove if none exists
+    const templates = hasDescriptionColumn ? 
+      baseTemplateData.map(template => {
+        if (descriptionColumn !== 'description') {
+          // Rename description field to match actual column
+          const { description, ...rest } = template;
+          return { ...rest, [descriptionColumn!]: description };
+        }
+        return template;
+      }) :
+      baseTemplateData.map(({ description, ...rest }) => rest);
 
     await this.seedWithFallback(
       async () => {
@@ -152,10 +243,17 @@ export class BaseDataSeeder extends BaseSeeder {
             .insert(newTemplates);
 
           if (insertError) {
-            throw insertError;
+            // Provide better error message for column issues
+            const errorMsg = insertError.message.includes('column') && !hasDescriptionColumn ?
+              `Base template creation failed: description column not found. ${insertError.message}` :
+              insertError.message;
+            throw new Error(errorMsg);
           }
 
-          Logger.complete(`Created ${newTemplates.length} base templates`);
+          const msg = hasDescriptionColumn ? 
+            `Created ${newTemplates.length} base templates` :
+            `Created ${newTemplates.length} base templates (without descriptions - column not found)`;
+          Logger.complete(msg);
         } else {
           Logger.info('Base templates already exist, skipping');
         }

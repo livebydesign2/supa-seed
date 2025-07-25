@@ -27,12 +27,21 @@ export interface SeedConfig {
       idField: string;
       nameField: string;
       pictureField?: string;
+      bioField?: string;
     };
     setupsTable?: {
       name: string;
       userField: string; // Match config-types naming
       titleField: string;
       descriptionField?: string;
+    };
+    baseTemplateTable?: {
+      name: string;
+      descriptionField?: string;
+      typeField?: string;
+      makeField?: string;
+      modelField?: string;
+      yearField?: string;
     };
     optionalTables?: {
       categories?: boolean | {

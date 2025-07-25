@@ -1,0 +1,71 @@
+{
+  "supabaseUrl": "http://127.0.0.1:54321",
+  "supabaseServiceKey": "YOUR_SERVICE_ROLE_KEY",
+  "environment": "local",
+  "userCount": 3,
+  "setupsPerUser": 2,
+  "imagesPerSetup": 1,
+  "enableRealImages": false,
+  "seed": "wildernest-test-2025",
+  "emailDomain": "wildernest.local",
+  "domain": "outdoor",
+  "createStandardTestEmails": true,
+  "createTeamAccounts": true,
+  "testUserPassword": "password123",
+  "schema": {
+    "framework": "makerkit",
+    "userTable": {
+      "name": "profiles",
+      "emailField": "email",
+      "idField": "id",
+      "nameField": "display_name",
+      "bioField": "bio",
+      "pictureField": "picture_url"
+    },
+    "setupTable": {
+      "name": "setups",
+      "userField": "user_id",
+      "titleField": "title",
+      "descriptionField": "description",
+      "categoryField": "category",
+      "publicField": "is_public"
+    },
+    "baseTemplateTable": {
+      "name": "base_templates",
+      "descriptionField": null,
+      "typeField": "type",
+      "makeField": "make",
+      "modelField": "model",
+      "yearField": "year"
+    },
+    "optionalTables": {
+      "categories": {
+        "enabled": true,
+        "autoCreate": true,
+        "tableName": "categories"
+      },
+      "gearItems": {
+        "enabled": true,
+        "autoCreate": true,
+        "tableName": "gear_items"
+      },
+      "setupGearItems": {
+        "enabled": true,
+        "autoCreate": true,
+        "tableName": "setup_gear_items"
+      }
+    }
+  },
+  "storage": {
+    "buckets": {
+      "setupImages": "setup-images",
+      "gearImages": "gear-images", 
+      "profileImages": "profile-images"
+    },
+    "autoCreate": true
+  },
+  "seeders": {
+    "enabled": ["auth", "user", "base-data", "setup", "gear", "media"],
+    "skip": []
+  }
+}

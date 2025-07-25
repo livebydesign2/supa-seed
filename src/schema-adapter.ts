@@ -275,6 +275,66 @@ export class SchemaAdapter {
     }
   }
 
+  /**
+   * Get the correct column name for a field, checking config first then what actually exists
+   */
+  private async getColumnMapping(tableName: string, expectedField: string, fallbacks: string[] = []): Promise<string | null> {
+    // First check if config override specifies a mapping
+    const configMapping = this.getConfigColumnMapping(tableName, expectedField);
+    if (configMapping && await this.columnExists(tableName, configMapping)) {
+      return configMapping;
+    }
+    
+    // Fall back to checking all options
+    const allOptions = [expectedField, ...fallbacks];
+    
+    for (const option of allOptions) {
+      if (await this.columnExists(tableName, option)) {
+        return option;
+      }
+    }
+    
+    return null;
+  }
+
+  /**
+   * Get column mapping from configuration
+   */
+  private getConfigColumnMapping(tableName: string, expectedField: string): string | null {
+    if (!this.configOverride?.schema) return null;
+    
+    // Map expected fields to config field names
+    const fieldMappings: Record<string, string> = {
+      // Profile/user table mappings
+      'picture_url': 'pictureField',
+      'avatar_url': 'pictureField',
+      'bio': 'bioField',
+      'username': 'usernameField',
+      'name': 'nameField',
+      'display_name': 'nameField',
+      // Base template mappings
+      'description': 'descriptionField',
+      'type': 'typeField',
+      'make': 'makeField',
+      'model': 'modelField',
+      'year': 'yearField'
+    };
+    
+    const configFieldName = fieldMappings[expectedField];
+    if (!configFieldName) return null;
+    
+    // Check different table configurations
+    if (tableName === 'profiles' && this.configOverride.schema.userTable) {
+      return this.configOverride.schema.userTable[configFieldName as keyof typeof this.configOverride.schema.userTable] as string || null;
+    }
+    
+    if (tableName === 'base_templates' && this.configOverride.schema.baseTemplateTable) {
+      return this.configOverride.schema.baseTemplateTable[configFieldName as keyof typeof this.configOverride.schema.baseTemplateTable] as string || null;
+    }
+    
+    return null;
+  }
+
   private async tableExists(tableName: string): Promise<boolean> {
     try {
       // For local Supabase environments, add extra timeout and retry logic
@@ -510,20 +570,71 @@ Technical details: ${error.message}
       return { id: '', success: false, error: `Auth user creation failed: ${authError.message}` };
     }
 
+    // Dynamically determine profile column mappings (config-aware)
+    const pictureColumn = await this.getColumnMapping('profiles', 'picture_url', ['avatar_url', 'profile_image_url', 'image_url']);
+    const bioColumn = await this.getColumnMapping('profiles', 'bio', ['about', 'description']);
+    const usernameColumn = await this.getColumnMapping('profiles', 'username', ['handle', 'user_name']);
+
+    // Build profile data with only columns that exist
+    const profileData: any = {
+      id: userId,
+      email: userData.email,
+      display_name: userData.name,
+      full_name: userData.name,
+      updated_at: new Date().toISOString(),
+    };
+
+    // Add optional fields only if columns exist and data provided
+    if (pictureColumn && userData.picture_url) {
+      profileData[pictureColumn] = userData.picture_url;
+    } else if (userData.picture_url) {
+      // Log missing column but don't fail
+      Logger.debug(`Picture field not found in profiles table - skipping avatar`);
+    }
+    
+    if (bioColumn && userData.bio) {
+      profileData[bioColumn] = userData.bio;
+    } else if (userData.bio) {
+      Logger.debug(`Bio field not found in profiles table - skipping bio`);
+    }
+    
+    if (usernameColumn && userData.username) {
+      profileData[usernameColumn] = userData.username;
+    } else if (userData.username) {
+      Logger.debug(`Username field not found in profiles table - skipping username`);
+    }
+
     // Create profile
     const { error: profileError } = await this.client
       .from('profiles')
-      .insert({
-        id: userId,
-        email: userData.email,
-        display_name: userData.name,
-        full_name: userData.name,
-        avatar_url: userData.picture_url,
-        updated_at: new Date().toISOString(),
-      });
+      .insert(profileData);
 
     if (profileError) {
-      return { id: '', success: false, error: `Profile creation failed: ${profileError.message}` };
+      // Enhanced error reporting with schema introspection hints
+      let errorMsg = `Profile creation failed: ${profileError.message}`;
+      
+      if (profileError.message.includes('column')) {
+        errorMsg += `\n\nColumn mapping suggestions:`;
+        if (pictureColumn) {
+          errorMsg += `\n  - Picture field: '${pictureColumn}' (mapped)`;
+        } else {
+          errorMsg += `\n  - Picture field: none found (tried: picture_url, avatar_url, profile_image_url, image_url)`;
+        }
+        if (bioColumn) {
+          errorMsg += `\n  - Bio field: '${bioColumn}' (mapped)`;
+        } else {
+          errorMsg += `\n  - Bio field: none found (tried: bio, about, description)`;
+        }
+        if (usernameColumn) {
+          errorMsg += `\n  - Username field: '${usernameColumn}' (mapped)`;
+        } else {
+          errorMsg += `\n  - Username field: none found (tried: username, handle, user_name)`;
+        }
+        
+        errorMsg += `\n\nTo fix: Update your config schema.userTable fields to match your database columns.`;
+      }
+      
+      return { id: '', success: false, error: errorMsg };
     }
 
     // Try to create a personal account/team if the tables exist
@@ -577,22 +688,78 @@ Technical details: ${error.message}
       return { id: '', success: false, error: `Auth user creation failed: ${authError.message}` };
     }
 
+    // Dynamically determine profile column mappings (config-aware)
+    const pictureColumn = await this.getColumnMapping('profiles', 'picture_url', ['avatar_url', 'profile_image_url', 'image_url']);
+    const bioColumn = await this.getColumnMapping('profiles', 'bio', ['about', 'description']);
+    const usernameColumn = await this.getColumnMapping('profiles', 'username', ['handle', 'user_name']);
+    const nameColumn = await this.getColumnMapping('profiles', 'name', ['display_name', 'full_name']);
+
+    // Build profile data with only columns that exist
+    const profileData: any = {
+      id: userId,
+      email: userData.email,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    // Add required fields with fallbacks
+    if (nameColumn) {
+      profileData[nameColumn] = userData.name;
+    } else {
+      profileData.name = userData.name; // fallback
+    }
+
+    // Add optional fields only if columns exist and data provided
+    if (pictureColumn && userData.picture_url) {
+      profileData[pictureColumn] = userData.picture_url;
+    } else if (userData.picture_url) {
+      // Log missing column but don't fail
+      Logger.debug(`Picture field not found in profiles table - skipping avatar`);
+    }
+    
+    if (bioColumn && userData.bio) {
+      profileData[bioColumn] = userData.bio;
+    } else if (userData.bio) {
+      Logger.debug(`Bio field not found in profiles table - skipping bio`);
+    }
+    
+    if (usernameColumn && userData.username) {
+      profileData[usernameColumn] = userData.username;
+    } else if (userData.username) {
+      Logger.debug(`Username field not found in profiles table - skipping username`);
+    }
+
     // Create profile
     const { error: profileError } = await this.client
       .from('profiles')
-      .insert({
-        id: userId,
-        email: userData.email,
-        name: userData.name,
-        username: userData.username,
-        bio: userData.bio,
-        avatar_url: userData.picture_url,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      });
+      .insert(profileData);
 
     if (profileError) {
-      return { id: '', success: false, error: `Profile creation failed: ${profileError.message}` };
+      // Enhanced error reporting with schema introspection hints
+      let errorMsg = `Profile creation failed: ${profileError.message}`;
+      
+      if (profileError.message.includes('column')) {
+        errorMsg += `\n\nColumn mapping suggestions:`;
+        if (pictureColumn) {
+          errorMsg += `\n  - Picture field: '${pictureColumn}' (mapped)`;
+        } else {
+          errorMsg += `\n  - Picture field: none found (tried: picture_url, avatar_url, profile_image_url, image_url)`;
+        }
+        if (bioColumn) {
+          errorMsg += `\n  - Bio field: '${bioColumn}' (mapped)`;
+        } else {
+          errorMsg += `\n  - Bio field: none found (tried: bio, about, description)`;
+        }
+        if (usernameColumn) {
+          errorMsg += `\n  - Username field: '${usernameColumn}' (mapped)`;
+        } else {
+          errorMsg += `\n  - Username field: none found (tried: username, handle, user_name)`;
+        }
+        
+        errorMsg += `\n\nTo fix: Update your config schema.userTable fields to match your database columns.`;
+      }
+      
+      return { id: '', success: false, error: errorMsg };
     }
 
     return { id: userId, success: true };
