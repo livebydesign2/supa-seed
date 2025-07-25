@@ -1,4 +1,4 @@
-# 🌱 Supa-Seed v2.2.0
+# 🌱 Supa-Seed v2.3.1
 
 **Constraint-Aware Database Seeding with Deep PostgreSQL Business Logic Discovery**
 
@@ -9,7 +9,29 @@ The evolution from schema-first to constraint-aware database seeding that automa
 
 ---
 
-## 🎯 What's New in v2.2.0 - **Constraint-Aware Architecture**
+## 🎯 What's New in v2.3.1 - **Complete Constraint-Aware Implementation**
+
+### 🚀 **Beta Feedback Resolved**
+- **✅ PostgreSQL Constraint Fix**: Fixed user creation order to prevent "Profiles can only be created for personal accounts"
+- **✅ Complete CLI Suite**: All 7 documented constraint-aware commands now implemented and functional
+- **✅ Enhanced Validation**: Improved column mapping validation with reduced false positives
+- **✅ AI Integration**: Full AI command suite with Ollama connectivity testing
+
+### 🔧 **New CLI Commands Available**
+```bash
+# Constraint-aware commands
+npx supa-seed discover-constraints --verbose
+npx supa-seed generate-workflows --enable-auto-fixes  
+npx supa-seed test-constraints --validate-rules
+npx supa-seed migrate-v2.2.0 --output migrated-config.json
+
+# AI integration commands  
+npx supa-seed ai status
+npx supa-seed ai test --model llama3.1:latest
+npx supa-seed ai clear-cache
+```
+
+## 🎯 v2.2.0 Foundation - **Constraint-Aware Architecture**
 
 ### 🔍 **Deep PostgreSQL Constraint Discovery**
 - **🧠 Business Logic Parsing**: Automatically parses PostgreSQL triggers and functions
@@ -58,7 +80,7 @@ $$ LANGUAGE plpgsql;
 
 ```bash
 # Install the latest constraint-aware version
-npm install -g supa-seed@2.2.0
+npm install -g supa-seed@2.3.1
 ```
 
 ```typescript
@@ -196,7 +218,7 @@ if (result.success) {
 
 ```json
 {
-  "version": "2.2.0",
+  "version": "2.3.1",
   "strategy": "constraint-aware",
   
   "seeding": {
@@ -413,13 +435,13 @@ v2.2.0 doesn't just fix the "profiles can only be created for personal accounts"
 
 ```bash
 # Install the latest constraint-aware version
-npm install -g supa-seed@2.2.0
+npm install -g supa-seed@2.3.1
 
 # Or upgrade from v2.1.0
 npm update supa-seed
 
 # Verify installation  
-supa-seed --version  # Should show 2.2.0
+supa-seed --version  # Should show 2.3.1
 ```
 
 ---
