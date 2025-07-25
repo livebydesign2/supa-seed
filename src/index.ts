@@ -370,4 +370,8 @@ export * from './types';
 export * from './config-types';
 export { ConfigManager } from './config-manager';
 export { SchemaAdapter } from './schema-adapter';
-export { AuthSeeder, BaseDataSeeder, UserSeeder, SetupSeeder, GearSeeder, MediaSeeder }; 
+export { AuthSeeder, BaseDataSeeder, UserSeeder, SetupSeeder, GearSeeder, MediaSeeder };
+
+// Export framework strategy system
+export * from './framework/strategy-interface';
+export { StrategyRegistry } from './framework/strategy-registry'; 

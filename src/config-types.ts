@@ -20,6 +20,16 @@ export interface FlexibleSeedConfig {
   // Schema configuration
   schema: {
     framework: 'simple' | 'makerkit' | 'custom';
+    // Framework strategy configuration
+    frameworkStrategy?: {
+      enabled: boolean;
+      override?: string; // Manual strategy override
+      enableConstraintHandling?: boolean;
+      enableBusinessLogicRespect?: boolean;
+      enableRLSCompliance?: boolean;
+      enableMultiTenant?: boolean;
+      debug?: boolean;
+    };
     userTable: {
       name: string;
       emailField: string;
