@@ -4,6 +4,13 @@
  */
 
 import type { createClient } from '@supabase/supabase-js';
+import type { 
+  ConstraintHandler,
+  ConstraintHandlingResult,
+  ConstraintFix,
+  TableConstraints,
+  ConstraintDiscoveryResult 
+} from '../schema/constraint-types';
 
 type SupabaseClient = ReturnType<typeof createClient>;
 
@@ -83,18 +90,23 @@ export interface User {
   metadata?: Record<string, any>;
 }
 
-export interface ConstraintHandlingResult {
-  data: any;
-  appliedFixes: ConstraintFix[];
-  warnings: string[];
-}
+// Re-export constraint types from schema module for consistency
+export type { 
+  ConstraintHandler,
+  ConstraintHandlingResult,
+  ConstraintFix,
+  TableConstraints,
+  ConstraintDiscoveryResult 
+} from '../schema/constraint-types';
 
-export interface ConstraintFix {
-  type: 'set_field' | 'remove_field' | 'transform_value';
-  field: string;
-  oldValue?: any;
-  newValue?: any;
-  reason: string;
+export interface StrategyConstraintResult {
+  success: boolean;
+  tables: TableConstraints[];
+  totalConstraints: number;
+  confidence: number;
+  errors: string[];
+  warnings: string[];
+  recommendations: string[];
 }
 
 export interface SeedingStrategy {
@@ -117,6 +129,21 @@ export interface SeedingStrategy {
    * Handle constraints for a specific table and data
    */
   handleConstraints(table: string, data: any): Promise<ConstraintHandlingResult>;
+
+  /**
+   * Discover and analyze constraints for this strategy
+   */
+  discoverConstraints?(tableNames?: string[]): Promise<StrategyConstraintResult>;
+
+  /**
+   * Get framework-specific constraint handlers
+   */
+  getConstraintHandlers?(): ConstraintHandler[];
+
+  /**
+   * Apply constraint-aware data transformation
+   */
+  applyConstraintFixes?(table: string, data: any, constraints: TableConstraints): Promise<ConstraintHandlingResult>;
 
   /**
    * Get recommendations for using this strategy

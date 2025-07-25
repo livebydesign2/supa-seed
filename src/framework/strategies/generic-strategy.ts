@@ -11,8 +11,13 @@ import {
   UserData,
   User,
   ConstraintHandlingResult,
-  ConstraintFix
+  ConstraintFix,
+  ConstraintHandler,
+  TableConstraints,
+  StrategyConstraintResult
 } from '../strategy-interface';
+import { ConstraintDiscoveryEngine } from '../../schema/constraint-discovery-engine';
+import { ConstraintRegistry } from '../../schema/constraint-registry';
 import { Logger } from '../../utils/logger';
 
 type SupabaseClient = ReturnType<typeof createClient>;
@@ -21,9 +26,21 @@ export class GenericStrategy implements SeedingStrategy {
   name = 'generic';
   private client!: SupabaseClient;
   private discoveredConstraints: Map<string, any[]> = new Map();
+  private constraintEngine?: ConstraintDiscoveryEngine;
+  private constraintRegistry?: ConstraintRegistry;
 
   async initialize(client: SupabaseClient): Promise<void> {
     this.client = client;
+    this.constraintEngine = new ConstraintDiscoveryEngine(client);
+    this.constraintRegistry = new ConstraintRegistry({
+      enablePriorityHandling: false,
+      enableFallbackHandlers: true,
+      logHandlerSelection: false
+    });
+    
+    // Register generic handlers
+    const handlers = this.getConstraintHandlers();
+    this.constraintRegistry.registerHandlers(handlers);
   }
 
   getPriority(): number {
@@ -184,7 +201,7 @@ export class GenericStrategy implements SeedingStrategy {
 
         const { error: insertError } = await this.client
           .from(tableName)
-          .insert(constraintResult.data);
+          .insert(constraintResult.modifiedData);
 
         if (!insertError) {
           createdUser = {
@@ -251,7 +268,7 @@ export class GenericStrategy implements SeedingStrategy {
 
         const { error: insertError } = await this.client
           .from(tableName)
-          .insert(constraintResult.data);
+          .insert(constraintResult.modifiedData);
 
         if (!insertError) {
           Logger.debug(`Related record created in ${tableName}`);
@@ -279,7 +296,8 @@ export class GenericStrategy implements SeedingStrategy {
           field: 'created_at',
           oldValue: undefined,
           newValue: processedData.created_at,
-          reason: 'Set default created_at timestamp'
+          reason: 'Set default created_at timestamp',
+          confidence: 0.9
         });
       }
 
@@ -290,7 +308,8 @@ export class GenericStrategy implements SeedingStrategy {
           field: 'updated_at',
           oldValue: undefined,
           newValue: processedData.updated_at,
-          reason: 'Set default updated_at timestamp'
+          reason: 'Set default updated_at timestamp',
+          confidence: 0.9
         });
       }
 
@@ -303,7 +322,8 @@ export class GenericStrategy implements SeedingStrategy {
           field: 'slug',
           oldValue: undefined,
           newValue: null,
-          reason: 'Default slug to null for compatibility'
+          reason: 'Default slug to null for compatibility',
+          confidence: 0.8
         });
       }
 
@@ -316,7 +336,8 @@ export class GenericStrategy implements SeedingStrategy {
             field: key,
             oldValue: undefined,
             newValue: undefined,
-            reason: 'Remove undefined value to prevent insertion errors'
+            reason: 'Remove undefined value to prevent insertion errors',
+            confidence: 0.95
           });
         }
       });
@@ -330,17 +351,25 @@ export class GenericStrategy implements SeedingStrategy {
       }
 
       return {
-        data: processedData,
+        success: true,
+        originalData: data,
+        modifiedData: processedData,
         appliedFixes,
-        warnings
+        warnings,
+        errors: [],
+        bypassRequired: false
       };
 
     } catch (error: any) {
       Logger.warn(`Generic constraint handling failed for ${table}: ${error.message}`);
       return {
-        data: processedData,
+        success: false,
+        originalData: data,
+        modifiedData: processedData,
         appliedFixes,
-        warnings: [...warnings, `Constraint handling error: ${error.message}`]
+        warnings: [...warnings, `Constraint handling error: ${error.message}`],
+        errors: [error.message],
+        bypassRequired: true
       };
     }
   }
@@ -361,9 +390,149 @@ export class GenericStrategy implements SeedingStrategy {
       'direct_insertion',
       'fallback_behavior',
       'constraint_basic_handling',
-      'multi_table_attempts'
+      'multi_table_attempts',
+      'constraint_discovery'
     ];
 
     return supportedFeatures.includes(feature);
+  }
+
+  /**
+   * Discover constraints using generic analysis
+   */
+  async discoverConstraints(tableNames?: string[]): Promise<StrategyConstraintResult> {
+    if (!this.constraintEngine) {
+      throw new Error('Constraint engine not initialized');
+    }
+
+    try {
+      Logger.debug('Discovering constraints with generic strategy');
+
+      const discoveryResult = await this.constraintEngine.discoverConstraints(tableNames || []);
+
+      // Convert discovery engine tables to constraint types format
+      const convertedTables = discoveryResult.tables.map(table => ({
+        table: table.tableName,
+        schema: 'public',
+        checkConstraints: [],
+        foreignKeyConstraints: [],
+        uniqueConstraints: [],
+        primaryKeyConstraints: [],
+        notNullConstraints: [],
+        confidence: discoveryResult.confidence,
+        discoveryTimestamp: new Date().toISOString()
+      }));
+
+      return {
+        success: true,
+        tables: convertedTables,
+        totalConstraints: discoveryResult.businessRules.length,
+        confidence: discoveryResult.confidence,
+        errors: [],
+        warnings: [],
+        recommendations: [
+          ...this.getRecommendations(),
+          'Consider using a framework-specific strategy for better constraint handling'
+        ]
+      };
+
+    } catch (error: any) {
+      Logger.error('Generic constraint discovery failed:', error);
+      return {
+        success: false,
+        tables: [],
+        totalConstraints: 0,
+        confidence: 0,
+        errors: [error.message],
+        warnings: [],
+        recommendations: ['Review constraint discovery configuration']
+      };
+    }
+  }
+
+  /**
+   * Get generic constraint handlers
+   */
+  getConstraintHandlers(): ConstraintHandler[] {
+    return [
+      {
+        id: 'generic_basic_check',
+        type: 'check',
+        priority: 10,
+        description: 'Basic handler for check constraints',
+        canHandle: () => true,
+        handle: (constraint: any, data: any) => ({
+          success: true,
+          originalData: { ...data },
+          modifiedData: { ...data },
+          appliedFixes: [],
+          warnings: [`Basic handling for check constraint: ${constraint.constraintName || 'unknown'}`],
+          errors: [],
+          bypassRequired: false
+        })
+      },
+      {
+        id: 'generic_basic_foreign_key',
+        type: 'foreign_key',
+        priority: 10,
+        description: 'Basic handler for foreign key constraints',
+        canHandle: () => true,
+        handle: (constraint: any, data: any) => ({
+          success: true,
+          originalData: { ...data },
+          modifiedData: { ...data },
+          appliedFixes: [],
+          warnings: [`Foreign key reference: ensure ${constraint.referencedTable} exists`],
+          errors: [],
+          bypassRequired: false
+        })
+      }
+    ];
+  }
+
+  /**
+   * Apply constraint fixes using generic logic
+   */
+  async applyConstraintFixes(
+    table: string, 
+    data: any, 
+    constraints: TableConstraints
+  ): Promise<ConstraintHandlingResult> {
+    if (!this.constraintRegistry) {
+      throw new Error('Constraint registry not initialized');
+    }
+
+    try {
+      Logger.debug(`Applying generic constraint fixes for table: ${table}`);
+
+      const result = this.constraintRegistry.handleTableConstraints(constraints, data);
+
+      // Add generic safety measures
+      if (!result.modifiedData.created_at) {
+        result.modifiedData.created_at = new Date().toISOString();
+        result.appliedFixes.push({
+          type: 'set_field',
+          field: 'created_at',
+          oldValue: undefined,
+          newValue: result.modifiedData.created_at,
+          reason: 'Set default timestamp',
+          confidence: 0.9
+        });
+      }
+
+      return result;
+
+    } catch (error: any) {
+      Logger.error('Generic constraint fix application failed:', error);
+      return {
+        success: false,
+        originalData: data,
+        modifiedData: data,
+        appliedFixes: [],
+        warnings: [],
+        errors: [error.message],
+        bypassRequired: true
+      };
+    }
   }
 }

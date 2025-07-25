@@ -11,8 +11,13 @@ import {
   UserData,
   User,
   ConstraintHandlingResult,
-  ConstraintFix
+  ConstraintFix,
+  ConstraintHandler,
+  TableConstraints,
+  StrategyConstraintResult
 } from '../strategy-interface';
+import { ConstraintDiscoveryEngine } from '../../schema/constraint-discovery-engine';
+import { ConstraintRegistry } from '../../schema/constraint-registry';
 import { Logger } from '../../utils/logger';
 
 type SupabaseClient = ReturnType<typeof createClient>;
@@ -22,9 +27,21 @@ export class MakerKitStrategy implements SeedingStrategy {
   private client!: SupabaseClient;
   private version?: string;
   private detectedFeatures: string[] = [];
+  private constraintEngine?: ConstraintDiscoveryEngine;
+  private constraintRegistry?: ConstraintRegistry;
 
   async initialize(client: SupabaseClient): Promise<void> {
     this.client = client;
+    this.constraintEngine = new ConstraintDiscoveryEngine(client);
+    this.constraintRegistry = new ConstraintRegistry({
+      enablePriorityHandling: true,
+      enableFallbackHandlers: true,
+      logHandlerSelection: true
+    });
+    
+    // Register MakerKit-specific handlers
+    const handlers = this.getConstraintHandlers();
+    this.constraintRegistry.registerHandlers(handlers);
   }
 
   getPriority(): number {
@@ -170,7 +187,7 @@ export class MakerKitStrategy implements SeedingStrategy {
 
         const { error: insertError } = await this.client
           .from('accounts')
-          .insert(accountData.data);
+          .insert(accountData.modifiedData);
 
         if (insertError) {
           throw new Error(`Manual account creation failed: ${insertError.message}`);
@@ -235,7 +252,8 @@ export class MakerKitStrategy implements SeedingStrategy {
             field: 'slug',
             oldValue: processedData.slug,
             newValue: null,
-            reason: 'Personal accounts must have null slug (MakerKit constraint)'
+            reason: 'Personal accounts must have null slug (MakerKit constraint)',
+            confidence: 0.95
           });
           processedData.slug = null;
         }
@@ -247,7 +265,8 @@ export class MakerKitStrategy implements SeedingStrategy {
             field: 'is_personal_account',
             oldValue: undefined,
             newValue: true,
-            reason: 'Default to personal account for user profiles'
+            reason: 'Default to personal account for user profiles',
+            confidence: 0.9
           });
           processedData.is_personal_account = true;
           processedData.slug = null; // Ensure slug is null for personal accounts
@@ -268,7 +287,8 @@ export class MakerKitStrategy implements SeedingStrategy {
             field: 'name',
             oldValue: undefined,
             newValue: processedData.display_name,
-            reason: 'Map display_name to name field'
+            reason: 'Map display_name to name field',
+            confidence: 0.8
           });
           processedData.name = processedData.display_name;
         }
@@ -281,17 +301,25 @@ export class MakerKitStrategy implements SeedingStrategy {
       }
 
       return {
-        data: processedData,
+        success: true,
+        originalData: data,
+        modifiedData: processedData,
         appliedFixes,
-        warnings
+        warnings,
+        errors: [],
+        bypassRequired: false
       };
 
     } catch (error: any) {
       Logger.warn(`Constraint handling failed for ${table}: ${error.message}`);
       return {
-        data: processedData,
+        success: false,
+        originalData: data,
+        modifiedData: processedData,
         appliedFixes,
-        warnings: [...warnings, `Constraint handling error: ${error.message}`]
+        warnings: [...warnings, `Constraint handling error: ${error.message}`],
+        errors: [error.message],
+        bypassRequired: true
       };
     }
   }
@@ -322,10 +350,211 @@ export class MakerKitStrategy implements SeedingStrategy {
       'personal_account_handling',
       'tenant_scoped_data',
       'rls_compliance',
-      'business_logic_respect'
+      'business_logic_respect',
+      'constraint_discovery',
+      'framework_specific_handlers'
     ];
 
     return supportedFeatures.includes(feature);
+  }
+
+  /**
+   * Discover constraints using MakerKit-aware analysis
+   */
+  async discoverConstraints(tableNames?: string[]): Promise<StrategyConstraintResult> {
+    if (!this.constraintEngine) {
+      throw new Error('Constraint engine not initialized');
+    }
+
+    try {
+      Logger.debug('Discovering constraints with MakerKit strategy');
+
+      // Use MakerKit-specific table focus if no tables specified
+      const targetTables = tableNames || [
+        'accounts', 'profiles', 'subscriptions', 
+        'organizations', 'organization_members', 'invitations'
+      ];
+
+      const discoveryResult = await this.constraintEngine.discoverConstraints(targetTables);
+
+      // Convert discovery engine tables to constraint types format with MakerKit-specific enhancements
+      const enhancedTables = discoveryResult.tables.map(table => {
+        let confidence = discoveryResult.confidence;
+        
+        // Add MakerKit-specific confidence boost for accounts table
+        if (table.tableName === 'accounts' && table.constraints.length > 0) {
+          confidence = Math.min(confidence + 0.2, 1.0);
+        }
+
+        return {
+          table: table.tableName,
+          schema: 'public',
+          checkConstraints: [],
+          foreignKeyConstraints: [],
+          uniqueConstraints: [],
+          primaryKeyConstraints: [],
+          notNullConstraints: [],
+          confidence,
+          discoveryTimestamp: new Date().toISOString()
+        };
+      });
+
+      return {
+        success: true,
+        tables: enhancedTables,
+        totalConstraints: discoveryResult.businessRules.length,
+        confidence: discoveryResult.confidence,
+        errors: [],
+        warnings: [],
+        recommendations: [
+          ...this.getRecommendations(),
+          'Enable constraint-aware data generation for better reliability'
+        ]
+      };
+
+    } catch (error: any) {
+      Logger.error('MakerKit constraint discovery failed:', error);
+      return {
+        success: false,
+        tables: [],
+        totalConstraints: 0,
+        confidence: 0,
+        errors: [error.message],
+        warnings: [],
+        recommendations: ['Review constraint discovery configuration']
+      };
+    }
+  }
+
+  /**
+   * Get MakerKit-specific constraint handlers
+   */
+  getConstraintHandlers(): ConstraintHandler[] {
+    return [
+      {
+        id: 'makerkit_personal_account_slug',
+        type: 'check',
+        priority: 100,
+        description: 'Handles MakerKit personal account slug constraint',
+        canHandle: (constraint: any) => {
+          return constraint.constraintName?.toLowerCase().includes('accounts_slug_null_if_personal') ||
+                 (constraint.checkClause?.toLowerCase().includes('is_personal_account') &&
+                  constraint.checkClause?.toLowerCase().includes('slug'));
+        },
+        handle: (constraint: any, data: any) => {
+          const result: ConstraintHandlingResult = {
+            success: true,
+            originalData: { ...data },
+            modifiedData: { ...data },
+            appliedFixes: [],
+            warnings: [],
+            errors: [],
+            bypassRequired: false
+          };
+
+          // If is_personal_account is true, slug must be null
+          if (data.is_personal_account === true && data.slug !== null) {
+            result.modifiedData.slug = null;
+            result.appliedFixes.push({
+              type: 'set_field',
+              field: 'slug',
+              oldValue: data.slug,
+              newValue: null,
+              reason: 'Personal accounts must have null slug (MakerKit constraint)',
+              confidence: 0.95
+            });
+          }
+
+          // Default to personal account if not specified
+          if (data.is_personal_account === undefined) {
+            result.modifiedData.is_personal_account = true;
+            result.modifiedData.slug = null;
+            result.appliedFixes.push({
+              type: 'set_field',
+              field: 'is_personal_account',
+              oldValue: undefined,
+              newValue: true,
+              reason: 'Default to personal account for profile compatibility',
+              confidence: 0.9
+            });
+          }
+
+          return result;
+        }
+      },
+      {
+        id: 'makerkit_organization_member_unique',
+        type: 'unique',
+        priority: 90,
+        description: 'Handles MakerKit organization member uniqueness',
+        canHandle: (constraint: any) => {
+          return constraint.constraintName?.toLowerCase().includes('organization_member') ||
+                 (constraint.columns?.includes('organization_id') && constraint.columns?.includes('user_id'));
+        },
+        handle: (constraint: any, data: any) => {
+          return {
+            success: true,
+            originalData: { ...data },
+            modifiedData: { ...data },
+            appliedFixes: [],
+            warnings: data.organization_id && data.user_id ? [] : 
+              ['Organization member requires both organization_id and user_id'],
+            errors: [],
+            bypassRequired: false
+          };
+        }
+      }
+    ];
+  }
+
+  /**
+   * Apply constraint fixes using MakerKit-aware logic
+   */
+  async applyConstraintFixes(
+    table: string, 
+    data: any, 
+    constraints: TableConstraints
+  ): Promise<ConstraintHandlingResult> {
+    if (!this.constraintRegistry) {
+      throw new Error('Constraint registry not initialized');
+    }
+
+    try {
+      Logger.debug(`Applying MakerKit constraint fixes for table: ${table}`);
+
+      const result = this.constraintRegistry.handleTableConstraints(constraints, data);
+
+      // Add MakerKit-specific enhancements
+      if (table === 'accounts' && !result.appliedFixes.some(f => f.field === 'is_personal_account')) {
+        // Ensure personal account defaults for MakerKit
+        if (data.is_personal_account === undefined) {
+          result.modifiedData.is_personal_account = true;
+          result.modifiedData.slug = null;
+          result.appliedFixes.push({
+            type: 'set_field',
+            field: 'is_personal_account',
+            oldValue: undefined,
+            newValue: true,
+            reason: 'MakerKit default: personal account for user profiles',
+            confidence: 0.9
+          });
+        }
+      }
+
+      return result;
+
+    } catch (error: any) {
+      Logger.error('MakerKit constraint fix application failed:', error);
+      return {
+        success: false,
+        originalData: data,
+        modifiedData: data,
+        appliedFixes: [],
+        warnings: [],
+        errors: [error.message],
+        bypassRequired: true
+      };
+    }
   }
 
   private detectMakerKitVersion(schema: DatabaseSchema): string | undefined {
