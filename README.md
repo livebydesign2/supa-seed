@@ -1,4 +1,4 @@
-# 🌱 Supa-Seed v2.3.1
+# 🌱 Supa-Seed v2.3.2
 
 **Constraint-Aware Database Seeding with Deep PostgreSQL Business Logic Discovery**
 
@@ -9,7 +9,7 @@ The evolution from schema-first to constraint-aware database seeding that automa
 
 ---
 
-## 🎯 What's New in v2.3.1 - **Complete Constraint-Aware Implementation**
+## 🎯 What's New in v2.3.2 - **Complete Constraint-Aware Implementation**
 
 ### 🚀 **Beta Feedback Resolved**
 - **✅ PostgreSQL Constraint Fix**: Fixed user creation order to prevent "Profiles can only be created for personal accounts"
@@ -80,7 +80,7 @@ $$ LANGUAGE plpgsql;
 
 ```bash
 # Install the latest constraint-aware version
-npm install -g supa-seed@2.3.1
+npm install -g supa-seed@2.3.2
 ```
 
 ```typescript
@@ -218,7 +218,7 @@ if (result.success) {
 
 ```json
 {
-  "version": "2.3.1",
+  "version": "2.3.2",
   "strategy": "constraint-aware",
   
   "seeding": {
@@ -435,13 +435,13 @@ v2.2.0 doesn't just fix the "profiles can only be created for personal accounts"
 
 ```bash
 # Install the latest constraint-aware version
-npm install -g supa-seed@2.3.1
+npm install -g supa-seed@2.3.2
 
 # Or upgrade from v2.1.0
 npm update supa-seed
 
 # Verify installation  
-supa-seed --version  # Should show 2.3.1
+supa-seed --version  # Should show 2.3.2
 ```
 
 ---
