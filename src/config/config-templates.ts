@@ -1,1078 +1,1076 @@
 /**
- * Framework-Specific Configuration Templates for Epic 7: Configuration Extensibility Framework
- * Provides pre-configured templates for different frameworks and use cases
+ * Configuration Templates for SupaSeed v2.5.0
+ * Implements Task 5.2.1: Create platform-specific configuration templates
+ * Provides ready-to-use templates for common platform types with inheritance and composition
  */
 
-import { ExtendedSeedConfig, FlexibleSeedConfig } from '../config-types';
+import type { FlexibleSeedConfig } from '../config-types';
+import type { 
+  ConfigurationTemplate, 
+  PlatformArchitectureType, 
+  ContentDomainType,
+  UniversalCoreConfig,
+  SmartDetectionConfig,
+  ExtensionsLayerConfig
+} from './config-layers';
 
-export interface ConfigTemplate {
+/**
+ * Template metadata for discovery and management
+ */
+export interface TemplateMetadata {
+  id: string;
   name: string;
   description: string;
-  framework: string;
-  useCase: 'development' | 'staging' | 'production' | 'testing' | 'demo';
-  config: Partial<ExtendedSeedConfig>;
-  features: string[];
-  requirements: string[];
-  notes?: string[];
+  version: string;
+  author: string;
+  tags: string[];
+  category: 'platform' | 'domain' | 'hybrid' | 'specialized';
+  difficulty: 'beginner' | 'intermediate' | 'advanced';
+  estimatedSetupTime: string;
+  usageCount: number;
+  rating: number;
+  lastUpdated: Date;
+  compatibility: {
+    minimumVersion: string;
+    maximumVersion?: string;
+    dependencies: string[];
+    conflicts?: string[];
+  };
+  examples: {
+    useCase: string;
+    description: string;
+    code?: string;
+  }[];
 }
 
-export class ConfigTemplateManager {
-  private templates: Map<string, ConfigTemplate> = new Map();
+/**
+ * Template composition and inheritance settings
+ */
+export interface TemplateComposition {
+  baseTemplates: string[]; // Templates to inherit from
+  overrides: {
+    path: string;
+    value: any;
+    reason: string;
+  }[];
+  mergeStrategy: {
+    arrays: 'replace' | 'merge' | 'append';
+    objects: 'replace' | 'merge' | 'deep_merge';
+    primitives: 'replace' | 'prefer_override' | 'prefer_base';
+  };
+  conditionalLogic?: {
+    condition: string;
+    apply: any;
+    description: string;
+  }[];
+}
 
-  constructor() {
-    this.initializeTemplates();
-  }
+/**
+ * Complete configuration template with all features
+ */
+export interface CompleteConfigurationTemplate extends ConfigurationTemplate {
+  metadata: TemplateMetadata;
+  composition: TemplateComposition;
+  validation: {
+    required: string[];
+    optional: string[];
+    constraints: {
+      path: string;
+      rule: string;
+      message: string;
+    }[];
+  };
+  documentation: {
+    overview: string;
+    setup: string[];
+    customization: string[];
+    troubleshooting: string[];
+    examples: any[];
+  };
+}
 
-  /**
-   * Get all available templates
-   */
-  getTemplates(): ConfigTemplate[] {
-    return Array.from(this.templates.values());
-  }
-
-  /**
-   * Get template by name
-   */
-  getTemplate(name: string): ConfigTemplate | undefined {
-    return this.templates.get(name);
-  }
-
-  /**
-   * Get templates by framework
-   */
-  getTemplatesByFramework(framework: string): ConfigTemplate[] {
-    return Array.from(this.templates.values())
-      .filter(template => template.framework === framework);
-  }
-
-  /**
-   * Get templates by use case
-   */
-  getTemplatesByUseCase(useCase: string): ConfigTemplate[] {
-    return Array.from(this.templates.values())
-      .filter(template => template.useCase === useCase);
-  }
-
-  /**
-   * Generate configuration from template
-   */
-  generateFromTemplate(templateName: string, overrides: Partial<ExtendedSeedConfig> = {}): ExtendedSeedConfig {
-    const template = this.templates.get(templateName);
-    if (!template) {
-      throw new Error(`Template '${templateName}' not found`);
-    }
-
-    // Merge template config with overrides
-    const baseConfig: ExtendedSeedConfig = {
-      // Basic configuration
-      supabaseUrl: process.env.SUPABASE_URL || 'http://127.0.0.1:54321',
-      supabaseServiceKey: process.env.SUPABASE_SERVICE_ROLE_KEY || 'your-service-role-key',
-      environment: 'local',
-      userCount: 5,
-      setupsPerUser: 2,
-      imagesPerSetup: 1,
-      enableRealImages: false,
-      seed: 'supa-seed-template',
-
-      // Schema configuration (will be overridden by template)
-      schema: {
-        framework: 'simple',
-        userTable: {
-          name: 'users',
-          emailField: 'email',
-          idField: 'id',
-          nameField: 'name'
-        },
-        setupTable: {
-          name: 'setups',
-          userField: 'user_id',
-          titleField: 'title',
-          descriptionField: 'description'
-        },
-        optionalTables: {}
-      },
-
-      // Storage configuration
-      storage: {
-        buckets: {
-          setupImages: 'setup-images',
-          gearImages: 'gear-images',
-          profileImages: 'profile-images'
-        },
-        autoCreate: true
-      },
-
-      // Default seeders
-      seeders: {
-        enabled: ['auth', 'baseData', 'users', 'gear', 'setups', 'media'],
-        order: ['auth', 'baseData', 'users', 'gear', 'setups', 'media']
-      },
-
-      // Default data
-      data: {
-        categories: [],
-        baseTemplates: []
-      }
-    };
-
-    // Deep merge template configuration
-    return this.deepMerge(baseConfig, template.config, overrides) as ExtendedSeedConfig;
-  }
-
-  /**
-   * Initialize all available templates
-   */
-  private initializeTemplates(): void {
-    // MakerKit Templates
-    this.templates.set('makerkit-local', this.createMakerKitLocalTemplate());
-    this.templates.set('makerkit-staging', this.createMakerKitStagingTemplate());
-    this.templates.set('makerkit-production', this.createMakerKitProductionTemplate());
-    this.templates.set('makerkit-testing', this.createMakerKitTestingTemplate());
-
-    // Generic/Simple Templates
-    this.templates.set('generic-local', this.createGenericLocalTemplate());
-    this.templates.set('generic-staging', this.createGenericStagingTemplate());
-    this.templates.set('generic-production', this.createGenericProductionTemplate());
-
-    // Specialized Templates
-    this.templates.set('wildernest-outdoor', this.createWildernestTemplate());
-    this.templates.set('saas-platform', this.createSaasPlatformTemplate());
-    this.templates.set('ecommerce-shop', this.createEcommerceTemplate());
-    this.templates.set('minimal-testing', this.createMinimalTestingTemplate());
-    this.templates.set('comprehensive-demo', this.createComprehensiveDemoTemplate());
-  }
-
-  /**
-   * MakerKit Local Development Template
-   */
-  private createMakerKitLocalTemplate(): ConfigTemplate {
-    return {
-      name: 'makerkit-local',
-      description: 'MakerKit local development with minimal data and fast seeding',
-      framework: 'makerkit',
-      useCase: 'development',
-      features: [
-        'MakerKit framework detection',
-        'Personal and team accounts',
-        'Constraint-aware seeding',
-        'Multi-tenant isolation',
-        'Local image generation'
-      ],
-      requirements: [
-        'MakerKit database schema',
-        'Profiles and accounts tables',
-        'Auth triggers configured'
-      ],
-      config: {
-        environment: 'local',
-        userCount: 4,
-        setupsPerUser: 2,
-        imagesPerSetup: 1,
-        enableRealImages: false,
-        seed: 'makerkit-local-dev',
-
-        schema: {
-          framework: 'makerkit',
-          userTable: {
-            name: 'profiles',
-            emailField: 'email',
-            idField: 'id',
-            nameField: 'display_name',
-            bioField: 'bio',
-            pictureField: 'avatar_url'
+/**
+ * Individual Creator Platform Templates
+ * For platforms focused on individual content creation and sharing
+ */
+export const INDIVIDUAL_PLATFORM_TEMPLATES: CompleteConfigurationTemplate[] = [
+  {
+    id: 'individual-outdoor-creator',
+    name: 'Individual Outdoor Creator Platform',
+    description: 'Perfect for Wildernest-style outdoor gear and adventure sharing platforms',
+    version: '1.0.0',
+    targets: {
+      architectures: ['individual'],
+      domains: ['outdoor'],
+      complexity: 'intermediate'
+    },
+    layers: {
+      universal: {
+        seeding: {
+          defaultUserCount: 12,
+          contentRatios: {
+            publicContent: 0.8, // High public sharing in outdoor community
+            privateContent: 0.15,
+            sharedContent: 0.05
           },
-          setupTable: {
-            name: 'setups',
-            userField: 'user_id',
-            titleField: 'title',
-            descriptionField: 'description',
-            categoryField: 'category',
-            publicField: 'is_public'
+          relationships: {
+            generateRelationships: true,
+            relationshipDensity: 0.4, // Moderate community connections
+            respectConstraints: true
+          }
+        }
+      } as Partial<UniversalCoreConfig>,
+      detection: {
+        platform: {
+          architecture: 'individual',
+          confidence: 0.95,
+          evidence: {
+            tablePatterns: ['setups', 'gear_items', 'base_templates'],
+            relationshipPatterns: ['user_id foreign keys', 'public sharing patterns'],
+            constraintPatterns: ['outdoor domain indicators'],
+            namingConventions: ['outdoor terminology']
           },
-          multiTenant: {
-            enabled: true,
-            tenantColumn: 'account_id',
-            tenantScopeDetection: 'auto',
-            validationEnabled: true,
-            strictIsolation: true,
-            allowSharedResources: false,
-            dataGeneration: {
-              generatePersonalAccounts: true,
-              generateTeamAccounts: true,
-              personalAccountRatio: 0.6,
-              dataDistributionStrategy: 'even',
-              crossTenantDataAllowed: false,
-              sharedResourcesEnabled: false,
-              accountTypes: [
-                {
-                  type: 'personal',
-                  weight: 0.6,
-                  settings: {
-                    defaultPlan: 'free',
-                    features: ['basic', 'personal']
-                  }
-                },
-                {
-                  type: 'team',
-                  weight: 0.4,
-                  settings: {
-                    minMembers: 2,
-                    maxMembers: 5,
-                    defaultPlan: 'pro',
-                    features: ['collaboration', 'team-management']
-                  }
-                }
-              ],
-              minUsersPerTenant: 1,
-              maxUsersPerTenant: 3,
-              minProjectsPerTenant: 1,
-              maxProjectsPerTenant: 3,
-              allowCrossTenantRelationships: false,
-              sharedTables: [],
-              respectTenantPlans: true,
-              enforceTenantLimits: true
+          architectureSettings: {
+            individual: {
+              focusOnPersonalContent: true,
+              enableSocialFeatures: true,
+              contentSharingRatio: 0.8,
+              communityInteraction: 'high',
+              personalBranding: true
             }
-          },
-          optionalTables: {
-            categories: { enabled: true, autoCreate: true },
-            gearItems: { enabled: true, autoCreate: true },
-            setupGearItems: { enabled: true, autoCreate: true },
-            setupBaseTemplates: { enabled: true, autoCreate: true }
           }
         },
-
-        frameworkStrategy: {
-          enabled: true,
-          fallbackBehavior: 'generic',
-          enableStrategyValidation: true
-        },
-
-        constraintHandlers: {
-          enabled: true,
-          overrideDefaults: false,
-          enableConstraintLogging: true
-        },
-
-        schemaEvolution: {
-          enabled: true,
-          trackingMode: 'hash',
-          cacheLocation: '.supa-seed-cache',
-          autoMigration: false,
-          migrationStrategies: [],
-          onSchemaChange: 'warn'
-        },
-
-        dataVolumes: {
-          enabled: true,
-          patterns: {
-            userDistribution: 'linear',
-            contentRatios: {
-              publicContent: 0.7,
-              privateContent: 0.3,
-              draftContent: 0.0
-            },
-            relationshipDensity: {
-              userToContent: 2,
-              crossReferences: 1,
-              tagConnections: 2
-            },
-            seasonalVariation: false,
-            activityCycles: false
+        domain: {
+          domain: 'outdoor',
+          confidence: 0.95,
+          evidence: {
+            tableNames: ['setups', 'gear_items', 'categories', 'base_templates'],
+            columnPatterns: ['gear', 'outdoor', 'adventure'],
+            dataTypes: ['gear categories', 'outdoor brands'],
+            businessLogicHints: ['gear setup creation', 'adventure sharing']
           },
-          volumeProfiles: [
-            {
-              name: 'minimal',
-              description: 'Minimal data for basic testing',
-              userCount: 3,
-              avgItemsPerUser: 2,
-              avgRelationshipsPerItem: 1,
-              dataQualityLevel: 'basic'
+          domainSettings: {
+            outdoor: {
+              gearFocus: true,
+              locationData: true,
+              weatherAwareness: true,
+              safetyEmphasis: true,
+              brandAuthenticity: true,
+              seasonalContent: true
             }
-          ]
+          }
         }
+      } as Partial<SmartDetectionConfig>,
+      extensions: {
+        domainExtensions: {
+          enabled: [{ name: 'outdoor', enabled: true }]
+        },
+        archetypes: {
+          enabled: true,
+          generationConfig: {
+            targetArchitecture: 'individual',
+            targetDomain: 'outdoor',
+            usersPerArchetype: { min: 2, max: 4 },
+            distributionStrategy: 'weighted',
+            includedCategories: ['gear_enthusiast', 'adventure_creator', 'community_expert', 'gear_reviewer'],
+            excludedCategories: ['team_leader', 'enterprise_user'],
+            experienceLevelDistribution: {
+              beginner: 0.25,
+              intermediate: 0.45,
+              advanced: 0.25,
+              expert: 0.05
+            },
+            generateRelationships: true,
+            relationshipDensity: 0.4,
+            applyDomainCustomizations: true
+          }
+        }
+      } as Partial<ExtensionsLayerConfig>
+    },
+    metadata: {
+      id: 'individual-outdoor-creator',
+      name: 'Individual Outdoor Creator Platform',
+      description: 'Perfect for Wildernest-style outdoor gear and adventure sharing platforms',
+      version: '1.0.0',
+      author: 'SupaSeed v2.5.0',
+      tags: ['individual', 'outdoor', 'gear', 'adventure', 'wildernest', 'creator'],
+      category: 'platform',
+      difficulty: 'intermediate',
+      estimatedSetupTime: '5-10 minutes',
+      usageCount: 0,
+      rating: 5.0,
+      lastUpdated: new Date(),
+      compatibility: {
+        minimumVersion: '2.5.0',
+        dependencies: ['outdoor-extension', 'individual-archetypes']
       },
-      notes: [
-        'Optimized for fast local development',
-        'Uses hash-based schema evolution tracking',
-        'Enables all MakerKit-specific features'
+      examples: [
+        {
+          useCase: 'Adventure gear sharing platform',
+          description: 'Create realistic outdoor gear setups with community features'
+        },
+        {
+          useCase: 'Equipment review platform',
+          description: 'Generate authentic gear reviews and recommendations'
+        }
       ]
-    };
-  }
-
-  /**
-   * MakerKit Staging Template
-   */
-  private createMakerKitStagingTemplate(): ConfigTemplate {
-    return {
-      name: 'makerkit-staging',
-      description: 'MakerKit staging environment with realistic data volumes',
-      framework: 'makerkit',
-      useCase: 'staging',
-      features: [
-        'Realistic data volumes',
-        'External image integration',
-        'Schema evolution detection',
-        'Multi-tenant validation',
-        'Production-like constraints'
-      ],
-      requirements: [
-        'MakerKit staging database',
-        'External image API keys',
-        'Storage buckets configured'
-      ],
-      config: {
-        environment: 'staging',
-        userCount: 25,
-        setupsPerUser: 4,
-        imagesPerSetup: 3,
-        enableRealImages: true,
-        seed: 'makerkit-staging-2025',
-
-        schema: {
-          framework: 'makerkit',
-          userTable: {
-            name: 'profiles',
-            emailField: 'email',
-            idField: 'id',
-            nameField: 'display_name',
-            bioField: 'bio',
-            pictureField: 'avatar_url'
-          },
-          setupTable: {
-            name: 'setups',
-            userField: 'user_id',
-            titleField: 'title',
-            descriptionField: 'description',
-            categoryField: 'category',
-            publicField: 'is_public'
-          },
-          multiTenant: {
-            enabled: true,
-            tenantColumn: 'account_id',
-            tenantScopeDetection: 'auto',
-            validationEnabled: true,
-            strictIsolation: true,
-            allowSharedResources: true,
-            dataGeneration: {
-              generatePersonalAccounts: true,
-              generateTeamAccounts: true,
-              personalAccountRatio: 0.7,
-              dataDistributionStrategy: 'realistic',
-              crossTenantDataAllowed: false,
-              sharedResourcesEnabled: true,
-              accountTypes: [
-                {
-                  type: 'personal',
-                  weight: 0.7,
-                  settings: {
-                    defaultPlan: 'free',
-                    features: ['basic', 'personal']
-                  }
-                },
-                {
-                  type: 'team',
-                  weight: 0.25,
-                  settings: {
-                    minMembers: 2,
-                    maxMembers: 10,
-                    defaultPlan: 'pro',
-                    features: ['collaboration', 'team-management', 'advanced']
-                  }
-                },
-                {
-                  type: 'organization',
-                  weight: 0.05,
-                  settings: {
-                    minMembers: 5,
-                    maxMembers: 50,
-                    defaultPlan: 'enterprise',
-                    features: ['enterprise', 'sso', 'advanced-analytics']
-                  }
-                }
-              ],
-              minUsersPerTenant: 1,
-              maxUsersPerTenant: 10,
-              minProjectsPerTenant: 2,
-              maxProjectsPerTenant: 8,
-              allowCrossTenantRelationships: false,
-              sharedTables: ['categories', 'base_templates'],
-              respectTenantPlans: true,
-              enforceTenantLimits: true
-            }
-          }
-        },
-
-        frameworkStrategy: {
-          enabled: true,
-          fallbackBehavior: 'error',
-          enableStrategyValidation: true
-        },
-
-        schemaEvolution: {
-          enabled: true,
-          trackingMode: 'timestamp',
-          cacheLocation: '.supa-seed-cache',
-          autoMigration: true,
-          migrationStrategies: [],
-          onSchemaChange: 'auto-adapt'
-        },
-
-        dataVolumes: {
-          enabled: true,
-          patterns: {
-            userDistribution: 'realistic',
-            contentRatios: {
-              publicContent: 0.75,
-              privateContent: 0.20,
-              draftContent: 0.05
-            },
-            relationshipDensity: {
-              userToContent: 4,
-              crossReferences: 3,
-              tagConnections: 5
-            },
-            seasonalVariation: true,
-            activityCycles: false
-          },
-          volumeProfiles: [
-            {
-              name: 'standard',
-              description: 'Standard staging data volume',
-              userCount: 25,
-              avgItemsPerUser: 4,
-              avgRelationshipsPerItem: 3,
-              dataQualityLevel: 'rich'
-            }
-          ]
-        }
+    },
+    composition: {
+      baseTemplates: [],
+      overrides: [],
+      mergeStrategy: {
+        arrays: 'merge',
+        objects: 'deep_merge',
+        primitives: 'replace'
       }
-    };
-  }
-
-  /**
-   * MakerKit Production Template
-   */
-  private createMakerKitProductionTemplate(): ConfigTemplate {
-    return {
-      name: 'makerkit-production',
-      description: 'MakerKit production demo data with comprehensive features',
-      framework: 'makerkit',
-      useCase: 'production',
-      features: [
-        'Production-scale data',
-        'Advanced multi-tenancy',
-        'Version-based schema tracking',
-        'Activity cycle simulation',
-        'Enterprise account types'
-      ],
-      requirements: [
-        'Production MakerKit database',
-        'Enterprise features enabled',
-        'Full storage integration'
-      ],
-      config: {
-        environment: 'production',
-        userCount: 100,
-        setupsPerUser: 6,
-        imagesPerSetup: 5,
-        enableRealImages: true,
-        seed: 'makerkit-prod-demo-2025',
-
-        schemaEvolution: {
-          enabled: true,
-          trackingMode: 'version',
-          cacheLocation: '.supa-seed-cache',
-          autoMigration: false,
-          onSchemaChange: 'prompt'
-        },
-
-        dataVolumes: {
-          enabled: true,
-          patterns: {
-            userDistribution: 'realistic',
-            contentRatios: {
-              publicContent: 0.60,
-              privateContent: 0.35,
-              draftContent: 0.05
-            },
-            relationshipDensity: {
-              userToContent: 6,
-              crossReferences: 5,
-              tagConnections: 8
-            },
-            seasonalVariation: true,
-            activityCycles: true
-          },
-          volumeProfiles: [
-            {
-              name: 'comprehensive',
-              description: 'Production-scale comprehensive data',
-              userCount: 100,
-              avgItemsPerUser: 6,
-              avgRelationshipsPerItem: 5,
-              dataQualityLevel: 'production'
-            }
-          ]
+    },
+    validation: {
+      required: ['supabaseUrl', 'supabaseServiceKey'],
+      optional: ['userCount', 'domain', 'extensions'],
+      constraints: [
+        {
+          path: 'extensions.outdoor',
+          rule: 'enabled === true',
+          message: 'Outdoor extension must be enabled for outdoor creator templates'
         }
-      }
-    };
-  }
-
-  /**
-   * MakerKit Testing Template
-   */
-  private createMakerKitTestingTemplate(): ConfigTemplate {
-    return {
-      name: 'makerkit-testing',
-      description: 'MakerKit testing template with predictable data patterns',
-      framework: 'makerkit',
-      useCase: 'testing',
-      features: [
-        'Predictable data generation',
-        'All constraint scenarios',
-        'Edge case coverage',
-        'Validation testing'
+      ]
+    },
+    documentation: {
+      overview: 'This template creates a realistic outdoor gear sharing platform similar to Wildernest, with individual creators sharing gear setups and adventure content.',
+      setup: [
+        'Requires outdoor domain extension',
+        'Generates 12 diverse outdoor enthusiasts',
+        'Creates realistic gear setups with authentic brands',
+        'Includes community features and social interactions'
       ],
-      requirements: [
-        'Test database environment',
-        'All MakerKit features'
+      customization: [
+        'Adjust userCount for platform size',
+        'Modify contentRatios for sharing patterns',
+        'Customize gear categories and brands',
+        'Configure relationship density for community feel'
       ],
-      config: {
-        environment: 'staging',
-        userCount: 10,
-        setupsPerUser: 3,
-        imagesPerSetup: 2,
-        enableRealImages: false,
-        seed: 'makerkit-testing-fixed',
-
-        constraintHandlers: {
-          enabled: true,
-          overrideDefaults: false,
-          enableConstraintLogging: true,
-          customHandlers: [
-            {
-              id: 'test-personal-account-constraint',
-              type: 'check',
-              priority: 100,
-              tables: ['accounts'],
-              handlerFunction: 'handlePersonalAccountSlugConstraint',
-              description: 'Test handler for personal account slug constraint'
-            }
-          ]
-        },
-
-        customRelationships: {
-          enabled: true,
-          relationships: [
-            {
-              id: 'test-user-setup-relationship',
-              fromTable: 'profiles',
-              toTable: 'setups',
-              relationshipType: 'one_to_many',
-              fromColumn: 'id',
-              toColumn: 'user_id',
-              isRequired: true,
-              cascadeDelete: true,
-              generationStrategy: 'sequential'
-            }
-          ]
-        }
-      }
-    };
-  }
-
-  /**
-   * Generic Local Template
-   */
-  private createGenericLocalTemplate(): ConfigTemplate {
-    return {
-      name: 'generic-local',
-      description: 'Generic/simple schema for local development',
-      framework: 'generic',
-      useCase: 'development',
-      features: [
-        'Simple table structure',
-        'Direct insertion seeding',
-        'Basic constraint handling',
-        'Fast local development'
+      troubleshooting: [
+        'Ensure outdoor extension is available',
+        'Verify database supports gear-related tables',
+        'Check that public sharing is enabled'
       ],
-      requirements: [
-        'Basic user/setup tables',
-        'No framework dependencies'
-      ],
-      config: {
-        environment: 'local',
-        userCount: 5,
-        setupsPerUser: 2,
-        imagesPerSetup: 1,
-        enableRealImages: false,
-
-        schema: {
-          framework: 'simple',
-          userTable: {
-            name: 'users',
-            emailField: 'email',
-            idField: 'id',
-            nameField: 'name',
-            bioField: 'bio',
-            pictureField: 'avatar_url'
-          },
-          setupTable: {
-            name: 'setups',
-            userField: 'user_id',
-            titleField: 'title',
-            descriptionField: 'description'
-          }
-        },
-
-        frameworkStrategy: {
-          enabled: false
-        },
-
-        schemaEvolution: {
-          enabled: true,
-          trackingMode: 'hash',
-          onSchemaChange: 'warn'
-        }
-      }
-    };
-  }
-
-  /**
-   * Generic Staging Template
-   */
-  private createGenericStagingTemplate(): ConfigTemplate {
-    return {
-      name: 'generic-staging',
-      description: 'Generic schema for staging environment testing',
-      framework: 'generic',
-      useCase: 'staging',
-      features: [
-        'Medium data volumes',
-        'Schema evolution tracking',
-        'Basic relationship handling'
-      ],
-      requirements: [
-        'Staging database',
-        'Basic table structure'
-      ],
-      config: {
-        environment: 'staging',
-        userCount: 20,
-        setupsPerUser: 3,
-        imagesPerSetup: 2,
-        enableRealImages: true,
-
-        schemaEvolution: {
-          enabled: true,
-          trackingMode: 'timestamp',
-          onSchemaChange: 'auto-adapt'
-        },
-
-        dataVolumes: {
-          enabled: true,
-          patterns: {
-            userDistribution: 'realistic',
-            contentRatios: {
-              publicContent: 0.8,
-              privateContent: 0.2,
-              draftContent: 0.0
-            },
-            relationshipDensity: {
-              userToContent: 3,
-              crossReferences: 2,
-              tagConnections: 3
-            },
-            seasonalVariation: false,
-            activityCycles: false
-          }
-        }
-      }
-    };
-  }
-
-  /**
-   * Generic Production Template
-   */
-  private createGenericProductionTemplate(): ConfigTemplate {
-    return {
-      name: 'generic-production',
-      description: 'Generic schema for production demo data',
-      framework: 'generic',
-      useCase: 'production',
-      features: [
-        'Large data volumes',
-        'Production-quality data',
-        'Comprehensive relationships'
-      ],
-      requirements: [
-        'Production database',
-        'Full feature set'
-      ],
-      config: {
-        environment: 'production',
-        userCount: 75,
-        setupsPerUser: 5,
-        imagesPerSetup: 4,
-        enableRealImages: true,
-
-        dataVolumes: {
-          enabled: true,
-          patterns: {
-            userDistribution: 'realistic',
-            contentRatios: {
-              publicContent: 0.65,
-              privateContent: 0.30,
-              draftContent: 0.05
-            },
-            relationshipDensity: {
-              userToContent: 5,
-              crossReferences: 4,
-              tagConnections: 6
-            },
-            seasonalVariation: true,
-            activityCycles: true
-          }
-        }
-      }
-    };
-  }
-
-  /**
-   * Wildernest Outdoor Template
-   */
-  private createWildernestTemplate(): ConfigTemplate {
-    return {
-      name: 'wildernest-outdoor',
-      description: 'Outdoor adventure gear platform (Wildernest-style)',
-      framework: 'makerkit',
-      useCase: 'demo',
-      features: [
-        'Outdoor gear categories',
-        'Adventure-themed content',
-        'Seasonal data patterns',
-        'Gear-specific relationships'
-      ],
-      requirements: [
-        'MakerKit or compatible schema',
-        'Outdoor domain content'
-      ],
-      config: {
-        domain: 'outdoor-adventure',
-        userCount: 15,
-        setupsPerUser: 4,
-        imagesPerSetup: 4,
-        enableRealImages: true,
-
-        data: {
-          categories: [
-            { name: 'Camping', description: 'Camping gear and supplies', icon: '⛺', color: '#22c55e' },
-            { name: 'Hiking', description: 'Hiking equipment and apparel', icon: '🥾', color: '#3b82f6' },
-            { name: 'Climbing', description: 'Rock and mountain climbing gear', icon: '🧗', color: '#f59e0b' },
-            { name: 'Water Sports', description: 'Kayaking, rafting, and water gear', icon: '🚣', color: '#06b6d4' },
-            { name: 'Winter Sports', description: 'Skiing, snowboarding, winter gear', icon: '⛷️', color: '#8b5cf6' }
-          ],
-          baseTemplates: [
-            { type: 'Camping Setup', make: 'Outdoor', model: 'Base Camp', description: 'Complete camping setup template' },
-            { type: 'Hiking Kit', make: 'Trail', model: 'Day Hike', description: 'Essential day hiking gear template' },
-            { type: 'Climbing Rack', make: 'Rock', model: 'Sport', description: 'Sport climbing gear template' }
-          ]
-        },
-
-        dataVolumes: {
-          enabled: true,
-          patterns: {
-            userDistribution: 'realistic',
-            contentRatios: {
-              publicContent: 0.85,
-              privateContent: 0.15,
-              draftContent: 0.0
-            },
-            relationshipDensity: {
-              userToContent: 4,
-              crossReferences: 6,
-              tagConnections: 8
-            },
-            seasonalVariation: true,
-            activityCycles: false
-          }
-        }
-      }
-    };
-  }
-
-  /**
-   * SaaS Platform Template
-   */
-  private createSaasPlatformTemplate(): ConfigTemplate {
-    return {
-      name: 'saas-platform',
-      description: 'SaaS platform with team collaboration features',
-      framework: 'makerkit',
-      useCase: 'demo',
-      features: [
-        'Team-focused data',
-        'SaaS business models',
-        'Subscription tiers',
-        'Collaboration patterns'
-      ],
-      requirements: [
-        'Team-enabled MakerKit',
-        'Subscription features'
-      ],
-      config: {
-        domain: 'saas-platform',
-        userCount: 30,
-        setupsPerUser: 3,
-        imagesPerSetup: 2,
-
-        schema: {
-          multiTenant: {
-            enabled: true,
-            dataGeneration: {
-              generatePersonalAccounts: false,
-              generateTeamAccounts: true,
-              personalAccountRatio: 0.2,
-              dataDistributionStrategy: 'realistic',
-              accountTypes: [
-                {
-                  type: 'team',
-                  weight: 0.7,
-                  settings: {
-                    minMembers: 3,
-                    maxMembers: 15,
-                    defaultPlan: 'pro',
-                    features: ['collaboration', 'team-management', 'integrations']
-                  }
-                },
-                {
-                  type: 'organization',
-                  weight: 0.3,
-                  settings: {
-                    minMembers: 10,
-                    maxMembers: 100,
-                    defaultPlan: 'enterprise',
-                    features: ['enterprise', 'sso', 'advanced-analytics', 'custom-integrations']
-                  }
-                }
-              ]
-            }
-          }
-        }
-      }
-    };
-  }
-
-  /**
-   * E-commerce Template
-   */
-  private createEcommerceTemplate(): ConfigTemplate {
-    return {
-      name: 'ecommerce-shop',
-      description: 'E-commerce shop with product catalogs and orders',
-      framework: 'generic',
-      useCase: 'demo',
-      features: [
-        'Product-focused data',
-        'Order relationships',
-        'Inventory patterns',
-        'Customer segments'
-      ],
-      requirements: [
-        'E-commerce schema',
-        'Product/order tables'
-      ],
-      config: {
-        domain: 'ecommerce',
-        userCount: 40,
-        setupsPerUser: 5,
-        imagesPerSetup: 6,
-        enableRealImages: true,
-
-        dataVolumes: {
-          enabled: true,
-          patterns: {
-            userDistribution: 'exponential',
-            contentRatios: {
-              publicContent: 0.95,
-              privateContent: 0.05,
-              draftContent: 0.0
-            },
-            relationshipDensity: {
-              userToContent: 5,
-              crossReferences: 8,
-              tagConnections: 12
-            },
-            seasonalVariation: true,
-            activityCycles: true
-          }
-        }
-      }
-    };
-  }
-
-  /**
-   * Minimal Testing Template
-   */
-  private createMinimalTestingTemplate(): ConfigTemplate {
-    return {
-      name: 'minimal-testing',
-      description: 'Minimal data for fast testing and CI/CD',
-      framework: 'generic',
-      useCase: 'testing',
-      features: [
-        'Minimal data set',
-        'Fast seeding',
-        'Essential relationships only',
-        'CI/CD optimized'
-      ],
-      requirements: [
-        'Basic schema',
-        'Fast execution needs'
-      ],
-      config: {
-        environment: 'local',
-        userCount: 2,
-        setupsPerUser: 1,
-        imagesPerSetup: 0,
-        enableRealImages: false,
-        seed: 'minimal-test-fixed',
-
-        frameworkStrategy: {
-          enabled: false
-        },
-
-        schemaEvolution: {
-          enabled: false
-        },
-
-        dataVolumes: {
-          enabled: false
-        }
-      }
-    };
-  }
-
-  /**
-   * Comprehensive Demo Template
-   */
-  private createComprehensiveDemoTemplate(): ConfigTemplate {
-    return {
-      name: 'comprehensive-demo',
-      description: 'Comprehensive demo showcasing all features',
-      framework: 'makerkit',
-      useCase: 'demo',
-      features: [
-        'All Epic 7 features enabled',
-        'Complex relationships',
-        'Custom constraint handlers',
-        'Schema evolution',
-        'Multiple data patterns'
-      ],
-      requirements: [
-        'Full MakerKit installation',
-        'All optional features'
-      ],
-      config: {
-        environment: 'staging',
-        userCount: 50,
-        setupsPerUser: 5,
-        imagesPerSetup: 4,
-        enableRealImages: true,
-
-        frameworkStrategy: {
-          enabled: true,
-          enableStrategyValidation: true,
-          fallbackBehavior: 'generic'
-        },
-
-        constraintHandlers: {
-          enabled: true,
-          overrideDefaults: false,
-          enableConstraintLogging: true
-        },
-
-        schemaEvolution: {
-          enabled: true,
-          trackingMode: 'version',
-          autoMigration: true,
-          onSchemaChange: 'auto-adapt'
-        },
-
-        dataVolumes: {
-          enabled: true,
-          patterns: {
-            userDistribution: 'realistic',
-            contentRatios: {
-              publicContent: 0.70,
-              privateContent: 0.25,
-              draftContent: 0.05
-            },
-            relationshipDensity: {
-              userToContent: 5,
-              crossReferences: 4,
-              tagConnections: 7
-            },
-            seasonalVariation: true,
-            activityCycles: true
-          },
-          volumeProfiles: [
-            {
-              name: 'comprehensive',
-              description: 'Full feature demonstration',
-              userCount: 50,
-              avgItemsPerUser: 5,
-              avgRelationshipsPerItem: 4,
-              dataQualityLevel: 'production'
-            }
-          ]
-        },
-
-        customRelationships: {
-          enabled: true,
-          relationships: [
-            {
-              id: 'demo-user-content',
-              fromTable: 'profiles',
-              toTable: 'setups',
-              relationshipType: 'one_to_many',
-              fromColumn: 'id',
-              toColumn: 'user_id',
-              isRequired: true,
-              cascadeDelete: true,
-              generationStrategy: 'weighted'
-            }
-          ]
-        }
-      }
-    };
-  }
-
-  /**
-   * Deep merge utility for configuration objects
-   */
-  private deepMerge(target: any, ...sources: any[]): any {
-    if (!sources.length) return target;
-    const source = sources.shift();
-
-    if (this.isObject(target) && this.isObject(source)) {
-      Object.keys(source).forEach(key => {
-        if (this.isObject(source[key])) {
-          if (!target[key]) Object.assign(target, { [key]: {} });
-          this.deepMerge(target[key], source[key]);
-        } else {
-          Object.assign(target, { [key]: source[key] });
-        }
-      });
+      examples: []
+    },
+    customization: {
+      requiredFields: [],
+      optionalFields: ['userCount', 'contentRatios', 'archetypes.experienceLevelDistribution'],
+      defaults: {
+        userCount: 12,
+        publicContentRatio: 0.8,
+        relationshipDensity: 0.4
+      },
+      validation: {}
     }
+  },
 
-    return this.deepMerge(target, ...sources);
+  {
+    id: 'individual-creative-portfolio',
+    name: 'Individual Creative Portfolio Platform',
+    description: 'For individual creators showcasing work and building personal brands',
+    version: '1.0.0',
+    targets: {
+      architectures: ['individual'],
+      domains: ['generic', 'social'],
+      complexity: 'beginner'
+    },
+    layers: {
+      universal: {
+        seeding: {
+          defaultUserCount: 8,
+          contentRatios: {
+            publicContent: 0.9, // Very high public visibility for portfolios
+            privateContent: 0.08,
+            sharedContent: 0.02
+          }
+        }
+      } as Partial<UniversalCoreConfig>,
+      detection: {
+        platform: {
+          architecture: 'individual',
+          confidence: 0.9,
+          architectureSettings: {
+            individual: {
+              focusOnPersonalContent: true,
+              enableSocialFeatures: true,
+              contentSharingRatio: 0.9,
+              personalBranding: true,
+              portfolioFocus: true
+            }
+          }
+        }
+      } as Partial<SmartDetectionConfig>,
+      extensions: {
+        archetypes: {
+          enabled: true,
+          generationConfig: {
+            targetArchitecture: 'individual',
+            targetDomain: 'generic',
+            includedCategories: ['content_creator', 'portfolio_artist', 'personal_brand', 'creative_professional'],
+            experienceLevelDistribution: {
+              beginner: 0.3,
+              intermediate: 0.4,
+              advanced: 0.25,
+              expert: 0.05
+            }
+          }
+        }
+      } as Partial<ExtensionsLayerConfig>
+    },
+    metadata: {
+      id: 'individual-creative-portfolio',
+      name: 'Individual Creative Portfolio Platform',
+      description: 'For individual creators showcasing work and building personal brands',
+      version: '1.0.0',
+      author: 'SupaSeed v2.5.0',
+      tags: ['individual', 'creative', 'portfolio', 'personal-brand', 'showcase'],
+      category: 'platform',
+      difficulty: 'beginner',
+      estimatedSetupTime: '3-5 minutes',
+      usageCount: 0,
+      rating: 4.8,
+      lastUpdated: new Date(),
+      compatibility: {
+        minimumVersion: '2.5.0',
+        dependencies: ['individual-archetypes']
+      },
+      examples: [
+        {
+          useCase: 'Artist portfolio platform',
+          description: 'Showcase creative work with high visibility'
+        }
+      ]
+    },
+    composition: {
+      baseTemplates: [],
+      overrides: [],
+      mergeStrategy: {
+        arrays: 'merge',
+        objects: 'deep_merge',
+        primitives: 'replace'
+      }
+    },
+    validation: {
+      required: ['supabaseUrl', 'supabaseServiceKey'],
+      optional: ['userCount', 'contentRatios'],
+      constraints: []
+    },
+    documentation: {
+      overview: 'Creates a platform focused on individual creative portfolios with high public visibility.',
+      setup: [
+        'Generates creative professionals and artists',
+        'High public content ratio for portfolio visibility',
+        'Focuses on personal branding and showcase features'
+      ],
+      customization: [
+        'Adjust user types for different creative fields',
+        'Modify content visibility ratios',
+        'Customize portfolio features'
+      ],
+      troubleshooting: [
+        'Ensure portfolio-related tables exist',
+        'Verify public content permissions'
+      ],
+      examples: []
+    },
+    customization: {
+      requiredFields: [],
+      optionalFields: ['userCount', 'contentRatios'],
+      defaults: {
+        userCount: 8,
+        publicContentRatio: 0.9
+      },
+      validation: {}
+    }
   }
+];
 
-  private isObject(item: any): boolean {
-    return item && typeof item === 'object' && !Array.isArray(item);
+/**
+ * Team Collaboration Platform Templates
+ * For platforms focused on team productivity and collaboration
+ */
+export const TEAM_PLATFORM_TEMPLATES: CompleteConfigurationTemplate[] = [
+  {
+    id: 'team-saas-productivity',
+    name: 'Team SaaS Productivity Platform',
+    description: 'For team-based SaaS platforms focused on productivity and collaboration',
+    version: '1.0.0',
+    targets: {
+      architectures: ['team'],
+      domains: ['saas'],
+      complexity: 'intermediate'
+    },
+    layers: {
+      universal: {
+        seeding: {
+          defaultUserCount: 15,
+          contentRatios: {
+            publicContent: 0.3, // Lower public, more team-internal
+            privateContent: 0.4,
+            sharedContent: 0.3 // High team sharing
+          },
+          relationships: {
+            generateRelationships: true,
+            relationshipDensity: 0.6, // High team connectivity
+            respectConstraints: true
+          }
+        }
+      } as Partial<UniversalCoreConfig>,
+      detection: {
+        platform: {
+          architecture: 'team',
+          confidence: 0.95,
+          architectureSettings: {
+            team: {
+              enableTeamCollaboration: true,
+              teamSizeRange: { min: 3, max: 8 },
+              workspaceManagement: true,
+              permissionComplexity: 'moderate',
+              hierarchicalStructure: true
+            }
+          }
+        },
+        domain: {
+          domain: 'saas',
+          confidence: 0.95,
+          domainSettings: {
+            saas: {
+              productivityFocus: true,
+              integrationHeavy: true,
+              analyticsEnabled: true,
+              workflowOptimization: true,
+              subscriptionBased: true
+            }
+          }
+        }
+      } as Partial<SmartDetectionConfig>,
+      extensions: {
+        domainExtensions: {
+          enabled: [{ name: 'saas', enabled: true }]
+        },
+        archetypes: {
+          enabled: true,
+          generationConfig: {
+            targetArchitecture: 'team',
+            targetDomain: 'saas',
+            usersPerArchetype: { min: 2, max: 5 },
+            distributionStrategy: 'weighted',
+            includedCategories: ['team_admin', 'team_member', 'project_manager', 'productivity_expert'],
+            experienceLevelDistribution: {
+              beginner: 0.2,
+              intermediate: 0.5,
+              advanced: 0.25,
+              expert: 0.05
+            },
+            generateRelationships: true,
+            relationshipDensity: 0.6,
+            applyDomainCustomizations: true
+          }
+        }
+      } as Partial<ExtensionsLayerConfig>
+    },
+    metadata: {
+      id: 'team-saas-productivity',
+      name: 'Team SaaS Productivity Platform',
+      description: 'For team-based SaaS platforms focused on productivity and collaboration',
+      version: '1.0.0',
+      author: 'SupaSeed v2.5.0',
+      tags: ['team', 'saas', 'productivity', 'collaboration', 'workspace'],
+      category: 'platform',
+      difficulty: 'intermediate',
+      estimatedSetupTime: '8-12 minutes',
+      usageCount: 0,
+      rating: 4.9,
+      lastUpdated: new Date(),
+      compatibility: {
+        minimumVersion: '2.5.0',
+        dependencies: ['saas-extension', 'team-archetypes']
+      },
+      examples: [
+        {
+          useCase: 'Project management platform',
+          description: 'Team collaboration with projects, tasks, and workflows'
+        },
+        {
+          useCase: 'Productivity suite',
+          description: 'Workspace management with team coordination features'
+        }
+      ]
+    },
+    composition: {
+      baseTemplates: [],
+      overrides: [],
+      mergeStrategy: {
+        arrays: 'merge',
+        objects: 'deep_merge',
+        primitives: 'replace'
+      }
+    },
+    validation: {
+      required: ['supabaseUrl', 'supabaseServiceKey'],
+      optional: ['userCount', 'teamSize', 'workspaceConfig'],
+      constraints: [
+        {
+          path: 'extensions.saas',
+          rule: 'enabled === true',
+          message: 'SaaS extension must be enabled for SaaS productivity templates'
+        }
+      ]
+    },
+    documentation: {
+      overview: 'Creates a realistic team-based SaaS productivity platform with multiple teams, projects, and collaboration features.',
+      setup: [
+        'Generates multiple teams with realistic hierarchies',
+        'Creates projects, tasks, and productivity workflows',
+        'Includes subscription and billing scenarios',
+        'Sets up team collaboration and permission patterns'
+      ],
+      customization: [
+        'Adjust team sizes and structures',
+        'Modify collaboration patterns',
+        'Customize productivity features',
+        'Configure subscription models'
+      ],
+      troubleshooting: [
+        'Ensure SaaS extension is available',
+        'Verify team-related tables exist',
+        'Check subscription model compatibility'
+      ],
+      examples: []
+    },
+    customization: {
+      requiredFields: [],
+      optionalFields: ['userCount', 'teamConfiguration', 'subscriptionModel'],
+      defaults: {
+        userCount: 15,
+        teamsCount: 3,
+        relationshipDensity: 0.6
+      },
+      validation: {}
+    }
+  },
+
+  {
+    id: 'team-ecommerce-marketplace',
+    name: 'Team E-commerce Marketplace Platform',
+    description: 'For team-managed e-commerce platforms and marketplaces',
+    version: '1.0.0',
+    targets: {
+      architectures: ['team'],
+      domains: ['ecommerce'],
+      complexity: 'advanced'
+    },
+    layers: {
+      universal: {
+        seeding: {
+          defaultUserCount: 20,
+          contentRatios: {
+            publicContent: 0.7, // High product visibility
+            privateContent: 0.2, // Internal management
+            sharedContent: 0.1   // Vendor sharing
+          }
+        }
+      } as Partial<UniversalCoreConfig>,
+      detection: {
+        platform: {
+          architecture: 'team',
+          confidence: 0.95,
+          architectureSettings: {
+            team: {
+              enableTeamCollaboration: true,
+              teamSizeRange: { min: 5, max: 12 },
+              workspaceManagement: true,
+              permissionComplexity: 'high',
+              vendorManagement: true
+            }
+          }
+        },
+        domain: {
+          domain: 'ecommerce',
+          confidence: 0.95,
+          domainSettings: {
+            ecommerce: {
+              productCatalogs: true,
+              inventoryManagement: true,
+              orderProcessing: true,
+              paymentIntegration: true,
+              vendorSupport: true,
+              multiChannelSales: true
+            }
+          }
+        }
+      } as Partial<SmartDetectionConfig>,
+      extensions: {
+        domainExtensions: {
+          enabled: [{ name: 'ecommerce', enabled: true }]
+        },
+        archetypes: {
+          enabled: true,
+          generationConfig: {
+            targetArchitecture: 'team',
+            targetDomain: 'ecommerce',
+            includedCategories: ['marketplace_admin', 'vendor_manager', 'product_curator', 'order_processor', 'customer_support'],
+            experienceLevelDistribution: {
+              beginner: 0.15,
+              intermediate: 0.45,
+              advanced: 0.3,
+              expert: 0.1
+            }
+          }
+        }
+      } as Partial<ExtensionsLayerConfig>
+    },
+    metadata: {
+      id: 'team-ecommerce-marketplace',
+      name: 'Team E-commerce Marketplace Platform',
+      description: 'For team-managed e-commerce platforms and marketplaces',
+      version: '1.0.0',
+      author: 'SupaSeed v2.5.0',
+      tags: ['team', 'ecommerce', 'marketplace', 'vendors', 'products'],
+      category: 'platform',
+      difficulty: 'advanced',
+      estimatedSetupTime: '15-20 minutes',
+      usageCount: 0,
+      rating: 4.7,
+      lastUpdated: new Date(),
+      compatibility: {
+        minimumVersion: '2.5.0',
+        dependencies: ['ecommerce-extension', 'team-archetypes']
+      },
+      examples: [
+        {
+          useCase: 'Multi-vendor marketplace',
+          description: 'Platform with multiple vendors and complex product management'
+        }
+      ]
+    },
+    composition: {
+      baseTemplates: [],
+      overrides: [],
+      mergeStrategy: {
+        arrays: 'merge',
+        objects: 'deep_merge',
+        primitives: 'replace'
+      }
+    },
+    validation: {
+      required: ['supabaseUrl', 'supabaseServiceKey'],
+      optional: ['vendorCount', 'productCategories'],
+      constraints: []
+    },
+    documentation: {
+      overview: 'Creates a complex e-commerce marketplace with team management, vendor systems, and product catalogs.',
+      setup: [
+        'Generates vendor teams and marketplace admins',
+        'Creates product catalogs with realistic inventory',
+        'Sets up order processing and payment workflows',
+        'Includes vendor management and permissions'
+      ],
+      customization: [
+        'Configure vendor structures',
+        'Adjust product categories and inventory',
+        'Modify payment and shipping options',
+        'Customize marketplace rules'
+      ],
+      troubleshooting: [
+        'Ensure e-commerce extension is available',
+        'Verify product and order tables exist',
+        'Check payment integration compatibility'
+      ],
+      examples: []
+    },
+    customization: {
+      requiredFields: [],
+      optionalFields: ['vendorCount', 'productCategories', 'paymentMethods'],
+      defaults: {
+        userCount: 20,
+        vendorCount: 5,
+        productsPerVendor: 15
+      },
+      validation: {}
+    }
   }
+];
+
+/**
+ * Hybrid Platform Templates
+ * For platforms supporting both individual and team usage patterns
+ */
+export const HYBRID_PLATFORM_TEMPLATES: CompleteConfigurationTemplate[] = [
+  {
+    id: 'hybrid-social-collaboration',
+    name: 'Hybrid Social Collaboration Platform',
+    description: 'Supports both individual content creation and team collaboration features',
+    version: '1.0.0',
+    targets: {
+      architectures: ['hybrid'],
+      domains: ['social', 'saas'],
+      complexity: 'advanced'
+    },
+    layers: {
+      universal: {
+        seeding: {
+          defaultUserCount: 18,
+          contentRatios: {
+            publicContent: 0.6, // Balanced public/private mix
+            privateContent: 0.25,
+            sharedContent: 0.15
+          },
+          relationships: {
+            generateRelationships: true,
+            relationshipDensity: 0.5, // Moderate connectivity
+            respectConstraints: true
+          }
+        }
+      } as Partial<UniversalCoreConfig>,
+      detection: {
+        platform: {
+          architecture: 'hybrid',
+          confidence: 0.9,
+          architectureSettings: {
+            hybrid: {
+              balanceRatio: 0.6, // 60% individual, 40% team
+              enableFlexibleRoles: true,
+              supportMultiContext: true,
+              adaptivePermissions: true
+            }
+          }
+        }
+      } as Partial<SmartDetectionConfig>,
+      extensions: {
+        domainExtensions: {
+          enabled: [
+            { name: 'social', enabled: true },
+            { name: 'saas', enabled: true }
+          ]
+        },
+        archetypes: {
+          enabled: true,
+          generationConfig: {
+            targetArchitecture: 'hybrid',
+            targetDomain: 'social',
+            includedCategories: ['individual_creator', 'team_member', 'community_leader', 'hybrid_user'],
+            experienceLevelDistribution: {
+              beginner: 0.25,
+              intermediate: 0.45,
+              advanced: 0.25,
+              expert: 0.05
+            }
+          }
+        }
+      } as Partial<ExtensionsLayerConfig>
+    },
+    metadata: {
+      id: 'hybrid-social-collaboration',
+      name: 'Hybrid Social Collaboration Platform',
+      description: 'Supports both individual content creation and team collaboration features',
+      version: '1.0.0',
+      author: 'SupaSeed v2.5.0',
+      tags: ['hybrid', 'social', 'collaboration', 'flexible', 'multi-context'],
+      category: 'hybrid',
+      difficulty: 'advanced',
+      estimatedSetupTime: '12-18 minutes',
+      usageCount: 0,
+      rating: 4.6,
+      lastUpdated: new Date(),
+      compatibility: {
+        minimumVersion: '2.5.0',
+        dependencies: ['social-extension', 'saas-extension', 'hybrid-archetypes']
+      },
+      examples: [
+        {
+          useCase: 'Social productivity platform',
+          description: 'Individual and team features in one platform'
+        }
+      ]
+    },
+    composition: {
+      baseTemplates: [],
+      overrides: [],
+      mergeStrategy: {
+        arrays: 'merge',
+        objects: 'deep_merge',
+        primitives: 'replace'
+      }
+    },
+    validation: {
+      required: ['supabaseUrl', 'supabaseServiceKey'],
+      optional: ['hybridRatio', 'contextSwitching'],
+      constraints: []
+    },
+    documentation: {
+      overview: 'Creates a platform that seamlessly supports both individual and team usage patterns.',
+      setup: [
+        'Generates users with hybrid roles and permissions',
+        'Creates both individual and team content',
+        'Sets up flexible collaboration features',
+        'Includes context-switching capabilities'
+      ],
+      customization: [
+        'Adjust individual vs team balance',
+        'Configure context-switching rules',
+        'Modify collaboration patterns',
+        'Customize permission models'
+      ],
+      troubleshooting: [
+        'Ensure both social and SaaS extensions are available',
+        'Verify flexible permission system',
+        'Check context-switching functionality'
+      ],
+      examples: []
+    },
+    customization: {
+      requiredFields: [],
+      optionalFields: ['hybridRatio', 'contextSwitching', 'permissionModel'],
+      defaults: {
+        userCount: 18,
+        hybridRatio: 0.6,
+        contextSwitching: true
+      },
+      validation: {}
+    }
+  }
+];
+
+/**
+ * Domain-Specific Templates
+ * Specialized templates for specific use cases and industries
+ */
+export const DOMAIN_SPECIFIC_TEMPLATES: CompleteConfigurationTemplate[] = [
+  {
+    id: 'wildernest-optimized',
+    name: 'Wildernest Optimized Template',
+    description: 'Specifically optimized for Wildernest outdoor gear platforms',
+    version: '1.0.0',
+    targets: {
+      architectures: ['individual'],
+      domains: ['outdoor'],
+      complexity: 'specialized'
+    },
+    layers: {
+      universal: {
+        seeding: {
+          defaultUserCount: 15,
+          contentRatios: {
+            publicContent: 0.85, // Very high public sharing
+            privateContent: 0.1,
+            sharedContent: 0.05
+          }
+        }
+      } as Partial<UniversalCoreConfig>,
+      detection: {
+        domain: {
+          domain: 'outdoor',
+          confidence: 1.0, // Perfect confidence for specialized template
+          domainSettings: {
+            outdoor: {
+              gearFocus: true,
+              locationData: true,
+              weatherAwareness: true,
+              safetyEmphasis: true,
+              brandAuthenticity: true,
+              seasonalContent: true,
+              wildernestOptimized: true
+            }
+          }
+        }
+      } as Partial<SmartDetectionConfig>,
+      extensions: {
+        domainExtensions: {
+          enabled: [{ name: 'outdoor', enabled: true }]
+        },
+        archetypes: {
+          enabled: true,
+          generationConfig: {
+            targetArchitecture: 'individual',
+            targetDomain: 'outdoor',
+            includedCategories: ['wildernest_creator', 'gear_expert', 'adventure_guide', 'outdoor_photographer'],
+            customArchetypes: [
+              {
+                email: 'wildernest.creator@example.com',
+                role: 'user',
+                purpose: 'Primary Wildernest content creator',
+                archetype: 'wildernest_creator',
+                contentPatterns: {
+                  setupsPerMonth: 4,
+                  gearPerSetup: 8,
+                  reviewsPerMonth: 6
+                }
+              }
+            ]
+          }
+        }
+      } as Partial<ExtensionsLayerConfig>
+    },
+    metadata: {
+      id: 'wildernest-optimized',
+      name: 'Wildernest Optimized Template',
+      description: 'Specifically optimized for Wildernest outdoor gear platforms',
+      version: '1.0.0',
+      author: 'SupaSeed v2.5.0',
+      tags: ['wildernest', 'outdoor', 'specialized', 'gear', 'optimized'],
+      category: 'specialized',
+      difficulty: 'intermediate',
+      estimatedSetupTime: '8-12 minutes',
+      usageCount: 0,
+      rating: 5.0,
+      lastUpdated: new Date(),
+      compatibility: {
+        minimumVersion: '2.5.0',
+        dependencies: ['outdoor-extension', 'wildernest-archetypes']
+      },
+      examples: [
+        {
+          useCase: 'Wildernest production environment',
+          description: 'Production-ready data for Wildernest platform'
+        }
+      ]
+    },
+    composition: {
+      baseTemplates: ['individual-outdoor-creator'],
+      overrides: [
+        {
+          path: 'seeding.defaultUserCount',
+          value: 15,
+          reason: 'Wildernest requires more diverse user base'
+        },
+        {
+          path: 'seeding.contentRatios.publicContent',
+          value: 0.85,
+          reason: 'Wildernest emphasizes public gear sharing'
+        }
+      ],
+      mergeStrategy: {
+        arrays: 'merge',
+        objects: 'deep_merge',
+        primitives: 'replace'
+      }
+    },
+    validation: {
+      required: ['supabaseUrl', 'supabaseServiceKey'],
+      optional: ['wildernestFeatures', 'gearCategories'],
+      constraints: [
+        {
+          path: 'domain',
+          rule: 'equals "outdoor"',
+          message: 'Wildernest template requires outdoor domain'
+        }
+      ]
+    },
+    documentation: {
+      overview: 'This template is specifically designed and optimized for Wildernest outdoor gear platforms.',
+      setup: [
+        'Inherits from individual-outdoor-creator template',
+        'Adds Wildernest-specific customizations',
+        'Includes specialized gear categories and brands',
+        'Optimizes for high public content sharing'
+      ],
+      customization: [
+        'Configure Wildernest-specific features',
+        'Adjust gear categories for target audience',
+        'Modify content sharing patterns',
+        'Customize adventure types and locations'
+      ],
+      troubleshooting: [
+        'Ensure base template is available',
+        'Verify Wildernest-specific extensions',
+        'Check outdoor domain compatibility'
+      ],
+      examples: []
+    },
+    customization: {
+      requiredFields: [],
+      optionalFields: ['wildernestFeatures', 'gearCategories', 'adventureTypes'],
+      defaults: {
+        userCount: 15,
+        wildernestOptimized: true,
+        publicContentRatio: 0.85
+      },
+      validation: {}
+    }
+  }
+];
+
+/**
+ * All available configuration templates organized by category
+ */
+export const ALL_CONFIGURATION_TEMPLATES: Record<string, CompleteConfigurationTemplate[]> = {
+  individual: INDIVIDUAL_PLATFORM_TEMPLATES,
+  team: TEAM_PLATFORM_TEMPLATES,
+  hybrid: HYBRID_PLATFORM_TEMPLATES,
+  specialized: DOMAIN_SPECIFIC_TEMPLATES
+};
+
+/**
+ * Quick template lookup by ID
+ */
+export const TEMPLATE_REGISTRY: Record<string, CompleteConfigurationTemplate> = Object.values(ALL_CONFIGURATION_TEMPLATES)
+  .flat()
+  .reduce((registry, template) => {
+    registry[template.id] = template;
+    return registry;
+  }, {} as Record<string, CompleteConfigurationTemplate>);
+
+/**
+ * Template discovery utilities
+ */
+export function findTemplatesByArchitecture(architecture: PlatformArchitectureType): CompleteConfigurationTemplate[] {
+  return Object.values(TEMPLATE_REGISTRY).filter(template => 
+    template.targets.architectures.includes(architecture)
+  );
 }
 
-// Export default instance
-export const configTemplateManager = new ConfigTemplateManager();
+export function findTemplatesByDomain(domain: ContentDomainType): CompleteConfigurationTemplate[] {
+  return Object.values(TEMPLATE_REGISTRY).filter(template => 
+    template.targets.domains.includes(domain)
+  );
+}
+
+export function findTemplatesByTags(tags: string[]): CompleteConfigurationTemplate[] {
+  return Object.values(TEMPLATE_REGISTRY).filter(template => 
+    tags.some(tag => template.metadata.tags.includes(tag))
+  );
+}
+
+export function findTemplatesByComplexity(complexity: string): CompleteConfigurationTemplate[] {
+  return Object.values(TEMPLATE_REGISTRY).filter(template => 
+    template.targets.complexity === complexity
+  );
+}
+
+export function getRecommendedTemplates(
+  architecture?: PlatformArchitectureType,
+  domain?: ContentDomainType,
+  difficulty?: string
+): CompleteConfigurationTemplate[] {
+  let candidates = Object.values(TEMPLATE_REGISTRY);
+
+  if (architecture) {
+    candidates = candidates.filter(template => 
+      template.targets.architectures.includes(architecture)
+    );
+  }
+
+  if (domain) {
+    candidates = candidates.filter(template => 
+      template.targets.domains.includes(domain)
+    );
+  }
+
+  if (difficulty) {
+    candidates = candidates.filter(template => 
+      template.metadata.difficulty === difficulty
+    );
+  }
+
+  // Sort by rating and usage count
+  return candidates.sort((a, b) => {
+    const ratingDiff = b.metadata.rating - a.metadata.rating;
+    if (ratingDiff !== 0) return ratingDiff;
+    return b.metadata.usageCount - a.metadata.usageCount;
+  });
+}
