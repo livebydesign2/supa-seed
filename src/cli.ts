@@ -285,11 +285,15 @@ async function main() {
 
   program
     .command('detect')
-    .description('Analyze database schema and show compatibility information')
+    .description('Analyze database schema and platform with smart detection reporting')
     .option('--url <url>', 'Supabase URL (overrides env var)')
     .option('--key <key>', 'Supabase service role key (overrides env var)')
     .option('--verbose', 'Enable verbose logging')
     .option('--debug', 'Enable debug mode for detailed analysis')
+    .option('--format <format>', 'Output format: cli, json, summary', 'cli')
+    .option('--strategy <strategy>', 'Auto-configuration strategy: comprehensive, minimal, conservative, optimized', 'comprehensive')
+    .option('--no-config', 'Skip auto-configuration generation')
+    .option('--no-details', 'Hide detailed detection information')
     .action(async (options) => {
       const spinner = ora('Analyzing database schema...').start();
       
@@ -385,6 +389,69 @@ async function main() {
           Logger.success('All required tables found!');
         }
         
+        // Enhanced detection reporting for v2.5.0
+        if (options.format !== 'cli' || options.strategy !== 'comprehensive' || options.noConfig === false) {
+          try {
+            // Import enhanced detection system
+            const { DetectionIntegrationEngine } = await import('./detection/detection-integration');
+            const { AutoConfigurator } = await import('./detection/auto-configurator');
+            const { DetectionReporter } = require('./detection/detection-reporter');
+            
+            spinner.text = 'Running enhanced platform detection...';
+            
+            // Initialize enhanced detection with integrated auto-configuration
+            const detectionEngine = new DetectionIntegrationEngine(client as any, supabaseUrl);
+            
+            let detectionResults;
+            let autoConfiguration;
+            
+            if (!options.noConfig) {
+              // Use integrated detection and auto-configuration
+              const result = await detectionEngine.performUnifiedDetectionWithAutoConfig({
+                strategy: options.strategy as any,
+                enableDomainExtensions: true,
+                enableArchitectureOptimizations: true,
+                confidenceThreshold: 0.6
+              });
+              
+              detectionResults = result.detection;
+              autoConfiguration = result.autoConfiguration;
+            } else {
+              // Use detection only
+              detectionResults = await detectionEngine.performUnifiedDetection();
+              autoConfiguration = undefined;
+            }
+            
+            spinner.succeed('Enhanced detection analysis complete');
+            
+            // Generate and display report
+            const reportOptions = {
+              format: options.format as any,
+              showDetails: !options.noDetails,
+              showConfiguration: !options.noConfig,
+              showRecommendations: true,
+              showWarnings: true,
+              showConfidenceScores: options.verbose,
+              useColors: true
+            };
+            
+            const report = DetectionReporter.generateReport(
+              detectionResults,
+              autoConfiguration,
+              reportOptions
+            );
+            
+            console.log(report);
+            
+          } catch (enhancedError: any) {
+            // Fall back to basic detection if enhanced fails
+            Logger.warn('Enhanced detection failed, using basic detection');
+            if (options.verbose) {
+              Logger.debug('Enhanced detection error:', enhancedError.message);
+            }
+          }
+        }
+
         console.log('\n🚀 Next steps:');
         if (configOverride) {
           console.log('   Configuration file detected and used for framework detection');
@@ -1225,6 +1292,94 @@ async function main() {
         if (options.verbose) {
           console.error(error.stack);
         }
+        process.exit(1);
+      }
+    });
+
+  // Detection Cache Management Commands
+  program
+    .command('cache-stats')
+    .description('Show detection cache statistics')
+    .option('--verbose', 'Show detailed cache information')
+    .action(async (options) => {
+      const spinner = ora('Retrieving cache statistics...').start();
+      
+      try {
+        if (options.verbose) {
+          Logger.setVerbose(true);
+        }
+
+        // Import detection cache system
+        const { DetectionCacheManager, DetectionCacheUtils } = await import('./detection/detection-cache');
+        
+        const cacheManager = new DetectionCacheManager();
+        const stats = await cacheManager.getStatistics();
+        
+        spinner.succeed('Cache statistics retrieved');
+        
+        // Display formatted statistics
+        const formattedStats = DetectionCacheUtils.formatStatistics(stats);
+        console.log('\n' + formattedStats);
+        
+        if (options.verbose && stats.totalEntries > 0) {
+          console.log('\n💡 Cache Optimization Tips:');
+          if (stats.hitRate < 0.5) {
+            console.log('   • Low hit rate - consider increasing cache TTL');
+          } else if (stats.hitRate > 0.8) {
+            console.log('   • Excellent hit rate - cache is working well');
+          }
+          
+          if (stats.cacheSize > 50 * 1024 * 1024) { // 50MB
+            console.log('   • Cache size is large - consider cleanup');
+          }
+          
+          if (stats.oldestEntry > 7 * 24 * 60 * 60 * 1000) { // 7 days
+            console.log('   • Old entries present - cache cleanup recommended');
+          }
+        }
+
+      } catch (error: any) {
+        spinner.fail('Failed to retrieve cache statistics');
+        Logger.error('Error:', error.message);
+        process.exit(1);
+      }
+    });
+
+  program
+    .command('cache-clear')
+    .description('Clear detection cache')
+    .option('--force', 'Skip confirmation prompt')
+    .option('--verbose', 'Enable verbose logging')
+    .action(async (options) => {
+      try {
+        if (options.verbose) {
+          Logger.setVerbose(true);
+        }
+
+        if (!options.force) {
+          console.log('⚠️  This will clear all cached detection results.');
+          console.log('   Detection will be slower on the next run but will use fresh data.');
+          console.log('\n   Use --force to skip this confirmation.');
+          process.exit(0);
+        }
+
+        const spinner = ora('Clearing detection cache...').start();
+
+        // Import detection cache system
+        const { DetectionCacheManager } = await import('./detection/detection-cache');
+        
+        const cacheManager = new DetectionCacheManager();
+        await cacheManager.clear();
+        
+        spinner.succeed('Detection cache cleared successfully!');
+        
+        console.log('\n🧹 Cache Management:');
+        console.log('✅ All detection cache entries removed');
+        console.log('🔄 Next detection will rebuild cache with fresh data');
+        console.log('💡 Run "supa-seed cache-stats" to see cache status');
+
+      } catch (error: any) {
+        console.error('❌ Failed to clear cache:', error.message);
         process.exit(1);
       }
     });

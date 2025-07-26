@@ -7,6 +7,12 @@
 import type { createClient } from '@supabase/supabase-js';
 import { Logger } from '../utils/logger';
 
+// Import caching system
+import { DetectionCacheManager, DetectionCacheUtils } from './detection-cache';
+
+// Import auto-configuration system
+import { AutoConfigurator, type AutoConfigurationResult, type AutoConfigurationOptions } from './auto-configurator';
+
 // Import existing detection systems
 import { SchemaIntrospector, type SchemaIntrospectionResult } from '../schema/schema-introspector';
 import { MakerKitDetector, type MakerKitDetectionResult } from '../framework/strategies/makerkit-detector';
@@ -148,15 +154,130 @@ export class DetectionIntegrationEngine {
   private architectureDetector: ArchitectureDetectionEngine;
   private domainDetector: DomainDetectionEngine;
   private evidenceCollector: ArchitectureEvidenceCollector;
-  private cache: Map<string, UnifiedDetectionResult> = new Map();
+  private cacheManager: DetectionCacheManager;
+  private autoConfigurator: AutoConfigurator;
+  private databaseUrl: string;
+  private schemaHash?: string;
 
-  constructor(client: SupabaseClient) {
+  constructor(client: SupabaseClient, databaseUrl?: string) {
     this.client = client;
+    this.databaseUrl = databaseUrl || this.extractUrlFromClient(client);
     this.schemaIntrospector = new SchemaIntrospector(client);
     this.makerKitDetector = new MakerKitDetector(client);
     this.architectureDetector = new ArchitectureDetectionEngine();
     this.domainDetector = new DomainDetectionEngine();
     this.evidenceCollector = new ArchitectureEvidenceCollector();
+    this.cacheManager = new DetectionCacheManager();
+    this.autoConfigurator = new AutoConfigurator();
+  }
+
+  /**
+   * Perform unified detection with auto-configuration
+   */
+  async performUnifiedDetectionWithAutoConfig(
+    autoConfigOptions: Partial<AutoConfigurationOptions> = {},
+    detectionConfig: Partial<UnifiedDetectionConfig> = {}
+  ): Promise<{ detection: UnifiedDetectionResult; autoConfiguration: AutoConfigurationResult }> {
+    const fullDetectionConfig: UnifiedDetectionConfig = {
+      enableCrossValidation: true,
+      enableConflictResolution: true,
+      maxExecutionTime: 30000,
+      enableCaching: true,
+      confidenceThreshold: 0.6,
+      ...detectionConfig
+    };
+
+    const startTime = Date.now();
+    Logger.info('🔄 Starting unified detection with auto-configuration...');
+
+    // Check cache first if enabled
+    let cacheKey: string;
+    if (fullDetectionConfig.enableCaching) {
+      try {
+        // Generate schema hash for cache validation
+        if (!this.schemaHash) {
+          this.schemaHash = await DetectionCacheUtils.generateSchemaHash(this.client);
+        }
+        
+        // Include auto-config options in cache key
+        const cacheData = {
+          detection: fullDetectionConfig,
+          autoConfig: autoConfigOptions
+        };
+        
+        cacheKey = this.cacheManager.generateCacheKey(
+          this.databaseUrl,
+          this.schemaHash,
+          cacheData
+        );
+        
+        const cachedEntry = await this.cacheManager.retrieve(
+          cacheKey,
+          this.databaseUrl,
+          this.schemaHash
+        );
+        
+        if (cachedEntry && cachedEntry.autoConfiguration) {
+          Logger.info('📦 Using cached unified detection and auto-configuration results');
+          Logger.debug(`Cache hit with detection confidence: ${cachedEntry.detectionResults.integration.overallConfidence}`);
+          Logger.debug(`Cache hit with config confidence: ${cachedEntry.autoConfiguration.confidence}`);
+          
+          return {
+            detection: cachedEntry.detectionResults,
+            autoConfiguration: cachedEntry.autoConfiguration
+          };
+        }
+      } catch (error: any) {
+        Logger.debug('Cache lookup failed:', error.message);
+        // Continue with fresh detection
+      }
+    }
+
+    try {
+      // Step 1: Perform unified detection
+      const detectionResults = await this.performUnifiedDetection(fullDetectionConfig);
+
+      // Step 2: Generate auto-configuration from detection results
+      Logger.debug('🔧 Generating auto-configuration from detection results...');
+      const autoConfigStartTime = Date.now();
+      
+      const autoConfiguration = await this.autoConfigurator.generateConfiguration(
+        detectionResults,
+        autoConfigOptions
+      );
+      
+      const autoConfigTime = Date.now() - autoConfigStartTime;
+      Logger.success(`✅ Auto-configuration completed in ${autoConfigTime}ms with ${autoConfiguration.confidence.toFixed(2)} confidence`);
+
+      // Step 3: Cache the combined results
+      if (fullDetectionConfig.enableCaching) {
+        try {
+          await this.cacheManager.store(
+            cacheKey!,
+            this.databaseUrl,
+            this.schemaHash!,
+            detectionResults,
+            autoConfiguration
+          );
+          Logger.debug('Combined detection and auto-configuration results cached successfully');
+        } catch (error: any) {
+          Logger.debug('Failed to cache combined results:', error.message);
+          // Continue without caching
+        }
+      }
+
+      const totalTime = Date.now() - startTime;
+      Logger.success(`🎉 Unified detection with auto-configuration completed in ${totalTime}ms`);
+
+      return {
+        detection: detectionResults,
+        autoConfiguration
+      };
+
+    } catch (error: any) {
+      Logger.error('Unified detection with auto-configuration failed:', error);
+      throw new Error(`Unified detection with auto-configuration failed: ${error.message}`);
+    }
   }
 
   /**
@@ -177,11 +298,36 @@ export class DetectionIntegrationEngine {
     const startTime = Date.now();
     Logger.info('🔄 Starting unified detection across all systems...');
 
-    // Check cache first
-    const cacheKey = this.generateCacheKey(fullConfig);
-    if (fullConfig.enableCaching && this.cache.has(cacheKey)) {
-      Logger.info('📦 Using cached unified detection result');
-      return this.cache.get(cacheKey)!;
+    // Check cache first if enabled
+    let cacheKey: string;
+    if (fullConfig.enableCaching) {
+      try {
+        // Generate schema hash for cache validation
+        if (!this.schemaHash) {
+          this.schemaHash = await DetectionCacheUtils.generateSchemaHash(this.client);
+        }
+        
+        cacheKey = this.cacheManager.generateCacheKey(
+          this.databaseUrl,
+          this.schemaHash,
+          fullConfig
+        );
+        
+        const cachedEntry = await this.cacheManager.retrieve(
+          cacheKey,
+          this.databaseUrl,
+          this.schemaHash
+        );
+        
+        if (cachedEntry) {
+          Logger.info('📦 Using cached unified detection result');
+          Logger.debug(`Cache hit with confidence: ${cachedEntry.detectionResults.integration.overallConfidence}`);
+          return cachedEntry.detectionResults;
+        }
+      } catch (error: any) {
+        Logger.debug('Cache lookup failed:', error.message);
+        // Continue with fresh detection
+      }
     }
 
     try {
@@ -286,9 +432,22 @@ export class DetectionIntegrationEngine {
         }
       };
 
-      // Cache the result
+      // Cache the result if enabled
       if (fullConfig.enableCaching) {
-        this.cache.set(cacheKey, unifiedResult);
+        try {
+          await this.cacheManager.store(
+            cacheKey!,
+            this.databaseUrl,
+            this.schemaHash!,
+            unifiedResult,
+            undefined, // No auto-configuration at this level
+            undefined // Use default TTL
+          );
+          Logger.debug('Detection results cached successfully');
+        } catch (error: any) {
+          Logger.debug('Failed to cache detection results:', error.message);
+          // Continue without caching
+        }
       }
 
       Logger.success(`🎉 Unified detection completed in ${totalTime}ms with ${overallConfidence.toFixed(2)} confidence`);
@@ -808,6 +967,34 @@ export class DetectionIntegrationEngine {
     }
   }
 
+  /**
+   * Extract database URL from Supabase client
+   */
+  private extractUrlFromClient(client: SupabaseClient): string {
+    try {
+      // Try to extract URL from client properties
+      return (client as any).supabaseUrl || 'unknown-url';
+    } catch {
+      return 'unknown-url';
+    }
+  }
+
+  /**
+   * Clear detection cache
+   */
+  async clearCache(): Promise<void> {
+    await this.cacheManager.clear();
+    this.schemaHash = undefined; // Force regeneration
+    Logger.info('Detection cache cleared');
+  }
+
+  /**
+   * Get cache statistics
+   */
+  async getCacheStatistics() {
+    return await this.cacheManager.getStatistics();
+  }
+
   private generateCacheKey(config: UnifiedDetectionConfig): string {
     return `unified_detection_${JSON.stringify(config)}`;
   }
@@ -815,8 +1002,8 @@ export class DetectionIntegrationEngine {
   /**
    * Clear all detection caches
    */
-  clearCaches(): void {
-    this.cache.clear();
+  async clearCaches(): Promise<void> {
+    await this.cacheManager.clear();
     this.schemaIntrospector.clearCache();
     Logger.info('🧹 All detection caches cleared');
   }

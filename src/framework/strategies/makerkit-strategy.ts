@@ -55,6 +55,13 @@ import { JunctionTableHandler } from '../../schema/junction-table-handler';
 import { MultiTenantManager } from '../../schema/multi-tenant-manager';
 import { StorageIntegrationManager } from '../../storage/storage-integration-manager';
 import { Logger } from '../../utils/logger';
+import { DetectionIntegrationEngine } from '../../detection/detection-integration';
+import { AutoConfigurator } from '../../detection/auto-configurator';
+import type {
+  UnifiedDetectionResult,
+  AutoConfigurationResult
+} from '../../detection/auto-configurator';
+import type { FlexibleSeedConfig } from '../../config-types';
 import type {
   BusinessLogicAnalysisResult,
   RLSComplianceOptions,
@@ -98,6 +105,12 @@ export class MakerKitStrategy implements SeedingStrategy {
   private constraintRegistry?: ConstraintRegistry;
   private businessLogicAnalyzer?: BusinessLogicAnalyzer;
   private rlsCompliantSeeder?: RLSCompliantSeeder;
+  
+  // Smart Detection and Auto-Configuration (Task 2.3.2)
+  private detectionEngine?: DetectionIntegrationEngine;
+  private autoConfigurator?: AutoConfigurator;
+  private detectionResults?: UnifiedDetectionResult;
+  private autoConfiguration?: AutoConfigurationResult;
   private relationshipAnalyzer?: RelationshipAnalyzer;
   private junctionTableHandler?: JunctionTableHandler;
   private multiTenantManager?: MultiTenantManager;
@@ -125,6 +138,10 @@ export class MakerKitStrategy implements SeedingStrategy {
     // Initialize enhanced RLS compliance validation system
     this.rlsComplianceEngine = new RLSComplianceEngine(client);
     this.rlsComplianceValidator = new RLSComplianceValidator(client);
+    
+    // Initialize Smart Detection and Auto-Configuration (Task 2.3.2)
+    this.detectionEngine = new DetectionIntegrationEngine(client);
+    this.autoConfigurator = new AutoConfigurator();
     
     // Set default auth flow configuration for MakerKit
     this.authFlowConfig = this.getDefaultAuthFlowConfig();
@@ -224,6 +241,249 @@ export class MakerKitStrategy implements SeedingStrategy {
     // Register MakerKit-specific handlers
     const handlers = this.getConstraintHandlers();
     this.constraintRegistry.registerHandlers(handlers);
+  }
+
+  /**
+   * Perform smart detection and auto-configuration (Task 2.3.2)
+   */
+  async performSmartDetectionAndConfiguration(
+    baseConfiguration?: Partial<FlexibleSeedConfig>
+  ): Promise<AutoConfigurationResult> {
+    if (!this.detectionEngine || !this.autoConfigurator) {
+      throw new Error('Detection engine or auto-configurator not initialized');
+    }
+    
+    Logger.info('🔍 Performing smart platform detection and auto-configuration...');
+    
+    try {
+      // Step 1: Perform unified detection
+      const detectionStartTime = Date.now();
+      this.detectionResults = await this.detectionEngine.performUnifiedDetection({
+        enableCrossValidation: true,
+        enableConflictResolution: true,
+        enableCaching: true,
+        confidenceThreshold: 0.6
+      });
+      const detectionTime = Date.now() - detectionStartTime;
+      
+      Logger.success(`✅ Platform detection completed in ${detectionTime}ms`);
+      Logger.info(`   Architecture: ${this.detectionResults.architecture.architectureType} (${(this.detectionResults.architecture.confidence * 100).toFixed(1)}% confidence)`);
+      Logger.info(`   Domain: ${this.detectionResults.domain.primaryDomain} (${(this.detectionResults.domain.confidence * 100).toFixed(1)}% confidence)`);
+      Logger.info(`   Overall Confidence: ${(this.detectionResults.integration.overallConfidence * 100).toFixed(1)}%`);
+      
+      // Step 2: Generate auto-configuration based on detection
+      const configStartTime = Date.now();
+      this.autoConfiguration = await this.autoConfigurator.generateConfiguration(
+        this.detectionResults,
+        {
+          strategy: 'comprehensive',
+          baseConfiguration,
+          enableDomainExtensions: true,
+          enableArchitectureOptimizations: true,
+          confidenceThreshold: 0.6
+        }
+      );
+      const configTime = Date.now() - configStartTime;
+      
+      Logger.success(`✅ Auto-configuration generated in ${configTime}ms`);
+      Logger.info(`   Configuration Confidence: ${(this.autoConfiguration.confidence * 100).toFixed(1)}%`);
+      Logger.info(`   Templates Applied: ${this.autoConfiguration.generationMetrics.templatesApplied}`);
+      
+      // Log key configuration recommendations
+      if (this.autoConfiguration.reasoning.length > 0) {
+        Logger.info('📋 Configuration Reasoning:');
+        this.autoConfiguration.reasoning.slice(0, 3).forEach(reason => {
+          Logger.info(`   • ${reason}`);
+        });
+      }
+      
+      // Log warnings if any
+      if (this.autoConfiguration.warnings.length > 0) {
+        Logger.warn('⚠️  Configuration Warnings:');
+        this.autoConfiguration.warnings.forEach(warning => {
+          Logger.warn(`   • ${warning}`);
+        });
+      }
+      
+      return this.autoConfiguration;
+      
+    } catch (error: any) {
+      Logger.error('Smart detection and configuration failed:', error);
+      throw new Error(`Smart detection and configuration failed: ${error.message}`);
+    }
+  }
+  
+  /**
+   * Get detection results (if available)
+   */
+  getDetectionResults(): UnifiedDetectionResult | undefined {
+    return this.detectionResults;
+  }
+  
+  /**
+   * Get auto-configuration results (if available)
+   */
+  getAutoConfiguration(): AutoConfigurationResult | undefined {
+    return this.autoConfiguration;
+  }
+  
+  /**
+   * Apply auto-configuration to seeding process
+   */
+  async applyAutoConfiguration(
+    userConfiguration: Partial<FlexibleSeedConfig> = {}
+  ): Promise<Partial<FlexibleSeedConfig>> {
+    if (!this.autoConfiguration) {
+      Logger.warn('No auto-configuration available - performing detection first');
+      await this.performSmartDetectionAndConfiguration(userConfiguration);
+    }
+    
+    if (!this.autoConfiguration) {
+      throw new Error('Auto-configuration failed and is not available');
+    }
+    
+    // Merge auto-configuration with user configuration (user config takes priority)
+    const mergedConfiguration: Partial<FlexibleSeedConfig> = {
+      ...this.autoConfiguration.configuration,
+      ...userConfiguration
+    };
+    
+    Logger.info('🔧 Applied auto-configuration with user overrides');
+    
+    // Log applied configuration summary
+    if (mergedConfiguration.userCount) {
+      Logger.info(`   User Count: ${mergedConfiguration.userCount}`);
+    }
+    if (mergedConfiguration.setupsPerUser) {
+      Logger.info(`   Setups per User: ${mergedConfiguration.setupsPerUser}`);
+    }
+    if (mergedConfiguration.domain) {
+      Logger.info(`   Domain: ${mergedConfiguration.domain}`);
+    }
+    if (mergedConfiguration.createTeamAccounts !== undefined) {
+      Logger.info(`   Team Accounts: ${mergedConfiguration.createTeamAccounts}`);
+    }
+    
+    return mergedConfiguration;
+  }
+  
+  /**
+   * Get platform-specific user archetypes based on detection
+   */
+  getPlatformSpecificArchetypes(): string[] {
+    if (!this.detectionResults) {
+      return ['admin@test.com', 'user@test.com']; // Default archetypes
+    }
+    
+    const { architectureType } = this.detectionResults.architecture;
+    const { primaryDomain } = this.detectionResults.domain;
+    
+    // Generate platform-specific archetypes
+    const archetypes: string[] = [];
+    
+    // Add architecture-specific archetypes
+    switch (architectureType) {
+      case 'individual':
+        archetypes.push('creator@test.com', 'explorer@test.com');
+        break;
+      case 'team':
+        archetypes.push('admin@test.com', 'team-lead@test.com', 'team-member@test.com');
+        break;
+      case 'hybrid':
+        archetypes.push('admin@test.com', 'creator@test.com', 'team-member@test.com');
+        break;
+    }
+    
+    // Add domain-specific archetypes
+    switch (primaryDomain) {
+      case 'outdoor':
+        archetypes.push('gear-expert@wildernest.test', 'adventure-guide@wildernest.test');
+        break;
+      case 'saas':
+        archetypes.push('workspace-admin@saas.test', 'power-user@saas.test');
+        break;
+      case 'ecommerce':
+        archetypes.push('merchant@store.test', 'customer@store.test');
+        break;
+      case 'social':
+        archetypes.push('influencer@social.test', 'community-member@social.test');
+        break;
+    }
+    
+    // Remove duplicates and return unique archetypes
+    return [...new Set(archetypes)];
+  }
+  
+  /**
+   * Get optimized seeding parameters based on detection
+   */
+  getOptimizedSeedingParameters(): {
+    userCount: number;
+    setupsPerUser: number;
+    imagesPerSetup: number;
+    enableRealImages: boolean;
+  } {
+    if (!this.detectionResults) {
+      return {
+        userCount: 5,
+        setupsPerUser: 2,
+        imagesPerSetup: 1,
+        enableRealImages: false
+      };
+    }
+    
+    const { architectureType } = this.detectionResults.architecture;
+    const { primaryDomain } = this.detectionResults.domain;
+    
+    let userCount = 5;
+    let setupsPerUser = 2;
+    let imagesPerSetup = 1;
+    let enableRealImages = false;
+    
+    // Optimize based on architecture
+    switch (architectureType) {
+      case 'individual':
+        userCount = 4;
+        setupsPerUser = 3;
+        break;
+      case 'team':
+        userCount = 8;
+        setupsPerUser = 1;
+        break;
+      case 'hybrid':
+        userCount = 10;
+        setupsPerUser = 2;
+        break;
+    }
+    
+    // Optimize based on domain
+    switch (primaryDomain) {
+      case 'outdoor':
+        imagesPerSetup = 3;
+        enableRealImages = true;
+        break;
+      case 'saas':
+        imagesPerSetup = 1;
+        enableRealImages = false;
+        break;
+      case 'ecommerce':
+        setupsPerUser = Math.max(setupsPerUser, 3); // Products
+        imagesPerSetup = 4;
+        enableRealImages = true;
+        break;
+      case 'social':
+        userCount = Math.max(userCount, 8); // More users for interactions
+        imagesPerSetup = 2;
+        enableRealImages = true;
+        break;
+    }
+    
+    return {
+      userCount,
+      setupsPerUser,
+      imagesPerSetup,
+      enableRealImages
+    };
   }
 
   getPriority(): number {
