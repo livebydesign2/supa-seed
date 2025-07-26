@@ -14,10 +14,16 @@ import { MakerKitDetector, type MakerKitDetectionResult } from '../framework/str
 // Import new architecture detection system
 import { ArchitectureDetectionEngine } from './architecture-detector';
 import { ArchitectureEvidenceCollector } from './evidence-collector';
+
+// Import new domain detection system
+import { DomainDetectionEngine } from './domain-detector';
 import {
   PlatformArchitectureDetectionResult,
+  DomainDetectionResult,
   DetectionAnalysisContext,
+  DomainAnalysisContext,
   ArchitectureDetectionConfig,
+  DomainDetectionConfig,
   PlatformArchitectureType,
   ContentDomainType
 } from './detection-types';
@@ -30,6 +36,9 @@ type SupabaseClient = ReturnType<typeof createClient>;
 export interface UnifiedDetectionResult {
   /** Architecture detection results (new system) */
   architecture: PlatformArchitectureDetectionResult;
+  
+  /** Domain detection results (new system) */
+  domain: DomainDetectionResult;
   
   /** Schema introspection results (existing system) */
   schema: SchemaIntrospectionResult;
@@ -57,6 +66,7 @@ export interface UnifiedDetectionResult {
       schemaIntrospectionTime: number;
       frameworkDetectionTime: number;
       architectureDetectionTime: number;
+      domainDetectionTime: number;
     };
   };
 }
@@ -70,6 +80,9 @@ export interface CrossValidationResult {
   
   /** Whether schema patterns match architecture detection */
   schemaArchitectureAgreement: number; // 0-1
+  
+  /** Whether domain and architecture detection align */
+  domainArchitectureAgreement: number; // 0-1
   
   /** Overall cross-validation score */
   overallAgreement: number; // 0-1
@@ -96,7 +109,7 @@ export interface DetectionConflict {
   suggestedResolution: string;
   
   /** Systems involved in the conflict */
-  involvedSystems: ('architecture' | 'schema' | 'framework')[];
+  involvedSystems: ('architecture' | 'schema' | 'framework' | 'domain')[];
 }
 
 /**
@@ -105,6 +118,9 @@ export interface DetectionConflict {
 export interface UnifiedDetectionConfig {
   /** Architecture detection configuration */
   architecture?: Partial<ArchitectureDetectionConfig>;
+  
+  /** Domain detection configuration */
+  domain?: Partial<DomainDetectionConfig>;
   
   /** Whether to perform cross-validation */
   enableCrossValidation: boolean;
@@ -130,6 +146,7 @@ export class DetectionIntegrationEngine {
   private schemaIntrospector: SchemaIntrospector;
   private makerKitDetector: MakerKitDetector;
   private architectureDetector: ArchitectureDetectionEngine;
+  private domainDetector: DomainDetectionEngine;
   private evidenceCollector: ArchitectureEvidenceCollector;
   private cache: Map<string, UnifiedDetectionResult> = new Map();
 
@@ -138,6 +155,7 @@ export class DetectionIntegrationEngine {
     this.schemaIntrospector = new SchemaIntrospector(client);
     this.makerKitDetector = new MakerKitDetector(client);
     this.architectureDetector = new ArchitectureDetectionEngine();
+    this.domainDetector = new DomainDetectionEngine();
     this.evidenceCollector = new ArchitectureEvidenceCollector();
   }
 
@@ -206,30 +224,43 @@ export class DetectionIntegrationEngine {
       const architectureTime = Date.now() - architectureStartTime;
       Logger.success(`✅ Architecture detection completed in ${architectureTime}ms`);
 
-      // Step 4: Cross-validation and integration
+      // Step 4: Domain Detection (new system)
+      const domainStartTime = Date.now();
+      Logger.debug('🎯 Performing domain detection...');
+      const domainContext = this.buildDomainContext(schemaResult, frameworkResult, architectureResult);
+      const domainResult = await this.domainDetector.detectDomain(
+        domainContext,
+        fullConfig.domain
+      );
+      const domainTime = Date.now() - domainStartTime;
+      Logger.success(`✅ Domain detection completed in ${domainTime}ms`);
+
+      // Step 5: Cross-validation and integration
       const crossValidation = fullConfig.enableCrossValidation
-        ? this.performCrossValidation(schemaResult, frameworkResult, architectureResult)
+        ? this.performCrossValidation(schemaResult, frameworkResult, architectureResult, domainResult)
         : this.createEmptyCrossValidation();
 
-      // Step 5: Conflict detection and resolution
+      // Step 6: Conflict detection and resolution
       const conflicts = fullConfig.enableConflictResolution
-        ? this.detectAndResolveConflicts(schemaResult, frameworkResult, architectureResult)
+        ? this.detectAndResolveConflicts(schemaResult, frameworkResult, architectureResult, domainResult)
         : [];
 
-      // Step 6: Generate consolidated recommendations
+      // Step 7: Generate consolidated recommendations
       const recommendations = this.generateConsolidatedRecommendations(
         schemaResult,
         frameworkResult,
         architectureResult,
+        domainResult,
         crossValidation,
         conflicts
       );
 
-      // Step 7: Calculate overall confidence
+      // Step 8: Calculate overall confidence
       const overallConfidence = this.calculateOverallConfidence(
         schemaResult,
         frameworkResult,
         architectureResult,
+        domainResult,
         crossValidation
       );
 
@@ -237,6 +268,7 @@ export class DetectionIntegrationEngine {
 
       const unifiedResult: UnifiedDetectionResult = {
         architecture: architectureResult,
+        domain: domainResult,
         schema: schemaResult,
         framework: frameworkResult,
         integration: {
@@ -248,7 +280,8 @@ export class DetectionIntegrationEngine {
             totalExecutionTime: totalTime,
             schemaIntrospectionTime: schemaTime,
             frameworkDetectionTime: frameworkTime,
-            architectureDetectionTime: architectureTime
+            architectureDetectionTime: architectureTime,
+            domainDetectionTime: domainTime
           }
         }
       };
@@ -309,12 +342,49 @@ export class DetectionIntegrationEngine {
   }
 
   /**
+   * Build domain analysis context from existing results
+   */
+  private buildDomainContext(
+    schemaResult: SchemaIntrospectionResult,
+    frameworkResult: MakerKitDetectionResult,
+    architectureResult: PlatformArchitectureDetectionResult
+  ): DomainAnalysisContext {
+    const baseContext = this.buildDetectionContext(schemaResult, frameworkResult);
+    
+    return {
+      ...baseContext,
+      domainHints: {
+        suggestedDomains: this.suggestDomainsFromArchitecture(architectureResult.architectureType),
+        excludedDomains: [],
+        knownPatterns: []
+      }
+    };
+  }
+
+  /**
+   * Suggest likely domains based on architecture type
+   */
+  private suggestDomainsFromArchitecture(architectureType: PlatformArchitectureType): ContentDomainType[] {
+    switch (architectureType) {
+      case 'individual':
+        return ['outdoor', 'social', 'generic']; // Individual creators often in outdoor/social
+      case 'team':
+        return ['saas', 'ecommerce', 'generic']; // Teams often in business/enterprise
+      case 'hybrid':
+        return ['saas', 'ecommerce', 'social', 'generic']; // Hybrid can be anything
+      default:
+        return ['generic'];
+    }
+  }
+
+  /**
    * Perform cross-validation between different detection systems
    */
   private performCrossValidation(
     schemaResult: SchemaIntrospectionResult,
     frameworkResult: MakerKitDetectionResult,
-    architectureResult: PlatformArchitectureDetectionResult
+    architectureResult: PlatformArchitectureDetectionResult,
+    domainResult: DomainDetectionResult
   ): CrossValidationResult {
     const agreements: string[] = [];
     const disagreements: string[] = [];
@@ -335,11 +405,20 @@ export class DetectionIntegrationEngine {
       disagreements
     );
 
-    const overallAgreement = (architectureFrameworkAgreement + schemaArchitectureAgreement) / 2;
+    // Validate domain against architecture alignment
+    const domainArchitectureAgreement = this.validateDomainArchitectureAgreement(
+      domainResult,
+      architectureResult,
+      agreements,
+      disagreements
+    );
+
+    const overallAgreement = (architectureFrameworkAgreement + schemaArchitectureAgreement + domainArchitectureAgreement) / 3;
 
     return {
       architectureFrameworkAgreement,
       schemaArchitectureAgreement,
+      domainArchitectureAgreement,
       overallAgreement,
       agreements,
       disagreements
@@ -443,12 +522,77 @@ export class DetectionIntegrationEngine {
   }
 
   /**
+   * Validate agreement between domain and architecture detection
+   */
+  private validateDomainArchitectureAgreement(
+    domainResult: DomainDetectionResult,
+    architectureResult: PlatformArchitectureDetectionResult,
+    agreements: string[],
+    disagreements: string[]
+  ): number {
+    let agreementScore = 0;
+    let totalChecks = 0;
+
+    // Check domain-architecture typical alignments
+    totalChecks++;
+    const domainArchitectureAlignment = this.getDomainArchitectureAlignment(
+      domainResult.primaryDomain, 
+      architectureResult.architectureType
+    );
+    
+    if (domainArchitectureAlignment >= 0.7) {
+      agreementScore++;
+      agreements.push(`${domainResult.primaryDomain} domain aligns well with ${architectureResult.architectureType} architecture`);
+    } else if (domainArchitectureAlignment < 0.3) {
+      disagreements.push(`${domainResult.primaryDomain} domain typically doesn't align with ${architectureResult.architectureType} architecture`);
+    }
+
+    // Check confidence alignment
+    totalChecks++;
+    const confidenceDiff = Math.abs(domainResult.confidence - architectureResult.confidence);
+    if (confidenceDiff < 0.2) {
+      agreementScore++;
+      agreements.push('Domain and architecture detection confidence levels are aligned');
+    } else {
+      disagreements.push(`Large confidence difference between domain (${domainResult.confidence.toFixed(2)}) and architecture (${architectureResult.confidence.toFixed(2)})`);
+    }
+
+    // Check hybrid capabilities alignment
+    if (domainResult.hybridCapabilities && architectureResult.architectureType === 'hybrid') {
+      totalChecks++;
+      agreementScore++;
+      agreements.push('Hybrid domain capabilities align with hybrid architecture');
+    } else if (domainResult.hybridCapabilities && architectureResult.architectureType !== 'hybrid') {
+      totalChecks++;
+      disagreements.push('Hybrid domain capabilities detected but architecture is not hybrid');
+    }
+
+    return totalChecks > 0 ? agreementScore / totalChecks : 0.5;
+  }
+
+  /**
+   * Get alignment score between domain and architecture types
+   */
+  private getDomainArchitectureAlignment(domain: ContentDomainType, architecture: PlatformArchitectureType): number {
+    const alignmentMatrix: Record<ContentDomainType, Record<PlatformArchitectureType, number>> = {
+      outdoor: { individual: 0.9, team: 0.3, hybrid: 0.7 },
+      saas: { individual: 0.2, team: 0.9, hybrid: 0.8 },
+      ecommerce: { individual: 0.4, team: 0.7, hybrid: 0.9 },
+      social: { individual: 0.8, team: 0.6, hybrid: 0.7 },
+      generic: { individual: 0.5, team: 0.5, hybrid: 0.5 }
+    };
+    
+    return alignmentMatrix[domain]?.[architecture] ?? 0.5;
+  }
+
+  /**
    * Detect and resolve conflicts between detection systems
    */
   private detectAndResolveConflicts(
     schemaResult: SchemaIntrospectionResult,
     frameworkResult: MakerKitDetectionResult,
-    architectureResult: PlatformArchitectureDetectionResult
+    architectureResult: PlatformArchitectureDetectionResult,
+    domainResult: DomainDetectionResult
   ): DetectionConflict[] {
     const conflicts: DetectionConflict[] = [];
 
@@ -480,16 +624,43 @@ export class DetectionIntegrationEngine {
       });
     }
 
-    // Check for low confidence across all systems
+    // Check for domain-architecture alignment conflicts
+    if (domainResult.primaryDomain === 'outdoor' && architectureResult.architectureType === 'team') {
+      if (domainResult.confidence > 0.7 && architectureResult.confidence > 0.7) {
+        conflicts.push({
+          type: 'architecture_mismatch',
+          description: 'Outdoor domain typically uses individual/hybrid architecture but team architecture detected',
+          severity: 'medium',
+          suggestedResolution: 'Verify if this is a team-oriented outdoor platform or consider hybrid architecture',
+          involvedSystems: ['architecture', 'domain']
+        });
+      }
+    }
+
+    // Check for domain-specific feature conflicts
+    if (domainResult.primaryDomain === 'saas' && !teamTables.length) {
+      if (domainResult.confidence > 0.7) {
+        conflicts.push({
+          type: 'schema_inconsistency',
+          description: 'SaaS domain detected but schema lacks typical team/organization structures',
+          severity: 'medium',
+          suggestedResolution: 'Verify SaaS classification or check for alternative team management patterns',
+          involvedSystems: ['schema', 'domain']
+        });
+      }
+    }
+
+    // Check for low confidence across all systems (including domain)
     if (schemaResult.framework.confidence < 0.5 && 
         frameworkResult.confidence < 0.5 && 
-        architectureResult.confidence < 0.5) {
+        architectureResult.confidence < 0.5 &&
+        domainResult.confidence < 0.5) {
       conflicts.push({
         type: 'framework_mismatch',
-        description: 'Low confidence across all detection systems',
+        description: 'Low confidence across all detection systems including domain detection',
         severity: 'high',
-        suggestedResolution: 'Manual verification required - consider custom configuration',
-        involvedSystems: ['schema', 'framework', 'architecture']
+        suggestedResolution: 'Manual verification required - consider custom configuration and domain specification',
+        involvedSystems: ['schema', 'framework', 'architecture', 'domain']
       });
     }
 
@@ -503,6 +674,7 @@ export class DetectionIntegrationEngine {
     schemaResult: SchemaIntrospectionResult,
     frameworkResult: MakerKitDetectionResult,
     architectureResult: PlatformArchitectureDetectionResult,
+    domainResult: DomainDetectionResult,
     crossValidation: CrossValidationResult,
     conflicts: DetectionConflict[]
   ): string[] {
@@ -511,6 +683,19 @@ export class DetectionIntegrationEngine {
     // Architecture-specific recommendations
     recommendations.push(`Platform Architecture: ${architectureResult.architectureType} (${(architectureResult.confidence * 100).toFixed(0)}% confidence)`);
     recommendations.push(...architectureResult.recommendations);
+
+    // Domain-specific recommendations
+    recommendations.push(`Content Domain: ${domainResult.primaryDomain} (${(domainResult.confidence * 100).toFixed(0)}% confidence)`);
+    if (domainResult.secondaryDomains.length > 0) {
+      const secondaryDomainsList = domainResult.secondaryDomains
+        .map(d => `${d.domain}(${(d.confidence * 100).toFixed(0)}%)`)
+        .join(', ');
+      recommendations.push(`Secondary domains: ${secondaryDomainsList}`);
+    }
+    if (domainResult.hybridCapabilities) {
+      recommendations.push('✨ Platform shows hybrid domain capabilities - consider multi-domain strategies');
+    }
+    recommendations.push(...domainResult.reasoning.slice(0, 3)); // Top 3 domain reasoning points
 
     // Framework-specific recommendations
     if (frameworkResult.isMakerKit) {
@@ -554,20 +739,23 @@ export class DetectionIntegrationEngine {
     schemaResult: SchemaIntrospectionResult,
     frameworkResult: MakerKitDetectionResult,
     architectureResult: PlatformArchitectureDetectionResult,
+    domainResult: DomainDetectionResult,
     crossValidation: CrossValidationResult
   ): number {
-    // Weight different confidence scores
+    // Weight different confidence scores including domain detection
     const weights = {
-      schema: 0.2,
-      framework: 0.3,
-      architecture: 0.3,
-      crossValidation: 0.2
+      schema: 0.15,
+      framework: 0.25,
+      architecture: 0.25,
+      domain: 0.20,
+      crossValidation: 0.15
     };
 
     const weightedSum = 
       (schemaResult.framework.confidence * weights.schema) +
       (frameworkResult.confidence * weights.framework) +
       (architectureResult.confidence * weights.architecture) +
+      (domainResult.confidence * weights.domain) +
       (crossValidation.overallAgreement * weights.crossValidation);
 
     return Math.min(1.0, weightedSum);
@@ -580,6 +768,7 @@ export class DetectionIntegrationEngine {
     return {
       architectureFrameworkAgreement: 0.5,
       schemaArchitectureAgreement: 0.5,
+      domainArchitectureAgreement: 0.5,
       overallAgreement: 0.5,
       agreements: [],
       disagreements: []

@@ -498,9 +498,199 @@ export interface DetectionStatistics {
 }
 
 /**
+ * Domain detection result interface
+ */
+export interface DomainDetectionResult {
+  /** Primary detected domain */
+  primaryDomain: ContentDomainType;
+  
+  /** Confidence in primary domain detection (0-1) */
+  confidence: number;
+  
+  /** Confidence level category */
+  confidenceLevel: ConfidenceLevel;
+  
+  /** Secondary domains detected with lower confidence */
+  secondaryDomains: Array<{
+    domain: ContentDomainType;
+    confidence: number;
+    reasoning: string;
+  }>;
+  
+  /** Evidence supporting domain detection */
+  domainEvidence: DomainEvidence[];
+  
+  /** Whether platform has hybrid domain capabilities */
+  hybridCapabilities: boolean;
+  
+  /** Detailed reasoning for domain classification */
+  reasoning: string[];
+  
+  /** Metrics about the domain detection process */
+  detectionMetrics: {
+    /** Time taken for detection (ms) */
+    executionTime: number;
+    
+    /** Number of patterns analyzed */
+    patternsAnalyzed: number;
+    
+    /** Number of evidence pieces found */
+    evidenceCount: number;
+    
+    /** Detection strategy used */
+    strategyUsed: string;
+  };
+  
+  /** Warnings about domain detection */
+  warnings: string[];
+  
+  /** Errors encountered during detection */
+  errors: string[];
+}
+
+/**
+ * Domain-specific evidence interface
+ */
+export interface DomainEvidence {
+  /** Type of evidence found */
+  type: 'table_pattern' | 'column_analysis' | 'relationship_pattern' | 'business_logic';
+  
+  /** Domain this evidence supports */
+  domain: ContentDomainType;
+  
+  /** Human-readable description of the evidence */
+  description: string;
+  
+  /** Confidence in this piece of evidence (0-1) */
+  confidence: number;
+  
+  /** Weight of this evidence in overall decision (0-1) */
+  weight: number;
+  
+  /** Supporting data for the evidence */
+  supportingData: {
+    /** Table names involved */
+    tables?: string[];
+    /** Column names involved */
+    columns?: string[];
+    /** Pattern matches */
+    patterns?: string[];
+    /** Business logic elements */
+    businessLogic?: string[];
+    /** Raw data samples */
+    samples?: any[];
+  };
+}
+
+/**
+ * Domain pattern definition interface
+ */
+export interface DomainPattern {
+  /** Pattern identifier */
+  id: string;
+  
+  /** Pattern name */
+  name: string;
+  
+  /** Pattern description */
+  description: string;
+  
+  /** Domain this pattern indicates */
+  indicatesDomain: ContentDomainType;
+  
+  /** Confidence boost when pattern matches (0-1) */
+  confidenceWeight: number;
+  
+  /** Table name patterns to match */
+  tablePatterns: string[];
+  
+  /** Column name patterns to match */
+  columnPatterns: string[];
+  
+  /** Relationship patterns to match */
+  relationshipPatterns: Array<{
+    fromTable: string;
+    toTable: string;
+    type: 'one_to_one' | 'one_to_many' | 'many_to_many';
+  }>;
+  
+  /** Business logic patterns to match */
+  businessLogicPatterns: string[];
+  
+  /** Minimum matches required for pattern to be valid */
+  minimumMatches: number;
+  
+  /** Whether this pattern is exclusive to this domain */
+  exclusive: boolean;
+  
+  /** Pattern priority (higher = more important) */
+  priority: number;
+}
+
+/**
+ * Domain detection configuration
+ */
+export interface DomainDetectionConfig {
+  /** Detection strategy to use */
+  strategy: 'comprehensive' | 'fast' | 'conservative' | 'aggressive';
+  
+  /** Minimum confidence threshold for domain classification */
+  confidenceThreshold: number;
+  
+  /** Whether to detect secondary domains */
+  detectSecondaryDomains: boolean;
+  
+  /** Whether to analyze business logic patterns */
+  analyzeBusinessLogic: boolean;
+  
+  /** Whether to perform deep relationship analysis */
+  deepRelationshipAnalysis: boolean;
+  
+  /** Domains to exclude from analysis */
+  excludeDomains: ContentDomainType[];
+  
+  /** Custom domain patterns to include */
+  customPatterns?: DomainPattern[];
+  
+  /** Maximum time to spend on detection (ms) */
+  maxExecutionTime: number;
+  
+  /** Whether to use cached detection results */
+  useCaching: boolean;
+  
+  /** Manual domain override */
+  manualOverride?: {
+    /** Force specific domain */
+    primaryDomain?: ContentDomainType;
+    
+    /** Custom evidence */
+    customEvidence?: DomainEvidence[];
+  };
+}
+
+/**
+ * Domain analysis context
+ */
+export interface DomainAnalysisContext extends DetectionAnalysisContext {
+  /** Domain-specific analysis data */
+  domainHints?: {
+    /** Suggested domains based on external factors */
+    suggestedDomains?: ContentDomainType[];
+    
+    /** Known domain patterns from configuration */
+    knownPatterns?: DomainPattern[];
+    
+    /** Domain exclusions */
+    excludedDomains?: ContentDomainType[];
+  };
+}
+
+/**
  * Export commonly used type unions
  */
 export type DetectionResultType = PlatformArchitectureDetectionResult;
 export type DetectionConfigType = ArchitectureDetectionConfig;
 export type ArchitectureEvidenceType = ArchitectureEvidence;
 export type PlatformFeatureType = PlatformFeature;
+export type DomainDetectionResultType = DomainDetectionResult;
+export type DomainEvidenceType = DomainEvidence;
