@@ -18,6 +18,7 @@ import {
 } from '../strategy-interface';
 import { IdentityManager } from '../../auth/identity-manager';
 import { MFAManager } from '../../auth/mfa-manager';
+import { DevelopmentWebhookManager } from '../../webhooks/development-webhook-manager';
 import type { 
   CompleteUserData, 
   CompleteUserResult, 
@@ -29,6 +30,11 @@ import type {
   MFAFactorCreationResult,
   ArchetypeMFAPreferences 
 } from '../../auth/mfa-types';
+import type {
+  DevelopmentWebhookConfig,
+  WebhookEndpoint,
+  PlatformWebhookConfig
+} from '../../webhooks/webhook-types';
 import { ConstraintDiscoveryEngine } from '../../schema/constraint-discovery-engine';
 import { ConstraintRegistry } from '../../schema/constraint-registry';
 import { BusinessLogicAnalyzer } from '../../schema/business-logic-analyzer';
@@ -87,6 +93,7 @@ export class MakerKitStrategy implements SeedingStrategy {
   private storageIntegrationManager?: StorageIntegrationManager;
   private identityManager?: IdentityManager;
   private mfaManager?: MFAManager;
+  private webhookManager?: DevelopmentWebhookManager;
   private authFlowConfig!: AuthFlowConfig;
 
   async initialize(client: SupabaseClient): Promise<void> {
@@ -98,6 +105,9 @@ export class MakerKitStrategy implements SeedingStrategy {
     
     // Initialize MFA manager for multi-factor authentication support
     this.mfaManager = new MFAManager(client);
+    
+    // Initialize webhook manager for development webhook support
+    this.webhookManager = new DevelopmentWebhookManager(client);
     
     // Set default auth flow configuration for MakerKit
     this.authFlowConfig = this.getDefaultAuthFlowConfig();
@@ -452,12 +462,21 @@ export class MakerKitStrategy implements SeedingStrategy {
         }
       }
 
+      // Step 6: Trigger development webhooks if enabled (FR-1.3)
+      if (this.authFlowConfig.setupDevelopmentWebhooks) {
+        await this.triggerUserCreatedWebhook(result.authUser);
+      }
+
       // Add success recommendations
       result.recommendations.push(
         'Complete MakerKit auth flow successfully created',
         `Created ${result.identities.length} identity provider${result.identities.length !== 1 ? 's' : ''}`,
         'User ready for MakerKit application testing'
       );
+
+      if (this.authFlowConfig.setupDevelopmentWebhooks) {
+        result.recommendations.push('Development webhooks triggered for user creation');
+      }
 
       result.success = true;
       Logger.success(`✅ Complete MakerKit user created: ${data.email}`);
@@ -586,7 +605,8 @@ export class MakerKitStrategy implements SeedingStrategy {
       'business_logic_respect',
       'constraint_discovery',
       'framework_specific_handlers',
-      'mfa_factor_support' // FR-1.2: Add MFA Factor Support
+      'mfa_factor_support', // FR-1.2: Add MFA Factor Support
+      'development_webhook_setup' // FR-1.3: Development Webhook Setup
     ];
 
     return supportedFeatures.includes(feature);
@@ -656,6 +676,145 @@ export class MakerKitStrategy implements SeedingStrategy {
         errors: [`MFA validation failed: ${error.message}`],
         warnings: []
       };
+    }
+  }
+
+  /**
+   * Configure development webhooks for the strategy
+   * Implements FR-1.3: Development Webhook Setup
+   */
+  async configureWebhooks(config: DevelopmentWebhookConfig): Promise<void> {
+    if (!this.webhookManager) {
+      throw new Error('Webhook manager not initialized');
+    }
+
+    await this.webhookManager.configure(config);
+    this.authFlowConfig.setupDevelopmentWebhooks = config.enabled;
+    
+    Logger.info(`✅ Development webhooks ${config.enabled ? 'enabled' : 'disabled'} for MakerKit strategy`);
+  }
+
+  /**
+   * Setup development webhook endpoints automatically
+   */
+  async setupDevelopmentWebhooks(): Promise<{ success: boolean; endpoints: WebhookEndpoint[]; errors: string[] }> {
+    if (!this.webhookManager) {
+      throw new Error('Webhook manager not initialized');
+    }
+
+    if (!this.authFlowConfig.setupDevelopmentWebhooks) {
+      Logger.debug('Development webhooks are disabled');
+      return {
+        success: false,
+        endpoints: [],
+        errors: ['Development webhooks are disabled in auth flow configuration']
+      };
+    }
+
+    Logger.info('🔗 Setting up MakerKit development webhooks...');
+    
+    const result = await this.webhookManager.setupDevelopmentEndpoints();
+    
+    if (result.success) {
+      Logger.success(`✅ Setup ${result.endpoints.length} development webhook endpoints`);
+      
+      // Trigger webhooks for newly created users if enabled
+      if (result.endpoints.some(ep => ep.events.includes('user.created'))) {
+        Logger.info('💡 Webhook endpoints ready for user creation events');
+      }
+    } else {
+      Logger.error('❌ Failed to setup development webhooks:', result.errors);
+    }
+
+    return result;
+  }
+
+  /**
+   * Generate platform-specific webhook configuration
+   */
+  generatePlatformWebhookConfig(
+    architecture: 'individual' | 'team' | 'hybrid' = 'individual',
+    domain: 'outdoor' | 'saas' | 'ecommerce' | 'social' | 'generic' = 'generic'
+  ): PlatformWebhookConfig | null {
+    if (!this.webhookManager) {
+      Logger.warn('Webhook manager not initialized');
+      return null;
+    }
+
+    const config = this.webhookManager.generatePlatformWebhookConfig(architecture, domain);
+    
+    Logger.info(`📋 Generated webhook configuration for ${architecture} ${domain} platform`);
+    return config;
+  }
+
+  /**
+   * Validate webhook support for the platform
+   */
+  async validateWebhookSupport(): Promise<{
+    supported: boolean;
+    configured: boolean;
+    errors: string[];
+    warnings: string[];
+  }> {
+    if (!this.webhookManager) {
+      return {
+        supported: false,
+        configured: false,
+        errors: ['Webhook manager not initialized'],
+        warnings: []
+      };
+    }
+
+    try {
+      const config = this.webhookManager.getConfiguration();
+      const endpoints = await this.webhookManager.listEndpoints();
+      
+      return {
+        supported: this.authFlowConfig.setupDevelopmentWebhooks,
+        configured: config !== null,
+        errors: [],
+        warnings: endpoints.length === 0 ? ['No webhook endpoints configured'] : []
+      };
+    } catch (error: any) {
+      return {
+        supported: false,
+        configured: false,
+        errors: [`Webhook validation failed: ${error.message}`],
+        warnings: []
+      };
+    }
+  }
+
+  /**
+   * Trigger webhook for user creation (integrates with createCompleteUser)
+   */
+  private async triggerUserCreatedWebhook(user: any): Promise<void> {
+    if (!this.webhookManager || !this.authFlowConfig.setupDevelopmentWebhooks) {
+      return;
+    }
+
+    try {
+      const payload = {
+        type: 'user.created' as const,
+        user: {
+          id: user.id,
+          email: user.email,
+          created_at: user.createdAt,
+          updated_at: user.updatedAt,
+          user_metadata: user.userMetadata || {},
+          app_metadata: user.appMetadata || {}
+        }
+      };
+
+      const results = await this.webhookManager.triggerWebhook('user.created', payload);
+      
+      if (results.length > 0) {
+        const successful = results.filter(r => r.success).length;
+        Logger.info(`📡 Triggered ${successful}/${results.length} user creation webhooks`);
+      }
+
+    } catch (error: any) {
+      Logger.warn(`Failed to trigger user creation webhook: ${error.message}`);
     }
   }
 
@@ -1207,7 +1366,7 @@ export class MakerKitStrategy implements SeedingStrategy {
       // Complete auth flow settings
       createIdentities: true,
       enableMFA: false, // Can be enabled via configuration
-      setupDevelopmentWebhooks: false, // Will be implemented in Task 1.3
+      setupDevelopmentWebhooks: false, // Can be enabled via configureWebhooks()
       
       // Provider settings
       supportedProviders: ['email', 'google', 'github'],

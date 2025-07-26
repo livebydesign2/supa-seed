@@ -170,6 +170,67 @@ export interface FlexibleSeedConfig {
     };
   };
 
+  // Webhook Configuration (FR-1.3: Development Webhook Setup)
+  webhooks?: {
+    enabled: boolean;
+    baseUrl: string; // e.g., 'http://localhost:3000' or ngrok URL
+    ngrokSupport: {
+      enabled: boolean;
+      subdomain?: string;
+      authToken?: string;
+      region?: 'us' | 'eu' | 'ap' | 'au' | 'sa' | 'jp' | 'in';
+    };
+    endpoints: {
+      // Authentication webhook endpoints
+      userCreated?: string;
+      userUpdated?: string;
+      userDeleted?: string;
+      userConfirmed?: string;
+      userSignIn?: string;
+      userSignOut?: string;
+      passwordReset?: string;
+      emailConfirm?: string;
+      mfaEnrolled?: string;
+      mfaVerified?: string;
+      
+      // Database webhook endpoints
+      accountCreated?: string;
+      accountUpdated?: string;
+      profileCreated?: string;
+      profileUpdated?: string;
+      subscriptionCreated?: string;
+      subscriptionUpdated?: string;
+      
+      // Custom endpoints for domain-specific events
+      custom?: Record<string, string>;
+    };
+    authentication: {
+      type: 'none' | 'bearer' | 'basic' | 'signature';
+      credentials?: {
+        token?: string;
+        username?: string;
+        password?: string;
+        secret?: string; // For signature verification
+      };
+      headers?: Record<string, string>;
+    };
+    testing: {
+      enablePayloadLogging: boolean;
+      enableRequestLogging: boolean;
+      enableResponseLogging: boolean;
+      logLevel: 'debug' | 'info' | 'warn' | 'error';
+      mockEndpoints: boolean;
+      validatePayloads: boolean;
+    };
+    retryPolicy: {
+      enabled: boolean;
+      maxAttempts: number;
+      backoffStrategy: 'linear' | 'exponential' | 'fixed';
+      initialDelay: number; // milliseconds
+      maxDelay: number; // milliseconds
+    };
+  };
+
   // Custom data
   data?: {
     categories?: Array<{
@@ -430,5 +491,127 @@ export interface ExtendedSeedConfig extends FlexibleSeedConfig {
       generatorFunction: string;
       config?: Record<string, any>;
     }>;
+  };
+
+  // Advanced Webhook Configuration (FR-1.3: Development Webhook Setup)
+  advancedWebhooks?: {
+    enabled: boolean;
+    developmentMode: boolean;
+    endpoints: Array<{
+      id: string;
+      name: string;
+      url: string;
+      events: ('INSERT' | 'UPDATE' | 'DELETE' | 'user.created' | 'user.updated' | 'user.deleted' | 'user.confirmed' | 'session.created' | 'mfa.enrolled')[];
+      enabled: boolean;
+      authentication?: {
+        type: 'none' | 'bearer' | 'basic' | 'signature';
+        credentials?: Record<string, string>;
+        headers?: Record<string, string>;
+      };
+      retryPolicy?: {
+        enabled: boolean;
+        maxAttempts: number;
+        backoffStrategy: 'linear' | 'exponential' | 'fixed';
+        initialDelay: number;
+        maxDelay: number;
+      };
+      filters?: Array<{
+        field: string;
+        operator: 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'in' | 'not_in' | 'contains';
+        value: any;
+        description?: string;
+      }>;
+      metadata?: Record<string, any>;
+    }>;
+    platformSpecific: {
+      architecture: 'individual' | 'team' | 'hybrid';
+      domain: 'outdoor' | 'saas' | 'ecommerce' | 'social' | 'generic';
+      coreEvents: {
+        userRegistration: {
+          enabled: boolean;
+          triggers: ('account_creation' | 'profile_setup' | 'welcome_email' | 'onboarding_start')[];
+          endpoint?: string;
+        };
+        accountManagement: {
+          enabled: boolean;
+          triggers: ('team_created' | 'member_added' | 'member_removed' | 'permissions_changed')[];
+          endpoint?: string;
+        };
+        subscriptionManagement: {
+          enabled: boolean;
+          triggers: ('subscription_created' | 'subscription_updated' | 'payment_succeeded' | 'payment_failed')[];
+          endpoint?: string;
+        };
+        securityEvents: {
+          enabled: boolean;
+          triggers: ('mfa_enabled' | 'password_changed' | 'suspicious_login' | 'account_locked')[];
+          endpoint?: string;
+        };
+      };
+      domainSpecific: {
+        outdoor?: {
+          enabled: boolean;
+          events: ('setup_created' | 'gear_added' | 'review_posted' | 'trip_planned')[];
+        };
+        saas?: {
+          enabled: boolean;
+          events: ('workspace_created' | 'project_created' | 'task_completed' | 'integration_connected')[];
+        };
+        ecommerce?: {
+          enabled: boolean;
+          events: ('product_created' | 'order_placed' | 'payment_processed' | 'inventory_updated')[];
+        };
+        social?: {
+          enabled: boolean;
+          events: ('post_created' | 'comment_added' | 'like_received' | 'follow_added')[];
+        };
+      };
+    };
+    ngrokIntegration: {
+      enabled: boolean;
+      autoStart: boolean;
+      subdomain?: string;
+      authToken?: string;
+      region: 'us' | 'eu' | 'ap' | 'au' | 'sa' | 'jp' | 'in';
+      configFile?: string;
+    };
+    testing: {
+      scenarios: Array<{
+        id: string;
+        name: string;
+        description: string;
+        event: string;
+        mockPayload: Record<string, any>;
+        expectedResponse: {
+          statusCode: number;
+          body?: any;
+          headers?: Record<string, string>;
+        };
+        validationRules: Array<{
+          field: string;
+          rule: string;
+          description: string;
+        }>;
+      }>;
+      enablePayloadSanitization: boolean;
+      enableSignatureValidation: boolean;
+      enableRateLimitTesting: boolean;
+      generateTestReports: boolean;
+    };
+    monitoring: {
+      enabled: boolean;
+      analytics: {
+        trackDeliverySuccess: boolean;
+        trackResponseTimes: boolean;
+        trackErrorPatterns: boolean;
+        generateHealthReports: boolean;
+      };
+      alerting: {
+        enabled: boolean;
+        failureThreshold: number; // percentage
+        responseTimeThreshold: number; // milliseconds
+        errorRateWindow: number; // minutes
+      };
+    };
   };
 }
