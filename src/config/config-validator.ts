@@ -1,6 +1,7 @@
 /**
- * Configuration Validation System for Epic 7: Configuration Extensibility Framework
- * Validates configuration against detected schema and provides recommendations
+ * Configuration Validation and Migration System for SupaSeed v2.5.0
+ * Implements Task 5.3.2: Validation and migration utilities for configuration upgrades
+ * Enhanced from Epic 7 system with advanced layered configuration support
  */
 
 import type { createClient } from '@supabase/supabase-js';
@@ -8,6 +9,13 @@ import { ExtendedSeedConfig, FlexibleSeedConfig } from '../config-types';
 import { SchemaAdapter } from '../schema-adapter';
 import { FrameworkAdapter } from '../framework/framework-adapter';
 import { Logger } from '../utils/logger';
+import type {
+  LayeredConfiguration,
+  UniversalCoreConfig,
+  SmartDetectionConfig,
+  ExtensionsLayerConfig
+} from './config-layers';
+import type { DeepOverrideConfig, ConstraintViolation } from './advanced-customization';
 
 type SupabaseClient = ReturnType<typeof createClient>;
 
@@ -25,6 +33,173 @@ export interface ConfigurationRecommendation {
   message: string;
   suggestedFix?: string;
   autoFixable: boolean;
+}
+
+/**
+ * Advanced validation options for Task 5.3.2
+ */
+export interface AdvancedValidationOptions {
+  strictMode?: boolean;
+  checkCompatibility?: boolean;
+  validatePerformance?: boolean;
+  includeWarnings?: boolean;
+  autoFix?: boolean;
+  migrationSupport?: boolean;
+  layeredConfigMode?: boolean;
+}
+
+/**
+ * Layered configuration validation result
+ */
+export interface LayeredConfigValidationResult {
+  valid: boolean;
+  score: number; // 0-100 validation score
+  validationTime: number; // milliseconds
+  layers: {
+    universal: LayerValidationResult;
+    detection: LayerValidationResult;
+    extensions: LayerValidationResult;
+  };
+  errors: LayeredValidationError[];
+  warnings: LayeredValidationWarning[];
+  suggestions: LayeredValidationSuggestion[];
+  autoFixSuggestions: LayeredAutoFixSuggestion[];
+  migrationInfo?: LayeredMigrationInfo;
+  performanceImpact?: LayeredPerformanceValidation;
+}
+
+/**
+ * Individual layer validation result
+ */
+export interface LayerValidationResult {
+  valid: boolean;
+  score: number;
+  errors: LayeredValidationError[];
+  warnings: LayeredValidationWarning[];
+  coverage: {
+    totalFields: number;
+    validatedFields: number;
+    percentage: number;
+  };
+  constraints: {
+    checked: number;
+    passed: number;
+    failed: number;
+  };
+}
+
+/**
+ * Layered configuration validation error
+ */
+export interface LayeredValidationError {
+  code: string;
+  path: string;
+  message: string;
+  severity: 'critical' | 'high' | 'medium' | 'low';
+  category: 'structure' | 'type' | 'constraint' | 'compatibility' | 'performance';
+  layer: 'universal' | 'detection' | 'extensions' | 'cross-layer';
+  autoFixable: boolean;
+  migrationRequired?: boolean;
+  relatedErrors?: string[];
+}
+
+/**
+ * Layered configuration validation warning
+ */
+export interface LayeredValidationWarning {
+  code: string;
+  path: string;
+  message: string;
+  impact: 'high' | 'medium' | 'low';
+  category: 'performance' | 'compatibility' | 'best-practice' | 'security';
+  layer: 'universal' | 'detection' | 'extensions' | 'cross-layer';
+  recommendation: string;
+  autoFixable: boolean;
+}
+
+/**
+ * Layered configuration validation suggestion
+ */
+export interface LayeredValidationSuggestion {
+  type: 'optimization' | 'enhancement' | 'alternative' | 'migration';
+  priority: 'high' | 'medium' | 'low';
+  description: string;
+  impact: string;
+  implementation: string[];
+  estimatedBenefit: string;
+  affectedLayers: ('universal' | 'detection' | 'extensions')[];
+}
+
+/**
+ * Layered auto-fix suggestion
+ */
+export interface LayeredAutoFixSuggestion {
+  errorCode: string;
+  path: string;
+  description: string;
+  action: 'add' | 'modify' | 'remove' | 'restructure';
+  currentValue?: any;
+  suggestedValue: any;
+  riskLevel: 'safe' | 'moderate' | 'risky';
+  backupRequired: boolean;
+  affectedLayers: ('universal' | 'detection' | 'extensions')[];
+}
+
+/**
+ * Layered migration information
+ */
+export interface LayeredMigrationInfo {
+  required: boolean;
+  fromVersion: string;
+  toVersion: string;
+  migrationSteps: LayeredMigrationStep[];
+  estimatedDuration: number; // minutes
+  riskAssessment: 'low' | 'medium' | 'high';
+  backupRecommended: boolean;
+  rollbackSupported: boolean;
+  layerMigrations: {
+    universal: LayeredMigrationStep[];
+    detection: LayeredMigrationStep[];
+    extensions: LayeredMigrationStep[];
+  };
+}
+
+/**
+ * Individual layered migration step
+ */
+export interface LayeredMigrationStep {
+  id: string;
+  order: number;
+  description: string;
+  type: 'schema' | 'config' | 'data' | 'validation';
+  layer: 'universal' | 'detection' | 'extensions' | 'cross-layer';
+  action: string;
+  reversible: boolean;
+  estimatedTime: number; // seconds
+  riskLevel: 'low' | 'medium' | 'high';
+  dependencies: string[];
+}
+
+/**
+ * Layered performance validation
+ */
+export interface LayeredPerformanceValidation {
+  score: number; // 0-100
+  estimatedSlowdown: number; // percentage
+  memoryImpact: number; // MB
+  complexityAnalysis: {
+    universalComplexity: number;
+    detectionComplexity: number;
+    extensionComplexity: number;
+    crossLayerComplexity: number;
+  };
+  recommendations: string[];
+  optimizations: string[];
+  layerImpact: {
+    universal: number;
+    detection: number;
+    extensions: number;
+  };
 }
 
 export class ConfigValidator {
@@ -688,5 +863,766 @@ export class ConfigValidator {
     }
 
     return recommendations;
+  }
+
+  /**
+   * Validate layered configuration with comprehensive analysis
+   * Task 5.3.2: Advanced validation for layered configuration system
+   */
+  async validateLayeredConfiguration(
+    config: LayeredConfiguration,
+    options: AdvancedValidationOptions = {}
+  ): Promise<LayeredConfigValidationResult> {
+    Logger.info('🔍 Starting advanced layered configuration validation...');
+    const startTime = Date.now();
+
+    try {
+      // Initialize validation result
+      const result: LayeredConfigValidationResult = {
+        valid: true,
+        score: 100,
+        validationTime: 0,
+        layers: {
+          universal: await this.validateConfigurationLayer(config.layers.universal, 'universal', options),
+          detection: await this.validateConfigurationLayer(config.layers.detection, 'detection', options),
+          extensions: await this.validateConfigurationLayer(config.layers.extensions, 'extensions', options)
+        },
+        errors: [],
+        warnings: [],
+        suggestions: [],
+        autoFixSuggestions: []
+      };
+
+      // Aggregate layer results
+      const allErrors = [
+        ...result.layers.universal.errors,
+        ...result.layers.detection.errors,
+        ...result.layers.extensions.errors
+      ];
+
+      const allWarnings = [
+        ...result.layers.universal.warnings,
+        ...result.layers.detection.warnings,
+        ...result.layers.extensions.warnings
+      ];
+
+      // Cross-layer validation
+      const crossLayerValidation = await this.validateCrossLayerConstraints(config, options);
+      allErrors.push(...crossLayerValidation.errors);
+      allWarnings.push(...crossLayerValidation.warnings);
+
+      // Compatibility validation
+      if (options.checkCompatibility) {
+        const compatibilityValidation = await this.validateLayeredCompatibility(config);
+        allErrors.push(...compatibilityValidation.errors);
+        allWarnings.push(...compatibilityValidation.warnings);
+      }
+
+      // Performance validation
+      if (options.validatePerformance) {
+        result.performanceImpact = await this.validateLayeredPerformance(config);
+        if (result.performanceImpact.score < 70) {
+          allWarnings.push({
+            code: 'PERF_LOW_SCORE',
+            path: 'config',
+            message: `Performance score is low: ${result.performanceImpact.score}/100`,
+            impact: 'high',
+            category: 'performance',
+            layer: 'cross-layer',
+            recommendation: 'Consider optimizing configuration complexity',
+            autoFixable: false
+          });
+        }
+      }
+
+      // Migration analysis
+      if (options.migrationSupport) {
+        result.migrationInfo = await this.analyzeLayeredMigrationRequirements(config);
+      }
+
+      // Generate suggestions
+      result.suggestions = await this.generateLayeredSuggestions(config, allErrors, allWarnings);
+
+      // Generate auto-fix suggestions
+      if (options.autoFix) {
+        result.autoFixSuggestions = await this.generateLayeredAutoFixSuggestions(allErrors);
+      }
+
+      // Calculate overall score and validity
+      result.errors = allErrors;
+      result.warnings = options.includeWarnings ? allWarnings : [];
+      result.valid = allErrors.filter(e => e.severity === 'critical' || e.severity === 'high').length === 0;
+      result.score = this.calculateLayeredOverallScore(result.layers, allErrors, allWarnings);
+      result.validationTime = Date.now() - startTime;
+
+      Logger.complete(`Layered configuration validation completed in ${result.validationTime}ms - Score: ${result.score}/100`);
+      return result;
+
+    } catch (error: any) {
+      Logger.error(`Layered configuration validation failed: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Validate individual configuration layer
+   */
+  private async validateConfigurationLayer(
+    layer: any,
+    layerName: 'universal' | 'detection' | 'extensions',
+    options: AdvancedValidationOptions
+  ): Promise<LayerValidationResult> {
+    const errors: LayeredValidationError[] = [];
+    const warnings: LayeredValidationWarning[] = [];
+
+    // Layer-specific validation
+    switch (layerName) {
+      case 'universal':
+        await this.validateUniversalLayer(layer, errors, warnings, options);
+        break;
+      case 'detection':
+        await this.validateDetectionLayer(layer, errors, warnings, options);
+        break;
+      case 'extensions':
+        await this.validateExtensionsLayer(layer, errors, warnings, options);
+        break;
+    }
+
+    // Calculate coverage and constraints
+    const coverage = this.calculateLayerCoverage(layer, layerName);
+    const constraintStats = this.calculateLayerConstraintStats(errors, warnings);
+
+    return {
+      valid: errors.filter(e => e.severity === 'critical' || e.severity === 'high').length === 0,
+      score: this.calculateLayerScore(errors, warnings, coverage),
+      errors,
+      warnings,
+      coverage,
+      constraints: constraintStats
+    };
+  }
+
+  /**
+   * Validate universal layer
+   */
+  private async validateUniversalLayer(
+    layer: UniversalCoreConfig,
+    errors: LayeredValidationError[],
+    warnings: LayeredValidationWarning[],
+    options: AdvancedValidationOptions
+  ): Promise<void> {
+    // MakerKit compliance validation
+    if (!layer.makerkit?.enabled) {
+      errors.push({
+        code: 'MAKERKIT_DISABLED',
+        path: 'layers.universal.makerkit.enabled',
+        message: 'MakerKit compliance is disabled in universal layer',
+        severity: 'high',
+        category: 'constraint',
+        layer: 'universal',
+        autoFixable: true
+      });
+    }
+
+    // RLS compliance validation
+    if (layer.security?.rlsCompliance === false) {
+      errors.push({
+        code: 'RLS_DISABLED',
+        path: 'layers.universal.security.rlsCompliance',
+        message: 'RLS compliance is disabled - security risk',
+        severity: 'critical',
+        category: 'constraint',
+        layer: 'universal',
+        autoFixable: true
+      });
+    }
+
+    // Webhook configuration validation
+    if (layer.webhook?.enabled && !layer.webhook.endpoints?.length) {
+      warnings.push({
+        code: 'WEBHOOK_NO_ENDPOINTS',
+        path: 'layers.universal.webhook.endpoints',
+        message: 'Webhook enabled but no endpoints configured',
+        impact: 'medium',
+        category: 'compatibility',
+        layer: 'universal',
+        recommendation: 'Add webhook endpoints or disable webhook support',
+        autoFixable: false
+      });
+    }
+  }
+
+  /**
+   * Validate detection layer
+   */
+  private async validateDetectionLayer(
+    layer: SmartDetectionConfig,
+    errors: LayeredValidationError[],
+    warnings: LayeredValidationWarning[],
+    options: AdvancedValidationOptions
+  ): Promise<void> {
+    // Platform detection validation
+    if (layer.platform) {
+      if (!['individual', 'team', 'hybrid', 'auto'].includes(layer.platform.architecture)) {
+        errors.push({
+          code: 'INVALID_ARCHITECTURE',
+          path: 'layers.detection.platform.architecture',
+          message: `Invalid platform architecture: ${layer.platform.architecture}`,
+          severity: 'medium',
+          category: 'type',
+          layer: 'detection',
+          autoFixable: false
+        });
+      }
+
+      if (layer.platform.domain && !['outdoor', 'saas', 'ecommerce', 'social', 'generic', 'auto'].includes(layer.platform.domain)) {
+        errors.push({
+          code: 'INVALID_DOMAIN',
+          path: 'layers.detection.platform.domain',
+          message: `Invalid platform domain: ${layer.platform.domain}`,
+          severity: 'medium',
+          category: 'type',
+          layer: 'detection',
+          autoFixable: false
+        });
+      }
+
+      // Confidence validation
+      if (layer.platform.confidence !== undefined && (layer.platform.confidence < 0 || layer.platform.confidence > 1)) {
+        errors.push({
+          code: 'INVALID_CONFIDENCE',
+          path: 'layers.detection.platform.confidence',
+          message: 'Platform detection confidence must be between 0 and 1',
+          severity: 'medium',
+          category: 'type',
+          layer: 'detection',
+          autoFixable: true
+        });
+      }
+    }
+
+    // Auto-configuration validation
+    if (layer.autoConfiguration?.enabled && !layer.autoConfiguration.strategy) {
+      warnings.push({
+        code: 'AUTOCONFIG_NO_STRATEGY',
+        path: 'layers.detection.autoConfiguration.strategy',
+        message: 'Auto-configuration enabled but no strategy specified',
+        impact: 'medium',
+        category: 'compatibility',
+        layer: 'detection',
+        recommendation: 'Specify auto-configuration strategy',
+        autoFixable: true
+      });
+    }
+  }
+
+  /**
+   * Validate extensions layer
+   */
+  private async validateExtensionsLayer(
+    layer: ExtensionsLayerConfig,
+    errors: LayeredValidationError[],
+    warnings: LayeredValidationWarning[],
+    options: AdvancedValidationOptions
+  ): Promise<void> {
+    // Domain extension validation
+    const domainExtensions = ['outdoor', 'saas', 'ecommerce', 'social'];
+    const enabledExtensions = domainExtensions.filter(ext => layer[ext]?.enabled);
+
+    if (enabledExtensions.length > 3) {
+      warnings.push({
+        code: 'TOO_MANY_EXTENSIONS',
+        path: 'layers.extensions',
+        message: `${enabledExtensions.length} extensions enabled - may impact performance`,
+        impact: 'medium',
+        category: 'performance',
+        layer: 'extensions',
+        recommendation: 'Consider reducing number of enabled extensions',
+        autoFixable: false
+      });
+    }
+
+    // Extension-specific validation
+    for (const extension of enabledExtensions) {
+      const config = layer[extension];
+      if (config && config.customization && !config.customization.validate) {
+        warnings.push({
+          code: 'EXTENSION_NO_VALIDATION',
+          path: `layers.extensions.${extension}.customization.validate`,
+          message: `Extension ${extension} has customization but validation is disabled`,
+          impact: 'low',
+          category: 'best-practice',
+          layer: 'extensions',
+          recommendation: 'Enable validation for customized extensions',
+          autoFixable: true
+        });
+      }
+    }
+
+    // Archetype system validation
+    if (layer.archetypes?.enabled && !layer.archetypes.profiles?.length) {
+      warnings.push({
+        code: 'ARCHETYPES_NO_PROFILES',
+        path: 'layers.extensions.archetypes.profiles',
+        message: 'Archetype system enabled but no profiles defined',
+        impact: 'medium',
+        category: 'compatibility',
+        layer: 'extensions',
+        recommendation: 'Define archetype profiles or disable archetype system',
+        autoFixable: false
+      });
+    }
+  }
+
+  /**
+   * Validate cross-layer constraints
+   */
+  private async validateCrossLayerConstraints(
+    config: LayeredConfiguration,
+    options: AdvancedValidationOptions
+  ): Promise<{ errors: LayeredValidationError[]; warnings: LayeredValidationWarning[] }> {
+    const errors: LayeredValidationError[] = [];
+    const warnings: LayeredValidationWarning[] = [];
+
+    // Architecture-Extension compatibility
+    if (config.layers.detection?.platform?.architecture && config.layers.extensions) {
+      const architecture = config.layers.detection.platform.architecture;
+      const enabledExtensions = Object.keys(config.layers.extensions).filter(
+        key => config.layers.extensions[key]?.enabled
+      );
+
+      if (architecture === 'individual' && enabledExtensions.includes('saas')) {
+        warnings.push({
+          code: 'ARCHITECTURE_EXTENSION_MISMATCH',
+          path: 'layers',
+          message: 'Individual architecture with SaaS extension may not be optimal',
+          impact: 'medium',
+          category: 'compatibility',
+          layer: 'cross-layer',
+          recommendation: 'Consider team or hybrid architecture for SaaS platforms',
+          autoFixable: false
+        });
+      }
+
+      if (architecture === 'team' && enabledExtensions.includes('outdoor')) {
+        warnings.push({
+          code: 'ARCHITECTURE_EXTENSION_MISMATCH',
+          path: 'layers',
+          message: 'Team architecture with outdoor extension may not be optimal',
+          impact: 'medium',
+          category: 'compatibility',
+          layer: 'cross-layer',
+          recommendation: 'Consider individual or hybrid architecture for outdoor platforms',
+          autoFixable: false
+        });
+      }
+    }
+
+    // Universal-Detection compatibility
+    if (config.layers.universal?.makerkit?.accountType && config.layers.detection?.platform?.architecture) {
+      const accountType = config.layers.universal.makerkit.accountType;
+      const architecture = config.layers.detection.platform.architecture;
+
+      if (accountType === 'personal' && architecture === 'team') {
+        errors.push({
+          code: 'ACCOUNT_ARCHITECTURE_CONFLICT',
+          path: 'layers',
+          message: 'Personal account type conflicts with team architecture',
+          severity: 'high',
+          category: 'compatibility',
+          layer: 'cross-layer',
+          autoFixable: true
+        });
+      }
+    }
+
+    return { errors, warnings };
+  }
+
+  /**
+   * Validate layered configuration compatibility
+   */
+  private async validateLayeredCompatibility(
+    config: LayeredConfiguration
+  ): Promise<{ errors: LayeredValidationError[]; warnings: LayeredValidationWarning[] }> {
+    const errors: LayeredValidationError[] = [];
+    const warnings: LayeredValidationWarning[] = [];
+
+    // Version compatibility
+    const configVersion = config.metadata?.version || '2.5.0';
+    if (configVersion < '2.5.0') {
+      warnings.push({
+        code: 'OLD_CONFIG_VERSION',
+        path: 'metadata.version',
+        message: `Configuration version ${configVersion} is outdated`,
+        impact: 'medium',
+        category: 'compatibility',
+        layer: 'cross-layer',
+        recommendation: 'Upgrade configuration to v2.5.0',
+        autoFixable: true
+      });
+    }
+
+    // Layer structure validation
+    if (!config.layers) {
+      errors.push({
+        code: 'MISSING_LAYERS',
+        path: 'layers',
+        message: 'Layered configuration missing layers object',
+        severity: 'critical',
+        category: 'structure',
+        layer: 'cross-layer',
+        autoFixable: false
+      });
+    }
+
+    return { errors, warnings };
+  }
+
+  /**
+   * Validate layered configuration performance
+   */
+  private async validateLayeredPerformance(config: LayeredConfiguration): Promise<LayeredPerformanceValidation> {
+    // Analyze layer complexity
+    const universalComplexity = this.analyzeLayerComplexity(config.layers.universal);
+    const detectionComplexity = this.analyzeLayerComplexity(config.layers.detection);
+    const extensionComplexity = this.analyzeLayerComplexity(config.layers.extensions);
+    const crossLayerComplexity = this.analyzeCrossLayerComplexity(config);
+
+    const overallComplexity = (universalComplexity + detectionComplexity + extensionComplexity + crossLayerComplexity) / 4;
+    const score = Math.max(0, 100 - (overallComplexity * 10));
+
+    return {
+      score,
+      estimatedSlowdown: Math.min(50, overallComplexity * 5),
+      memoryImpact: Math.min(100, overallComplexity * 2),
+      complexityAnalysis: {
+        universalComplexity,
+        detectionComplexity,
+        extensionComplexity,
+        crossLayerComplexity
+      },
+      recommendations: this.generateLayeredPerformanceRecommendations(overallComplexity),
+      optimizations: this.generateLayeredOptimizationSuggestions(config),
+      layerImpact: {
+        universal: universalComplexity,
+        detection: detectionComplexity,
+        extensions: extensionComplexity
+      }
+    };
+  }
+
+  /**
+   * Analyze migration requirements for layered configuration
+   */
+  private async analyzeLayeredMigrationRequirements(config: LayeredConfiguration): Promise<LayeredMigrationInfo> {
+    const currentVersion = config.metadata?.version || '2.5.0';
+    const targetVersion = '2.5.0';
+    
+    // Check if migration is needed
+    const migrationRequired = currentVersion !== targetVersion;
+    
+    return {
+      required: migrationRequired,
+      fromVersion: currentVersion,
+      toVersion: targetVersion,
+      migrationSteps: [],
+      estimatedDuration: 0,
+      riskAssessment: 'low',
+      backupRecommended: migrationRequired,
+      rollbackSupported: true,
+      layerMigrations: {
+        universal: [],
+        detection: [],
+        extensions: []
+      }
+    };
+  }
+
+  /**
+   * Generate improvement suggestions for layered configuration
+   */
+  private async generateLayeredSuggestions(
+    config: LayeredConfiguration,
+    errors: LayeredValidationError[],
+    warnings: LayeredValidationWarning[]
+  ): Promise<LayeredValidationSuggestion[]> {
+    const suggestions: LayeredValidationSuggestion[] = [];
+
+    // Performance optimization suggestions
+    const extensionComplexity = this.analyzeLayerComplexity(config.layers.extensions);
+    if (extensionComplexity > 5) {
+      suggestions.push({
+        type: 'optimization',
+        priority: 'medium',
+        description: 'Extension layer complexity is high, consider simplification',
+        impact: 'Improved performance and maintainability',
+        implementation: [
+          'Disable unused extensions',
+          'Simplify extension configurations',
+          'Use extension templates'
+        ],
+        estimatedBenefit: '10-30% performance improvement',
+        affectedLayers: ['extensions']
+      });
+    }
+
+    // Migration suggestions
+    const compatibilityErrors = errors.filter(e => e.category === 'compatibility');
+    if (compatibilityErrors.length > 0) {
+      suggestions.push({
+        type: 'migration',
+        priority: 'high',
+        description: 'Configuration compatibility issues detected',
+        impact: 'Improved compatibility and reduced errors',
+        implementation: [
+          'Run configuration migration utility',
+          'Update deprecated configurations',
+          'Test migrated configuration'
+        ],
+        estimatedBenefit: 'Improved compatibility and reduced errors',
+        affectedLayers: ['universal', 'detection', 'extensions']
+      });
+    }
+
+    return suggestions;
+  }
+
+  /**
+   * Generate auto-fix suggestions for layered configuration
+   */
+  private async generateLayeredAutoFixSuggestions(errors: LayeredValidationError[]): Promise<LayeredAutoFixSuggestion[]> {
+    const autoFixSuggestions: LayeredAutoFixSuggestion[] = [];
+
+    for (const error of errors.filter(e => e.autoFixable)) {
+      switch (error.code) {
+        case 'MAKERKIT_DISABLED':
+          autoFixSuggestions.push({
+            errorCode: error.code,
+            path: error.path,
+            description: 'Enable MakerKit compliance in universal layer',
+            action: 'modify',
+            suggestedValue: true,
+            riskLevel: 'safe',
+            backupRequired: false,
+            affectedLayers: ['universal']
+          });
+          break;
+
+        case 'RLS_DISABLED':
+          autoFixSuggestions.push({
+            errorCode: error.code,
+            path: error.path,
+            description: 'Enable RLS compliance for security',
+            action: 'modify',
+            suggestedValue: true,
+            riskLevel: 'moderate',
+            backupRequired: true,
+            affectedLayers: ['universal']
+          });
+          break;
+
+        case 'INVALID_CONFIDENCE':
+          autoFixSuggestions.push({
+            errorCode: error.code,
+            path: error.path,
+            description: 'Fix detection confidence value',
+            action: 'modify',
+            suggestedValue: 0.8,
+            riskLevel: 'safe',
+            backupRequired: false,
+            affectedLayers: ['detection']
+          });
+          break;
+      }
+    }
+
+    return autoFixSuggestions;
+  }
+
+  /**
+   * Utility methods for layered validation
+   */
+  private calculateLayerCoverage(layer: any, layerName: string): LayerValidationResult['coverage'] {
+    if (!layer) return { totalFields: 0, validatedFields: 0, percentage: 0 };
+    
+    const totalFields = this.getExpectedFieldsForLayer(layerName);
+    const validatedFields = Object.keys(layer).length;
+    
+    return {
+      totalFields,
+      validatedFields,
+      percentage: totalFields > 0 ? (validatedFields / totalFields) * 100 : 100
+    };
+  }
+
+  private getExpectedFieldsForLayer(layerName: string): number {
+    switch (layerName) {
+      case 'universal': return 5; // makerkit, security, storage, webhook, deployment
+      case 'detection': return 3; // platform, autoConfiguration, overrides
+      case 'extensions': return 6; // outdoor, saas, ecommerce, social, archetypes, customization
+      default: return 0;
+    }
+  }
+
+  private calculateLayerConstraintStats(
+    errors: LayeredValidationError[],
+    warnings: LayeredValidationWarning[]
+  ): LayerValidationResult['constraints'] {
+    const checked = errors.length + warnings.length;
+    const failed = errors.length;
+    const passed = warnings.length;
+
+    return { checked, passed, failed };
+  }
+
+  private calculateLayerScore(
+    errors: LayeredValidationError[],
+    warnings: LayeredValidationWarning[],
+    coverage: LayerValidationResult['coverage']
+  ): number {
+    let score = 100;
+    
+    // Deduct for errors
+    score -= errors.filter(e => e.severity === 'critical').length * 25;
+    score -= errors.filter(e => e.severity === 'high').length * 15;
+    score -= errors.filter(e => e.severity === 'medium').length * 10;
+    score -= errors.filter(e => e.severity === 'low').length * 5;
+    
+    // Deduct for warnings
+    score -= warnings.filter(w => w.impact === 'high').length * 5;
+    score -= warnings.filter(w => w.impact === 'medium').length * 3;
+    score -= warnings.filter(w => w.impact === 'low').length * 1;
+    
+    // Factor in coverage
+    score = score * (coverage.percentage / 100);
+    
+    return Math.max(0, Math.round(score));
+  }
+
+  private calculateLayeredOverallScore(
+    layers: LayeredConfigValidationResult['layers'],
+    errors: LayeredValidationError[],
+    warnings: LayeredValidationWarning[]
+  ): number {
+    const layerScores = [layers.universal.score, layers.detection.score, layers.extensions.score];
+    const averageLayerScore = layerScores.reduce((a, b) => a + b, 0) / layerScores.length;
+    
+    // Apply global penalties
+    let globalScore = averageLayerScore;
+    globalScore -= errors.filter(e => e.category === 'compatibility').length * 10;
+    globalScore -= warnings.filter(w => w.category === 'performance').length * 5;
+    
+    return Math.max(0, Math.round(globalScore));
+  }
+
+  private analyzeLayerComplexity(layer: any): number {
+    if (!layer) return 0;
+    const complexity = JSON.stringify(layer).split('{').length + JSON.stringify(layer).split('[').length;
+    return Math.min(10, complexity / 50);
+  }
+
+  private analyzeCrossLayerComplexity(config: LayeredConfiguration): number {
+    // Analyze interactions between layers
+    let complexity = 0;
+    
+    // Detection-Extension interactions
+    if (config.layers.detection?.platform && config.layers.extensions) {
+      complexity += Object.keys(config.layers.extensions).filter(key => 
+        config.layers.extensions[key]?.enabled
+      ).length;
+    }
+    
+    // Universal-Detection interactions
+    if (config.layers.universal?.makerkit && config.layers.detection?.platform) {
+      complexity += 1;
+    }
+    
+    return Math.min(10, complexity);
+  }
+
+  private generateLayeredPerformanceRecommendations(complexity: number): string[] {
+    const recommendations: string[] = [];
+    
+    if (complexity > 7) {
+      recommendations.push('Consider simplifying layer configurations');
+      recommendations.push('Disable unused extensions');
+      recommendations.push('Use configuration templates');
+    }
+    
+    if (complexity > 5) {
+      recommendations.push('Enable configuration caching');
+      recommendations.push('Consider lazy loading for extensions');
+    }
+    
+    return recommendations;
+  }
+
+  private generateLayeredOptimizationSuggestions(config: LayeredConfiguration): string[] {
+    const suggestions = [
+      'Use template-based configurations for better performance',
+      'Enable configuration caching',
+      'Consider batch validation for multiple configurations'
+    ];
+
+    // Layer-specific suggestions
+    if (config.layers.extensions) {
+      const enabledExtensions = Object.keys(config.layers.extensions).filter(
+        key => config.layers.extensions[key]?.enabled
+      );
+      if (enabledExtensions.length > 2) {
+        suggestions.push('Consider reducing number of enabled extensions');
+      }
+    }
+
+    return suggestions;
+  }
+
+  /**
+   * Apply auto-fixes to layered configuration
+   */
+  async applyLayeredAutoFixes(
+    config: LayeredConfiguration,
+    autoFixSuggestions: LayeredAutoFixSuggestion[]
+  ): Promise<{ fixedConfig: LayeredConfiguration; appliedFixes: string[] }> {
+    const fixedConfig = JSON.parse(JSON.stringify(config)) as LayeredConfiguration;
+    const appliedFixes: string[] = [];
+
+    for (const fix of autoFixSuggestions.filter(f => f.riskLevel === 'safe')) {
+      try {
+        this.applyLayeredFix(fixedConfig, fix);
+        appliedFixes.push(`${fix.action} ${fix.path}: ${fix.description}`);
+      } catch (error: any) {
+        Logger.warn(`Failed to apply auto-fix for ${fix.path}: ${error.message}`);
+      }
+    }
+
+    Logger.info(`Applied ${appliedFixes.length} layered auto-fixes`);
+    return { fixedConfig, appliedFixes };
+  }
+
+  private applyLayeredFix(config: LayeredConfiguration, fix: LayeredAutoFixSuggestion): void {
+    const pathParts = fix.path.split('.');
+    let current: any = config;
+
+    // Navigate to parent
+    for (let i = 0; i < pathParts.length - 1; i++) {
+      if (!current[pathParts[i]]) {
+        current[pathParts[i]] = {};
+      }
+      current = current[pathParts[i]];
+    }
+
+    const lastKey = pathParts[pathParts.length - 1];
+
+    switch (fix.action) {
+      case 'add':
+      case 'modify':
+        current[lastKey] = fix.suggestedValue;
+        break;
+      case 'remove':
+        delete current[lastKey];
+        break;
+    }
   }
 }
