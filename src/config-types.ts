@@ -17,6 +17,76 @@ export interface FlexibleSeedConfig {
   createTeamAccounts?: boolean; // Create team accounts for testing
   testUserPassword?: string; // Password for test users
   
+  // Manual Override Configuration (FR-2.5: Support manual platform/domain overrides)
+  detection?: {
+    // Platform architecture override
+    platformArchitecture?: {
+      override?: 'individual' | 'team' | 'hybrid';
+      confidence?: number; // Override confidence level (0-1)
+      reason?: string; // Reason for manual override
+      fallbackToAutoDetection?: boolean; // Whether to fall back to auto-detection if override fails
+    };
+    
+    // Content domain override
+    contentDomain?: {
+      override?: 'outdoor' | 'saas' | 'ecommerce' | 'social' | 'generic';
+      confidence?: number; // Override confidence level (0-1)  
+      reason?: string; // Reason for manual override
+      fallbackToAutoDetection?: boolean; // Whether to fall back to auto-detection if override fails
+      
+      // Domain-specific overrides
+      domainSpecific?: {
+        // Outdoor domain overrides
+        outdoor?: {
+          gearCategories?: string[];
+          brands?: string[];
+          priceRange?: {
+            min: number;
+            max: number;
+          };
+          imageStyle?: 'realistic' | 'stock' | 'adventure';
+        };
+        
+        // SaaS domain overrides
+        saas?: {
+          productivityFocus?: boolean;
+          workspaceType?: 'team-collaboration' | 'individual-productivity' | 'hybrid';
+          subscriptionModel?: 'freemium' | 'tiered' | 'usage-based';
+        };
+        
+        // E-commerce domain overrides
+        ecommerce?: {
+          storeType?: 'marketplace' | 'single-vendor' | 'dropshipping';
+          productCategories?: string[];
+          paymentMethods?: string[];
+          inventoryTracking?: boolean;
+        };
+        
+        // Social domain overrides
+        social?: {
+          platformType?: 'content-sharing' | 'networking' | 'messaging';
+          contentTypes?: string[];
+          interactionFeatures?: string[];
+        };
+      };
+    };
+    
+    // Validation settings for overrides
+    validation?: {
+      enabled: boolean; // Whether to validate overrides against detected patterns
+      strictMode: boolean; // Whether to reject conflicting overrides or just warn
+      warningLevel: 'none' | 'basic' | 'detailed'; // Level of warning detail for mismatches
+      requireConfidenceThreshold: number; // Minimum confidence required for auto-detection to challenge overrides
+    };
+    
+    // Override reporting and debugging
+    reporting?: {
+      enabled: boolean; // Whether to generate override validation reports
+      includeDetectionComparison: boolean; // Whether to compare overrides with auto-detection results
+      saveReportToFile?: string; // Optional file path to save detailed reports
+    };
+  };
+  
   // Schema configuration
   schema: {
     framework: 'simple' | 'makerkit' | 'custom';

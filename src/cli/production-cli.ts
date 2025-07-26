@@ -15,6 +15,7 @@ import { GracefulDegradation } from '../utils/graceful-degradation';
 import { ConfigValidator } from '../utils/config-validator';
 import { StorageCommands } from './storage-commands';
 import { FrameworkCommands } from './framework-commands';
+import { OverrideCommands } from './override-commands';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -354,6 +355,73 @@ export class ProductionCLI {
                 verbose: this.config.verbose,
                 setupId: options.setupId,
                 bucket: options.bucket
+              });
+            });
+          })
+      );
+
+    // Override commands (FR-2.5: Manual Override Support)
+    this.program
+      .command('overrides')
+      .description('Manual override validation and testing')
+      .addCommand(
+        new Command('test')
+          .description('Test manual overrides against auto-detection results')
+          .option('-c, --config <file>', 'Configuration file path')
+          .option('--strict-mode', 'Enable strict validation mode')
+          .option('--warning-level <level>', 'Warning level (none|basic|detailed)', 'detailed')
+          .option('--confidence-threshold <number>', 'Confidence threshold for validation', '0.7')
+          .option('--output-format <format>', 'Output format (text|json)', 'text')
+          .action(async (options) => {
+            await this.handleCommand('override-test', async () => {
+              await OverrideCommands.testOverrides({
+                ...this.getConnectionOptions(),
+                verbose: this.config.verbose,
+                config: options.config,
+                strictMode: options.strictMode,
+                warningLevel: options.warningLevel,
+                confidenceThreshold: parseFloat(options.confidenceThreshold),
+                outputFormat: options.outputFormat
+              });
+            });
+          })
+      )
+      .addCommand(
+        new Command('compare')
+          .description('Compare manual overrides with auto-detection results')
+          .option('-c, --config <file>', 'Configuration file path')
+          .action(async (options) => {
+            await this.handleCommand('override-compare', async () => {
+              await OverrideCommands.compareOverrides({
+                ...this.getConnectionOptions(),
+                verbose: this.config.verbose,
+                config: options.config
+              });
+            });
+          })
+      )
+      .addCommand(
+        new Command('validate-config')
+          .description('Validate override configuration format')
+          .option('-c, --config <file>', 'Configuration file path')
+          .action(async (options) => {
+            await this.handleCommand('override-validate-config', async () => {
+              await OverrideCommands.validateConfig({
+                ...this.getConnectionOptions(),
+                verbose: this.config.verbose,
+                config: options.config
+              });
+            });
+          })
+      )
+      .addCommand(
+        new Command('generate-template')
+          .description('Generate override configuration template with intelligent suggestions')
+          .action(async () => {
+            await this.handleCommand('override-generate-template', async () => {
+              await OverrideCommands.generateTemplate({
+                ...this.getConnectionOptions(),
+                verbose: this.config.verbose
               });
             });
           })
