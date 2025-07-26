@@ -2504,4 +2504,494 @@ export class MakerKitStrategy implements SeedingStrategy {
 
     return baseReport + makerkitSection;
   }
+
+  // ================================================================================
+  // ADVANCED CONSTRAINT HANDLING METHODS - Task 1.5.6
+  // ================================================================================
+
+  /**
+   * Advanced constraint handling with multi-table resolution
+   */
+  async handleAdvancedConstraints(
+    tableName: string,
+    data: any,
+    constraints: any[]
+  ): Promise<ConstraintHandlingResult> {
+    const { MultiTableConstraintResolver } = await import('../../schema/multi-table-constraint-resolver');
+    const resolver = new MultiTableConstraintResolver(this.client, {
+      enableCascadeResolution: true,
+      enableDependencyCreation: true,
+      maxResolutionDepth: 3,
+      strictMode: false
+    });
+
+    try {
+      const result = await resolver.resolveMultiTableConstraints(data, tableName, constraints);
+      
+      return {
+        success: result.success,
+        originalData: data,
+        modifiedData: this.applyModifications(data, result.modifiedRecords),
+        appliedFixes: this.convertToConstraintFixes(result.modifiedRecords, result.createdDependencies),
+        warnings: result.warnings,
+        errors: result.errors,
+        bypassRequired: !result.success
+      };
+    } catch (error: any) {
+      Logger.error('Advanced constraint handling failed:', error);
+      return {
+        success: false,
+        originalData: data,
+        modifiedData: data,
+        appliedFixes: [],
+        warnings: [],
+        errors: [`Advanced constraint handling error: ${error.message}`],
+        bypassRequired: true
+      };
+    }
+  }
+
+  /**
+   * Generate intelligent slugs for team accounts
+   */
+  async generateTeamAccountSlug(data: any): Promise<string> {
+    const { AdvancedSlugManager } = await import('../../schema/slug-management-system');
+    const slugManager = new AdvancedSlugManager(this.client);
+
+    const baseName = data.name || data.organization_name || data.team_name || 'team';
+    
+    try {
+      return await slugManager.generateUniqueSlug(baseName, 'accounts', {
+        maxLength: 50,
+        allowNumbers: true,
+        allowHyphens: true,
+        collisionStrategy: 'increment',
+        reservedSlugs: [
+          'admin', 'api', 'app', 'auth', 'billing', 'dashboard', 'docs', 'help',
+          'home', 'login', 'logout', 'profile', 'settings', 'signup', 'support',
+          'team', 'teams', 'user', 'users', 'www'
+        ]
+      });
+    } catch (error: any) {
+      Logger.warn(`Slug generation failed, using fallback: ${error.message}`);
+      return `${baseName.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${Date.now().toString().slice(-6)}`;
+    }
+  }
+
+  /**
+   * Validate and fix constraint violations with advanced debugging
+   */
+  async validateAndFixConstraints(
+    tableName: string,
+    data: any[],
+    constraints: any[]
+  ): Promise<{
+    validatedData: any[];
+    constraintReport: any;
+    debuggingSession?: string;
+  }> {
+    const { ConstraintDebuggingUtilities } = await import('../../schema/constraint-debugging-utilities');
+    const debuggingUtility = new ConstraintDebuggingUtilities(this.client);
+
+    try {
+      // Start debugging session
+      const sessionId = await debuggingUtility.startDebuggingSession(tableName, constraints, data);
+      
+      // Run comprehensive tests
+      const session = await debuggingUtility.runConstraintTests(sessionId);
+      
+      // Apply fixes based on results
+      const validatedData = data.map((item, index) => {
+        const testResults = session.results.filter(r => r.testDataIndex === index);
+        let modifiedItem = { ...item };
+
+        for (const result of testResults) {
+          if (result.result.success && result.result.appliedFixes.length > 0) {
+            modifiedItem = { ...modifiedItem, ...result.result.modifiedData };
+          }
+        }
+
+        return modifiedItem;
+      });
+
+      const constraintReport = {
+        sessionId: session.sessionId,
+        summary: session.summary,
+        totalIssues: session.results.reduce((sum, r) => sum + r.issues.length, 0),
+        criticalIssues: session.results.filter(r => 
+          r.issues.some(i => i.severity === 'critical')
+        ).length,
+        successRate: (session.summary.successfulHandling / session.summary.totalTests) * 100,
+        recommendations: session.summary.recommendations
+      };
+
+      // Clean up session
+      debuggingUtility.endDebuggingSession(sessionId);
+
+      return {
+        validatedData,
+        constraintReport,
+        debuggingSession: sessionId
+      };
+
+    } catch (error: any) {
+      Logger.error('Constraint validation failed:', error);
+      return {
+        validatedData: data,
+        constraintReport: {
+          error: error.message,
+          success: false
+        }
+      };
+    }
+  }
+
+  /**
+   * Handle complex MakerKit business rules
+   */
+  async handleMakerKitBusinessRules(data: any, tableName: string): Promise<any> {
+    let modifiedData = { ...data };
+
+    // Rule 1: Account creation business logic
+    if (tableName === 'accounts') {
+      modifiedData = await this.handleAccountCreationRules(modifiedData);
+    }
+
+    // Rule 2: Organization membership rules
+    if (tableName === 'organization_members' || tableName === 'team_members') {
+      modifiedData = await this.handleMembershipRules(modifiedData);
+    }
+
+    // Rule 3: Subscription and billing rules
+    if (tableName === 'subscriptions' || tableName === 'billing') {
+      modifiedData = await this.handleSubscriptionRules(modifiedData);
+    }
+
+    // Rule 4: Invitation workflow rules
+    if (tableName === 'invitations') {
+      modifiedData = await this.handleInvitationRules(modifiedData);
+    }
+
+    return modifiedData;
+  }
+
+  /**
+   * Handle account creation business rules
+   */
+  private async handleAccountCreationRules(data: any): Promise<any> {
+    const modified = { ...data };
+
+    // Ensure personal accounts have proper setup
+    if (modified.is_personal_account === true) {
+      modified.slug = null;
+      modified.account_type = 'personal';
+      
+      // Personal accounts don't need organization setup
+      if (modified.organization_id) {
+        Logger.warn('Personal account has organization_id, removing');
+        delete modified.organization_id;
+      }
+    }
+
+    // Ensure team accounts have proper setup
+    if (modified.is_personal_account === false) {
+      modified.account_type = modified.account_type || 'team';
+      
+      // Generate slug if missing
+      if (!modified.slug) {
+        modified.slug = await this.generateTeamAccountSlug(modified);
+      }
+
+      // Team accounts need organization reference
+      if (!modified.organization_id && !modified.organization_name) {
+        Logger.warn('Team account missing organization reference');
+        modified.organization_name = `${modified.name || 'Team'} Organization`;
+      }
+    }
+
+    return modified;
+  }
+
+  /**
+   * Handle organization membership rules
+   */
+  private async handleMembershipRules(data: any): Promise<any> {
+    const modified = { ...data };
+
+    // Ensure role hierarchy is respected
+    if (modified.role === 'owner' && modified.is_owner !== true) {
+      modified.is_owner = true;
+    }
+
+    if (modified.is_owner === true && modified.role !== 'owner') {
+      modified.role = 'owner';
+    }
+
+    // Set default role if missing
+    if (!modified.role) {
+      modified.role = modified.is_owner ? 'owner' : 'member';
+    }
+
+    // Ensure proper timestamps
+    if (!modified.joined_at && !modified.invited_at) {
+      modified.joined_at = new Date().toISOString();
+    }
+
+    return modified;
+  }
+
+  /**
+   * Handle subscription business rules
+   */
+  private async handleSubscriptionRules(data: any): Promise<any> {
+    const modified = { ...data };
+
+    // Ensure proper billing cycle
+    if (!modified.interval && !modified.billing_cycle) {
+      modified.interval = 'month';
+      modified.billing_cycle = 'monthly';
+    }
+
+    // Sync billing cycle with interval
+    if (modified.interval && !modified.billing_cycle) {
+      const cycleMap: Record<string, string> = {
+        'month': 'monthly',
+        'year': 'yearly',
+        'week': 'weekly',
+        'day': 'daily'
+      };
+      modified.billing_cycle = cycleMap[modified.interval] || 'monthly';
+    }
+
+    // Ensure proper status
+    if (!modified.status) {
+      modified.status = 'active';
+    }
+
+    return modified;
+  }
+
+  /**
+   * Handle invitation workflow rules
+   */
+  private async handleInvitationRules(data: any): Promise<any> {
+    const modified = { ...data };
+
+    // Set default status
+    if (!modified.status) {
+      modified.status = 'pending';
+    }
+
+    // Set expiry if missing
+    if (!modified.expires_at) {
+      const expiryDate = new Date();
+      expiryDate.setDate(expiryDate.getDate() + 7);
+      modified.expires_at = expiryDate.toISOString();
+    }
+
+    // Validate role
+    const validRoles = ['owner', 'admin', 'member', 'viewer'];
+    if (modified.role && !validRoles.includes(modified.role)) {
+      Logger.warn(`Invalid role '${modified.role}', defaulting to 'member'`);
+      modified.role = 'member';
+    }
+
+    return modified;
+  }
+
+  /**
+   * Generate comprehensive constraint handling report
+   */
+  async generateConstraintHandlingReport(format: 'json' | 'markdown' = 'markdown'): Promise<string> {
+    try {
+      const constraintStats = await this.analyzeConstraintHandlingStats();
+      
+      if (format === 'json') {
+        return JSON.stringify(constraintStats, null, 2);
+      }
+
+      return this.generateConstraintMarkdownReport(constraintStats);
+    } catch (error: any) {
+      Logger.error('Failed to generate constraint handling report:', error);
+      return `# Constraint Handling Report\n\nError generating report: ${error.message}`;
+    }
+  }
+
+  /**
+   * Analyze constraint handling statistics
+   */
+  private async analyzeConstraintHandlingStats(): Promise<any> {
+    const tables = await this.getTableList();
+    const stats = {
+      totalTables: tables.length,
+      tablesWithConstraints: 0,
+      constraintsByType: {} as Record<string, number>,
+      makerkitSpecificConstraints: 0,
+      complexConstraints: 0,
+      handlerCoverage: 0,
+      recommendedImprovements: [] as string[]
+    };
+
+    for (const table of tables) {
+      try {
+        const constraints = await this.discoverConstraints([table]);
+        if (constraints.hasConstraints) {
+          stats.tablesWithConstraints++;
+        }
+
+        // Use generic constraint analysis since specific properties may not exist
+        const constraintCount = constraints.analysisSummary?.totalConstraints || 0;
+        stats.constraintsByType.total = (stats.constraintsByType.total || 0) + constraintCount;
+
+        // Simplified constraint analysis
+        if (constraints.recommendation && constraints.recommendation.includes('MakerKit')) {
+          stats.makerkitSpecificConstraints++;
+        }
+        
+        if (constraintCount > 3) {
+          stats.complexConstraints++;
+        }
+      } catch (error: any) {
+        Logger.warn(`Failed to analyze constraints for table ${table}: ${error.message}`);
+      }
+    }
+
+    // Calculate handler coverage
+    const totalConstraints = Object.values(stats.constraintsByType).reduce((a, b) => a + b, 0);
+    stats.handlerCoverage = totalConstraints > 0 ? 
+      (stats.makerkitSpecificConstraints / totalConstraints) * 100 : 0;
+
+    // Generate recommendations
+    if (stats.handlerCoverage < 50) {
+      stats.recommendedImprovements.push('Consider implementing more MakerKit-specific constraint handlers');
+    }
+    if (stats.complexConstraints > 5) {
+      stats.recommendedImprovements.push('Review complex constraints for optimization opportunities');
+    }
+    if (stats.tablesWithConstraints / stats.totalTables < 0.7) {
+      stats.recommendedImprovements.push('Consider adding constraints to more tables for data integrity');
+    }
+
+    return stats;
+  }
+
+  /**
+   * Generate markdown constraint report
+   */
+  private generateConstraintMarkdownReport(stats: any): string {
+    return `# MakerKit Constraint Handling Report
+
+## Overview
+- **Total Tables**: ${stats.totalTables}
+- **Tables with Constraints**: ${stats.tablesWithConstraints}
+- **MakerKit-Specific Constraints**: ${stats.makerkitSpecificConstraints}
+- **Complex Constraints**: ${stats.complexConstraints}
+- **Handler Coverage**: ${stats.handlerCoverage.toFixed(1)}%
+
+## Constraint Distribution
+${Object.entries(stats.constraintsByType)
+  .map(([type, count]) => `- **${type.replace('_', ' ').toUpperCase()}**: ${count}`)
+  .join('\n')}
+
+## Recommendations
+${stats.recommendedImprovements.map((rec: string) => `- ${rec}`).join('\n')}
+
+## Advanced Constraint Features
+- ✅ Multi-table constraint resolution
+- ✅ Advanced slug management for team accounts
+- ✅ MakerKit business rule enforcement
+- ✅ Constraint debugging and testing utilities
+- ✅ Intelligent constraint validation
+
+Generated on: ${new Date().toISOString()}
+`;
+  }
+
+  /**
+   * Helper methods for constraint analysis
+   */
+  private isMakerKitSpecificConstraint(constraint: any): boolean {
+    const name = constraint.constraintName?.toLowerCase() || '';
+    const clause = constraint.checkClause?.toLowerCase() || '';
+    
+    return name.includes('account') || 
+           name.includes('organization') || 
+           name.includes('subscription') ||
+           clause.includes('is_personal_account') ||
+           clause.includes('auth.uid()');
+  }
+
+  private isComplexConstraint(constraint: any): boolean {
+    const clause = constraint.checkClause?.toLowerCase() || '';
+    return clause.includes('exists') || 
+           clause.includes('case when') || 
+           clause.split('and').length > 2 ||
+           clause.includes('not exists');
+  }
+
+  private async getTableList(): Promise<string[]> {
+    try {
+      const { data: tables, error } = await this.client
+        .from('pg_tables')
+        .select('tablename')
+        .eq('schemaname', 'public');
+
+      if (error) throw error;
+      return tables.map((table: any) => table.tablename);
+    } catch (error: any) {
+      Logger.warn(`Failed to get table list: ${error.message}`);
+      return [];
+    }
+  }
+
+  /**
+   * Apply record modifications from multi-table resolver
+   */
+  private applyModifications(originalData: any, modifications: any[]): any {
+    let modifiedData = { ...originalData };
+
+    for (const mod of modifications) {
+      if (mod.field && mod.newValue !== undefined) {
+        modifiedData[mod.field] = mod.newValue;
+      }
+    }
+
+    return modifiedData;
+  }
+
+  /**
+   * Convert resolver results to constraint fixes
+   */
+  private convertToConstraintFixes(
+    modifications: any[],
+    dependencies: any[]
+  ): ConstraintFix[] {
+    const fixes: ConstraintFix[] = [];
+
+    // Convert modifications
+    for (const mod of modifications) {
+      fixes.push({
+        type: 'set_field',
+        field: mod.field,
+        oldValue: mod.oldValue,
+        newValue: mod.newValue,
+        reason: mod.reason,
+        confidence: mod.confidence
+      });
+    }
+
+    // Convert dependencies
+    for (const dep of dependencies) {
+      fixes.push({
+        type: 'add_dependency',
+        field: dep.targetTable,
+        oldValue: null,
+        newValue: dep.data,
+        reason: dep.reason,
+        confidence: 0.9
+      });
+    }
+
+    return fixes;
+  }
 }
