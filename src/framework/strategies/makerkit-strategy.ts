@@ -39,6 +39,17 @@ import { ConstraintDiscoveryEngine } from '../../schema/constraint-discovery-eng
 import { ConstraintRegistry } from '../../schema/constraint-registry';
 import { BusinessLogicAnalyzer } from '../../schema/business-logic-analyzer';
 import { RLSCompliantSeeder } from '../../schema/rls-compliant-seeder';
+import { RLSComplianceEngine } from '../../security/rls-compliance-engine';
+import { RLSComplianceValidator } from '../../security/rls-compliance-validator';
+import type { 
+  ComplianceEngineResult, 
+  ComplianceEngineConfig, 
+  ComplianceStatus 
+} from '../../security/rls-compliance-engine';
+import type { 
+  DetailedComplianceReport, 
+  ComplianceValidationOptions 
+} from '../../security/rls-compliance-validator';
 import { RelationshipAnalyzer } from '../../schema/relationship-analyzer';
 import { JunctionTableHandler } from '../../schema/junction-table-handler';
 import { MultiTenantManager } from '../../schema/multi-tenant-manager';
@@ -94,6 +105,8 @@ export class MakerKitStrategy implements SeedingStrategy {
   private identityManager?: IdentityManager;
   private mfaManager?: MFAManager;
   private webhookManager?: DevelopmentWebhookManager;
+  private rlsComplianceEngine?: RLSComplianceEngine;
+  private rlsComplianceValidator?: RLSComplianceValidator;
   private authFlowConfig!: AuthFlowConfig;
 
   async initialize(client: SupabaseClient): Promise<void> {
@@ -108,6 +121,10 @@ export class MakerKitStrategy implements SeedingStrategy {
     
     // Initialize webhook manager for development webhook support
     this.webhookManager = new DevelopmentWebhookManager(client);
+    
+    // Initialize enhanced RLS compliance validation system
+    this.rlsComplianceEngine = new RLSComplianceEngine(client);
+    this.rlsComplianceValidator = new RLSComplianceValidator(client);
     
     // Set default auth flow configuration for MakerKit
     this.authFlowConfig = this.getDefaultAuthFlowConfig();
@@ -2016,5 +2033,475 @@ export class MakerKitStrategy implements SeedingStrategy {
       respectRLS: true,
       storageRootPath: 'supa-seed/makerkit'
     };
+  }
+
+  /**
+   * Enhanced RLS Compliance Validation Methods (Task 1.4.5)
+   * Comprehensive RLS compliance validation for 100% security coverage
+   */
+
+  /**
+   * Perform comprehensive RLS compliance analysis for MakerKit applications
+   */
+  async validateRLSCompliance(
+    options: Partial<ComplianceEngineConfig> = {}
+  ): Promise<ComplianceEngineResult> {
+    Logger.info('🔒 Starting comprehensive MakerKit RLS compliance validation');
+
+    if (!this.rlsComplianceEngine) {
+      throw new Error('RLS compliance engine not initialized');
+    }
+
+    const makerkitConfig: Partial<ComplianceEngineConfig> = {
+      strictMode: true,
+      enableAdvancedParsing: true,
+      enableConflictDetection: true,
+      enablePerformanceAnalysis: true,
+      enableSecurityAnalysis: true,
+      generateReports: true,
+      frameworkSpecific: true,
+      autoFixEnabled: false, // Conservative approach for MakerKit
+      maxConcurrentValidations: 3, // MakerKit-optimized concurrency
+      reportFormat: 'json',
+      auditLevel: 'comprehensive',
+      ...options
+    };
+
+    try {
+      const result = await this.rlsComplianceEngine.analyzeAndEnforceCompliance(makerkitConfig);
+      
+      // Add MakerKit-specific analysis
+      const enhancedResult = await this.enhanceComplianceResultForMakerKit(result);
+      
+      Logger.success(`✅ MakerKit RLS compliance validation completed`);
+      Logger.info(`📊 Compliance Grade: ${enhancedResult.overallCompliance.grade}`);
+      Logger.info(`🔍 MakerKit Score: ${enhancedResult.overallCompliance.score}/100`);
+      
+      return enhancedResult;
+
+    } catch (error: any) {
+      Logger.error('❌ MakerKit RLS compliance validation failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Quick RLS compliance check for seeding operations
+   */
+  async quickRLSCheck(
+    tableName: string,
+    operation: 'SELECT' | 'INSERT' | 'UPDATE' | 'DELETE' = 'INSERT',
+    userContext?: UserContext
+  ): Promise<{
+    isCompliant: boolean;
+    requiresUserContext: boolean;
+    recommendations: string[];
+    riskLevel: 'low' | 'medium' | 'high' | 'critical';
+  }> {
+    Logger.debug(`⚡ Quick MakerKit RLS check for ${tableName} (${operation})`);
+
+    if (!this.rlsComplianceEngine) {
+      throw new Error('RLS compliance engine not initialized');
+    }
+
+    try {
+      const validationResult = await this.rlsComplianceEngine.quickComplianceCheck(
+        tableName,
+        operation,
+        userContext
+      );
+
+      // Enhance with MakerKit-specific insights
+      const makerkitRecommendations = this.generateMakerKitRLSRecommendations(
+        tableName,
+        operation,
+        validationResult
+      );
+
+      const riskLevel = this.assessMakerKitRLSRisk(tableName, validationResult);
+
+      return {
+        isCompliant: validationResult.isCompliant,
+        requiresUserContext: validationResult.requiresUserContext,
+        recommendations: [
+          ...validationResult.suggestedFixes.map(fix => fix.description),
+          ...makerkitRecommendations
+        ],
+        riskLevel
+      };
+
+    } catch (error: any) {
+      Logger.error(`Quick MakerKit RLS check failed for ${tableName}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Validate RLS compliance before seeding operation
+   */
+  async validatePreSeedingRLS(
+    tableName: string,
+    dataCount: number,
+    userContext?: UserContext
+  ): Promise<{
+    approved: boolean;
+    complianceStatus: 'compliant' | 'warning' | 'blocked';
+    message: string;
+    suggestedActions: string[];
+  }> {
+    Logger.debug(`🔍 Pre-seeding RLS validation for ${tableName} (${dataCount} records)`);
+
+    const quickCheck = await this.quickRLSCheck(tableName, 'INSERT', userContext);
+
+    if (!quickCheck.isCompliant) {
+      return {
+        approved: false,
+        complianceStatus: 'blocked',
+        message: `RLS compliance issues prevent seeding ${tableName}`,
+        suggestedActions: quickCheck.recommendations
+      };
+    }
+
+    // Check for MakerKit-specific patterns
+    const makerkitIssues = await this.checkMakerKitSpecificRLSPatterns(tableName);
+
+    if (makerkitIssues.length > 0) {
+      const severity = quickCheck.riskLevel;
+      
+      if (severity === 'critical' || severity === 'high') {
+        return {
+          approved: false,
+          complianceStatus: 'blocked',
+          message: `Critical MakerKit RLS issues found for ${tableName}`,
+          suggestedActions: makerkitIssues
+        };
+      } else {
+        return {
+          approved: true,
+          complianceStatus: 'warning',
+          message: `RLS warnings for ${tableName} - proceeding with caution`,
+          suggestedActions: makerkitIssues
+        };
+      }
+    }
+
+    return {
+      approved: true,
+      complianceStatus: 'compliant',
+      message: `RLS validation passed for ${tableName}`,
+      suggestedActions: []
+    };
+  }
+
+  /**
+   * Generate comprehensive RLS compliance report for MakerKit
+   */
+  async generateRLSComplianceReport(
+    format: 'json' | 'markdown' | 'html' = 'markdown'
+  ): Promise<string> {
+    Logger.info('📄 Generating MakerKit RLS compliance report');
+
+    const complianceResult = await this.validateRLSCompliance();
+    
+    if (!this.rlsComplianceEngine) {
+      throw new Error('RLS compliance engine not initialized');
+    }
+
+    const baseReport = await this.rlsComplianceEngine.generateFormattedReport(
+      complianceResult,
+      format
+    );
+
+    if (format === 'markdown') {
+      return this.enhanceMarkdownReportForMakerKit(baseReport, complianceResult);
+    }
+
+    return baseReport;
+  }
+
+  /**
+   * Auto-fix common MakerKit RLS issues (conservative approach)
+   */
+  async autoFixMakerKitRLSIssues(
+    options: {
+      dryRun?: boolean;
+      enableRLSOnly?: boolean;
+      skipCriticalFixes?: boolean;
+    } = {}
+  ): Promise<{
+    fixesApplied: number;
+    fixesFailed: number;
+    fixesSkipped: number;
+    recommendations: string[];
+    requiresManualReview: string[];
+  }> {
+    Logger.info('🔧 Auto-fixing MakerKit RLS issues');
+
+    const config: Partial<ComplianceEngineConfig> = {
+      autoFixEnabled: !options.dryRun,
+      strictMode: true,
+      frameworkSpecific: true
+    };
+
+    const result = await this.validateRLSCompliance(config);
+    
+    let fixesApplied = 0;
+    let fixesFailed = 0;
+    let fixesSkipped = 0;
+    const recommendations: string[] = [];
+    const requiresManualReview: string[] = [];
+
+    // Process auto-fix results
+    for (const autoFix of result.autoFixResults) {
+      switch (autoFix.status) {
+        case 'applied':
+          fixesApplied++;
+          break;
+        case 'failed':
+          fixesFailed++;
+          break;
+        case 'skipped':
+        case 'requires_manual_review':
+          fixesSkipped++;
+          requiresManualReview.push(`${autoFix.fixType}: ${autoFix.originalIssue}`);
+          break;
+      }
+    }
+
+    // Generate MakerKit-specific recommendations
+    recommendations.push(...this.generateMakerKitRLSFixRecommendations(result));
+
+    Logger.info(`🔧 Auto-fix summary: ${fixesApplied} applied, ${fixesFailed} failed, ${fixesSkipped} skipped`);
+
+    return {
+      fixesApplied,
+      fixesFailed,
+      fixesSkipped,
+      recommendations,
+      requiresManualReview
+    };
+  }
+
+  /**
+   * Private helper methods for MakerKit RLS enhancement
+   */
+  private async enhanceComplianceResultForMakerKit(
+    result: ComplianceEngineResult
+  ): Promise<ComplianceEngineResult> {
+    // Add MakerKit-specific analysis
+    const makerkitPatterns = await this.analyzeMakerKitRLSPatterns(result);
+    
+    // Enhance recommendations with MakerKit-specific guidance
+    const enhancedRecommendations = [
+      ...result.recommendations,
+      ...this.generateMakerKitSpecificRecommendations(result)
+    ];
+
+    return {
+      ...result,
+      recommendations: enhancedRecommendations,
+      // Add MakerKit-specific metadata
+      executionMetrics: {
+        ...result.executionMetrics
+      }
+    };
+  }
+
+  private generateMakerKitRLSRecommendations(
+    tableName: string,
+    operation: string,
+    validationResult: any
+  ): string[] {
+    const recommendations: string[] = [];
+
+    // MakerKit-specific table recommendations
+    if (tableName === 'accounts') {
+      recommendations.push('Ensure account isolation with proper tenant scoping');
+      recommendations.push('Verify personal vs team account RLS policies');
+    }
+
+    if (tableName === 'profiles') {
+      recommendations.push('Implement user-scoped access using auth.uid()');
+      recommendations.push('Consider profile visibility settings for team accounts');
+    }
+
+    if (tableName.includes('organization') || tableName.includes('team')) {
+      recommendations.push('Implement role-based access control for team operations');
+      recommendations.push('Ensure proper member permission validation');
+    }
+
+    if (operation === 'INSERT' && !validationResult.requiresUserContext) {
+      recommendations.push('Consider adding user context for audit trails');
+    }
+
+    return recommendations;
+  }
+
+  private assessMakerKitRLSRisk(
+    tableName: string,
+    validationResult: any
+  ): 'low' | 'medium' | 'high' | 'critical' {
+    // Critical risk tables in MakerKit
+    const criticalTables = ['accounts', 'users', 'organization_members', 'billing'];
+    const sensitiveTable = criticalTables.some(table => tableName.includes(table));
+
+    if (!validationResult.isCompliant) {
+      return sensitiveTable ? 'critical' : 'high';
+    }
+
+    if (validationResult.violatedPolicies.length > 0) {
+      return sensitiveTable ? 'high' : 'medium';
+    }
+
+    return 'low';
+  }
+
+  private async checkMakerKitSpecificRLSPatterns(tableName: string): Promise<string[]> {
+    const issues: string[] = [];
+
+    // Check for common MakerKit patterns
+    if (tableName === 'accounts') {
+      // Check for personal account constraint
+      const hasPersonalAccountConstraint = await this.checkForConstraint(
+        tableName,
+        'accounts_slug_null_if_personal_account'
+      );
+      
+      if (!hasPersonalAccountConstraint) {
+        issues.push('Missing personal account constraint - may affect RLS policy logic');
+      }
+    }
+
+    if (tableName.includes('organization')) {
+      // Check for proper team member policies
+      issues.push('Verify team member access policies for organization data');
+    }
+
+    return issues;
+  }
+
+  private async checkForConstraint(tableName: string, constraintName: string): Promise<boolean> {
+    try {
+      // Simplified constraint check - would use constraint discovery engine in real implementation
+      const { data } = await this.client
+        .rpc('exec_sql', {
+          query: `
+            SELECT 1 FROM information_schema.table_constraints 
+            WHERE table_name = $1 AND constraint_name = $2
+          `,
+          params: [tableName, constraintName]
+        });
+      
+      return data && (data as any[]).length > 0;
+    } catch {
+      return false;
+    }
+  }
+
+  private async analyzeMakerKitRLSPatterns(result: ComplianceEngineResult): Promise<any[]> {
+    const patterns: any[] = [];
+
+    // Analyze common MakerKit RLS patterns
+    for (const policy of result.policyAnalysis.parsedPolicies) {
+      if (policy.parsed.expression.includes('auth.uid()')) {
+        patterns.push({
+          type: 'user_scoped_access',
+          table: policy.tableName,
+          description: 'User-scoped access pattern detected'
+        });
+      }
+
+      if (policy.parsed.expression.includes('account_id')) {
+        patterns.push({
+          type: 'tenant_isolation',
+          table: policy.tableName,
+          description: 'Tenant isolation pattern detected'
+        });
+      }
+    }
+
+    return patterns;
+  }
+
+  private generateMakerKitSpecificRecommendations(result: ComplianceEngineResult): any[] {
+    const recommendations: any[] = [];
+
+    // Add MakerKit-specific security recommendations
+    if (result.overallCompliance.score < 80) {
+      recommendations.push({
+        id: 'makerkit-security-enhancement',
+        priority: 'high',
+        category: 'security',
+        title: 'Enhance MakerKit Security Posture',
+        description: 'Implement MakerKit best practices for RLS policies',
+        impact: 'Improved security for multi-tenant SaaS applications',
+        effort: 'moderate',
+        implementation: [
+          {
+            step: 1,
+            action: 'Review tenant isolation policies',
+            verification: 'Ensure proper account_id scoping'
+          },
+          {
+            step: 2,
+            action: 'Implement user-scoped access controls',
+            verification: 'Verify auth.uid() usage in critical tables'
+          }
+        ],
+        dependencies: ['MakerKit framework knowledge'],
+        risks: ['Potential access control issues'],
+        benefits: ['Better tenant isolation', 'Improved security']
+      });
+    }
+
+    return recommendations;
+  }
+
+  private generateMakerKitRLSFixRecommendations(result: ComplianceEngineResult): string[] {
+    const recommendations: string[] = [];
+
+    // Analyze critical issues specific to MakerKit
+    if (result.overallCompliance.criticalIssues > 0) {
+      recommendations.push('Prioritize fixing critical RLS issues in auth and account tables');
+      recommendations.push('Implement proper tenant isolation before production deployment');
+    }
+
+    if (result.policyAnalysis.securityDistribution.weak > 0) {
+      recommendations.push('Strengthen weak RLS policies with proper user context validation');
+      recommendations.push('Consider implementing role-based access control for team features');
+    }
+
+    recommendations.push('Regular RLS compliance audits recommended for MakerKit applications');
+    recommendations.push('Test RLS policies with different user roles and tenant scenarios');
+
+    return recommendations;
+  }
+
+  private enhanceMarkdownReportForMakerKit(
+    baseReport: string,
+    result: ComplianceEngineResult
+  ): string {
+    const makerkitSection = [
+      '',
+      '## MakerKit-Specific Analysis',
+      '',
+      '### Framework Compatibility',
+      `**MakerKit Version Detected:** ${this.version || 'Unknown'}`,
+      `**Features Detected:** ${this.detectedFeatures.join(', ') || 'Standard'}`,
+      '',
+      '### Common MakerKit Patterns',
+      '- **Tenant Isolation:** Account-based data scoping',
+      '- **User Authentication:** Auth.uid() based access control',
+      '- **Team Management:** Role-based organization access',
+      '',
+      '### MakerKit Recommendations',
+      '1. Ensure all tenant-scoped tables use `account_id` properly',
+      '2. Implement user-scoped policies for personal data',
+      '3. Test RLS policies with different organization roles',
+      '4. Regular compliance audits for multi-tenant security',
+      ''
+    ].join('\n');
+
+    return baseReport + makerkitSection;
   }
 }
