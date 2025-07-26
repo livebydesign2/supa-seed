@@ -9,6 +9,7 @@ import { createClient } from '@supabase/supabase-js';
 import { loadConfiguration } from './config';
 import { Logger } from './utils/logger';
 import { createEnhancedSupabaseClient } from './utils/enhanced-supabase-client';
+import { createExtensionCommands } from './cli/extension-commands';
 import type { SeedConfig } from './types';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -1727,6 +1728,9 @@ async function main() {
         process.exit(1);
       }
     });
+
+  // Add extension management commands
+  program.addCommand(createExtensionCommands());
 
   await program.parseAsync(process.argv);
 }

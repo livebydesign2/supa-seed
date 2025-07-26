@@ -1,3 +1,5 @@
+import type { ExtensionsConfig } from './extensions/extension-config';
+
 export interface FlexibleSeedConfig {
   // Basic connection settings
   supabaseUrl: string;
@@ -325,6 +327,9 @@ export interface FlexibleSeedConfig {
       price?: number;
     }>;
   };
+  
+  // Extension configuration (FR-3.5: Domain extension configuration and customization options)
+  extensions?: ExtensionsConfig;
 }
 
 export interface ConfigProfile {
