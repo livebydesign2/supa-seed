@@ -1,7 +1,7 @@
 {
   "name": "supa-seed",
-  "version": "2.3.2",
-  "description": "A constraint-aware, framework-agnostic database seeding framework with deep PostgreSQL business logic discovery",
+  "version": "2.4.0",
+  "description": "A constraint-aware, framework-agnostic database seeding framework with deep PostgreSQL business logic discovery and MakerKit integration support",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
@@ -53,6 +53,10 @@
     "auto-fix",
     "workflow-generation",
     "makerkit",
+    "makerkit-integration",
+    "existing-users",
+    "hybrid-seeding",
+    "persona-users",
     "constraint-discovery",
     "database-introspection"
   ],
