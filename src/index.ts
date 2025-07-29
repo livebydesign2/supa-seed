@@ -332,6 +332,36 @@ export class SupaSeedFramework {
     if (config.userCount <= 0 || config.setupsPerUser <= 0) {
       throw new Error('userCount and setupsPerUser must be greater than 0');
     }
+
+    // NEW: Validate userStrategy configuration (SUPASEED-001)
+    if (config.userStrategy && !['use-existing', 'create-new', 'hybrid'].includes(config.userStrategy)) {
+      throw new Error(
+        `Invalid userStrategy: '${config.userStrategy}'. Must be 'use-existing', 'create-new', or 'hybrid'.`
+      );
+    }
+
+    // Validate existingUsers configuration when userStrategy requires it
+    if ((config.userStrategy === 'use-existing' || config.userStrategy === 'hybrid') && config.existingUsers) {
+      if (config.existingUsers.table && typeof config.existingUsers.table !== 'string') {
+        throw new Error('existingUsers.table must be a string');
+      }
+      if (config.existingUsers.filter && typeof config.existingUsers.filter !== 'object') {
+        throw new Error('existingUsers.filter must be an object');
+      }
+    }
+
+    // Validate additionalUsers configuration for hybrid mode
+    if (config.userStrategy === 'hybrid' && config.additionalUsers) {
+      if (config.additionalUsers.count && config.additionalUsers.count <= 0) {
+        throw new Error('additionalUsers.count must be greater than 0');
+      }
+      if (config.additionalUsers.authIntegration && 
+          !['makerkit', 'supabase', 'custom'].includes(config.additionalUsers.authIntegration)) {
+        throw new Error(
+          `Invalid additionalUsers.authIntegration: '${config.additionalUsers.authIntegration}'. Must be 'makerkit', 'supabase', or 'custom'.`
+        );
+      }
+    }
   }
 
   private async printSummary(): Promise<void> {
@@ -361,6 +391,22 @@ export function createDefaultConfig(overrides: Partial<SeedConfig> = {}): SeedCo
     enableRealImages: false,
     seed: 'supa-seed-2025',
     emailDomain: 'supaseed.test',
+    
+    // NEW: Default values for MakerKit Integration (SUPASEED-001)
+    // Maintains 100% backward compatibility with 'create-new' as default
+    userStrategy: 'create-new',
+    existingUsers: {
+      preserve: true,
+      table: 'accounts',
+      filter: { is_personal_account: true },
+      idField: 'id'
+    },
+    additionalUsers: {
+      count: 7,
+      personas: ['casual_user', 'expert_user', 'content_creator', 'admin_user', 'power_user'],
+      authIntegration: 'supabase'
+    },
+    
     ...overrides,
   };
 }

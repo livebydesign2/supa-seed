@@ -24,53 +24,85 @@ export class UserSeeder extends SeedModule {
       const users: CachedUser[] = [];
       let successfulUsers = 0;
       let failedUsers = 0;
+
+      // NEW: Handle different user strategies (SUPASEED-001)
+      const userStrategy = this.context.config.userStrategy || 'create-new';
       
-      // Create standard MakerKit test emails if enabled (enhanced)
-      if (this.context.config.createStandardTestEmails) {
-        try {
-          const standardUsers = await this.createEnhancedStandardTestUsers();
-          users.push(...standardUsers);
-          successfulUsers += standardUsers.length;
-        } catch (error: any) {
-          console.log(`⚠️  Standard test user creation failed: ${error.message}`);
-          console.log('   Continuing with regular user creation...');
-          failedUsers++;
-        }
-      }
-      
-      // Create diverse generated users with error recovery
-      console.log(`🔄 Creating ${this.context.config.userCount} users...`);
-      for (let i = 0; i < this.context.config.userCount; i++) {
-        try {
-          const user = await this.createUser();
-          if (user) {
-            users.push(user);
-            this.context.stats.usersCreated++;
-            successfulUsers++;
-          } else {
-            failedUsers++;
+      switch (userStrategy) {
+        case 'use-existing':
+          console.log('📋 Using existing users only...');
+          const existingUsers = await this.useExistingUsers();
+          users.push(...existingUsers);
+          successfulUsers = existingUsers.length;
+          console.log(`✅ Found ${existingUsers.length} existing users`);
+          break;
+          
+        case 'hybrid':
+          console.log('🔀 Using hybrid user strategy (existing + new)...');
+          const hybridResult = await this.hybridUserStrategy();
+          users.push(...hybridResult.allUsers);
+          successfulUsers = hybridResult.totalCreated;
+          console.log(`✅ Hybrid strategy: ${hybridResult.existing} existing + ${hybridResult.created} new = ${hybridResult.allUsers.length} total`);
+          break;
+          
+        case 'create-new':
+        default:
+          // Original behavior - create standard test emails if enabled
+          if (this.context.config.createStandardTestEmails) {
+            try {
+              const standardUsers = await this.createEnhancedStandardTestUsers();
+              users.push(...standardUsers);
+              successfulUsers += standardUsers.length;
+            } catch (error: any) {
+              console.log(`⚠️  Standard test user creation failed: ${error.message}`);
+              console.log('   Continuing with regular user creation...');
+              failedUsers++;
+            }
           }
-        } catch (error: any) {
-          console.log(`⚠️  User ${i + 1} creation failed: ${error.message}`);
-          failedUsers++;
-          // Continue with next user instead of failing completely
-        }
+          
+          // Create diverse generated users with error recovery
+          console.log(`🔄 Creating ${this.context.config.userCount} users...`);
+          for (let i = 0; i < this.context.config.userCount; i++) {
+            try {
+              const user = await this.createUser();
+              if (user) {
+                users.push(user);
+                this.context.stats.usersCreated++;
+                successfulUsers++;
+              } else {
+                failedUsers++;
+              }
+            } catch (error: any) {
+              console.log(`⚠️  User ${i + 1} creation failed: ${error.message}`);
+              failedUsers++;
+              // Continue with next user instead of failing completely
+            }
+          }
+          break;
       }
       
       // Report results
-      console.log(`✅ User creation complete: ${successfulUsers} successful, ${failedUsers} failed`);
+      console.log(`✅ User processing complete: ${successfulUsers} successful, ${failedUsers} failed`);
       
       // Cache users and compatibility info for other seeders (even if some failed)
       this.context.cache.set('users', users);
       this.context.cache.set('schemaAdapter', this.schemaAdapter);
       this.context.cache.set('makerkitCompatibility', this.makerkitCompatibility);
       
-      // If no users were created at all, provide helpful guidance
+      // If no users were found/created at all, provide helpful guidance
       if (users.length === 0) {
-        console.log('🚨 No users were created successfully. This may cause cascade failures.');
-        console.log('💡 Check your schema configuration and column mappings.');
-        console.log('   Other seeders will be skipped to prevent errors.');
-        // Set a flag to indicate no users were created
+        if (userStrategy === 'use-existing') {
+          console.log('🚨 No existing users found matching criteria. This may cause cascade failures.');
+          console.log('💡 Check your existingUsers configuration:');
+          console.log('   1. Table name and filter criteria');
+          console.log('   2. Database permissions');
+          console.log('   3. Existing data in the specified table');
+        } else {
+          console.log('🚨 No users were created successfully. This may cause cascade failures.');
+          console.log('💡 Check your schema configuration and column mappings.');
+          console.log('   Other seeders will be skipped to prevent errors.');
+        }
+        // Set a flag to indicate no users were available
         this.context.cache.set('noUsersCreated', true);
       }
       
@@ -86,6 +118,263 @@ export class UserSeeder extends SeedModule {
       this.context.cache.set('noUsersCreated', true);
       throw error;
     }
+  }
+
+  /**
+   * NEW: Use existing users only (SUPASEED-001)
+   * Queries the database for existing users based on configuration
+   */
+  private async useExistingUsers(): Promise<CachedUser[]> {
+    const existingConfig = this.context.config.existingUsers || {};
+    const table = existingConfig.table || 'accounts';
+    const filter = existingConfig.filter || { is_personal_account: true };
+    const idField = existingConfig.idField || 'id';
+
+    console.log(`🔍 Querying existing users from '${table}' table...`);
+    console.log(`🔍 Filter criteria:`, filter);
+
+    try {
+      // Query existing users with the specified filter
+      const query = this.context.client.from(table).select('*');
+      
+      // Apply filter criteria
+      Object.entries(filter).forEach(([key, value]) => {
+        query.eq(key, value);
+      });
+
+      const { data: existingUsers, error } = await query;
+
+      if (error) {
+        console.error(`❌ Error querying existing users:`, error);
+        throw new Error(`Failed to query existing users from '${table}': ${error.message}`);
+      }
+
+      if (!existingUsers || existingUsers.length === 0) {
+        console.log(`⚠️  No existing users found in '${table}' matching criteria`);
+        return [];
+      }
+
+      // Convert database users to CachedUser format
+      const cachedUsers: CachedUser[] = existingUsers.map((user: any) => {
+        // Try common field mappings for email, name, username
+        const email = user.email || user.email_address || user.user_email || `user-${user[idField]}@existing.test`;
+        const name = user.name || user.display_name || user.full_name || user.username || `User ${user[idField]}`;
+        const username = user.username || user.display_name || user.name || `user_${user[idField]}`;
+
+        return {
+          id: user[idField],
+          email,
+          username,
+          name,
+        };
+      });
+
+      console.log(`✅ Successfully loaded ${cachedUsers.length} existing users`);
+      
+      // Log sample of found users for verification
+      if (cachedUsers.length > 0) {
+        console.log('📋 Sample existing users:');
+        cachedUsers.slice(0, 3).forEach(user => {
+          console.log(`   • ${user.email} (${user.name})`);
+        });
+        if (cachedUsers.length > 3) {
+          console.log(`   ... and ${cachedUsers.length - 3} more`);
+        }
+      }
+
+      return cachedUsers;
+
+    } catch (error: any) {
+      console.error(`❌ Failed to load existing users:`, error.message);
+      
+      // Provide helpful debugging information
+      if (error.message.includes('relation') && error.message.includes('does not exist')) {
+        console.log(`💡 Table '${table}' does not exist. Please check your configuration.`);
+      } else if (error.message.includes('permission denied')) {
+        console.log(`💡 Permission denied accessing '${table}'. Check your service role key permissions.`);
+      } else if (error.message.includes('column') && error.message.includes('does not exist')) {
+        console.log(`💡 One of the filter columns doesn't exist in '${table}'. Check your filter configuration.`);
+      }
+      
+      throw error;
+    }
+  }
+
+  /**
+   * NEW: Hybrid user strategy - combine existing users with newly created ones (SUPASEED-001)
+   */
+  private async hybridUserStrategy(): Promise<{
+    existing: number;
+    created: number;
+    totalCreated: number;
+    allUsers: CachedUser[];
+  }> {
+    console.log('🔀 Starting hybrid user strategy...');
+
+    // Step 1: Load existing users
+    const existingUsers = await this.useExistingUsers();
+    console.log(`📋 Found ${existingUsers.length} existing users`);
+
+    // Step 2: Create additional users based on configuration
+    const additionalConfig = this.context.config.additionalUsers || {};
+    const additionalCount = additionalConfig.count || 7;
+    const personas = additionalConfig.personas || ['casual_user', 'expert_user', 'content_creator', 'admin_user', 'power_user'];
+    
+    console.log(`🆕 Creating ${additionalCount} additional users with personas...`);
+    
+    const newUsers: CachedUser[] = [];
+    let createdCount = 0;
+    let failedCount = 0;
+
+    for (let i = 0; i < additionalCount; i++) {
+      try {
+        // Create user with persona-based profile
+        const persona = personas[i % personas.length];
+        const user = await this.createPersonaUser(persona, i);
+        
+        if (user) {
+          newUsers.push(user);
+          createdCount++;
+          this.context.stats.usersCreated++;
+        } else {
+          failedCount++;
+        }
+      } catch (error: any) {
+        console.log(`⚠️  Persona user ${i + 1} (${personas[i % personas.length]}) creation failed: ${error.message}`);
+        failedCount++;
+      }
+    }
+
+    console.log(`✅ Additional user creation: ${createdCount} successful, ${failedCount} failed`);
+
+    // Step 3: Combine existing and new users
+    const allUsers = [...existingUsers, ...newUsers];
+    
+    // Step 4: Log summary for user visibility
+    console.log('📊 Hybrid Strategy Summary:');
+    console.log(`   • Existing users: ${existingUsers.length}`);
+    console.log(`   • Newly created: ${createdCount}`);
+    console.log(`   • Total available: ${allUsers.length}`);
+    console.log(`   • Failed creations: ${failedCount}`);
+
+    return {
+      existing: existingUsers.length,
+      created: createdCount,
+      totalCreated: existingUsers.length + createdCount, // Total successful users
+      allUsers
+    };
+  }
+
+  /**
+   * NEW: Create a user with persona-based characteristics (SUPASEED-001)
+   */
+  private async createPersonaUser(persona: string, index: number): Promise<CachedUser | null> {
+    const { faker } = this.context;
+    const domainConfig = getDomainConfig(this.context.config.domain);
+    
+    // Generate persona-specific characteristics
+    const personaConfig = this.getPersonaConfig(persona);
+    
+    // Generate realistic profile based on persona
+    const firstName = faker.person.firstName();
+    const lastName = faker.person.lastName();
+    const username = `${personaConfig.usernamePrefix}_${firstName.toLowerCase()}_${lastName.toLowerCase().slice(0, 3)}`;
+    const email = `${username}@${this.context.config.emailDomain || 'supaseed.test'}`;
+    const bio = this.generatePersonaBio(persona, personaConfig, domainConfig);
+    const name = `${firstName} ${lastName}`;
+
+    console.log(`  🎭 Creating ${persona}: ${email}`);
+    
+    try {
+      // Use schema adapter to create user with appropriate strategy
+      const result = await this.schemaAdapter.createUserForSchema({
+        email,
+        name,
+        username,
+        bio,
+        picture_url: this.generateProfileImage(firstName, lastName),
+      });
+
+      if (!result.success) {
+        console.log(`    ⚠️  ${persona} user creation failed: ${result.error}`);
+        return null;
+      }
+
+      console.log(`    ✅ Created ${persona}: ${email}`);
+      return {
+        id: result.id,
+        email,
+        username,
+        name,
+      };
+    } catch (error: any) {
+      console.log(`    ⚠️  Unexpected error creating ${persona} user ${email}: ${error.message}`);
+      return null;
+    }
+  }
+
+  /**
+   * NEW: Get persona-specific configuration (SUPASEED-001)
+   */
+  private getPersonaConfig(persona: string): {
+    usernamePrefix: string;
+    activities: string[];
+    traits: string[];
+    experience: string;
+  } {
+    const personaConfigs: Record<string, any> = {
+      casual_user: {
+        usernamePrefix: 'casual',
+        activities: ['browsing', 'sharing', 'commenting'],
+        traits: ['friendly', 'curious', 'social'],
+        experience: 'beginner'
+      },
+      expert_user: {
+        usernamePrefix: 'expert',
+        activities: ['analyzing', 'teaching', 'mentoring', 'reviewing'],
+        traits: ['knowledgeable', 'detailed', 'helpful'],
+        experience: 'expert'
+      },
+      content_creator: {
+        usernamePrefix: 'creator',
+        activities: ['creating', 'publishing', 'sharing', 'storytelling'],
+        traits: ['creative', 'engaging', 'prolific'],
+        experience: 'intermediate'
+      },
+      admin_user: {
+        usernamePrefix: 'admin',
+        activities: ['managing', 'moderating', 'organizing'],
+        traits: ['responsible', 'organized', 'fair'],
+        experience: 'advanced'
+      },
+      power_user: {
+        usernamePrefix: 'power',
+        activities: ['optimizing', 'customizing', 'automating'],
+        traits: ['efficient', 'technical', 'innovative'],
+        experience: 'advanced'
+      }
+    };
+
+    return personaConfigs[persona] || personaConfigs.casual_user;
+  }
+
+  /**
+   * NEW: Generate persona-specific bio (SUPASEED-001)
+   */
+  private generatePersonaBio(persona: string, personaConfig: any, domainConfig: any): string {
+    const { faker } = this.context;
+    
+    const activity = faker.helpers.arrayElement(personaConfig.activities) as string;
+    const trait = faker.helpers.arrayElement(personaConfig.traits) as string;
+    const location = faker.helpers.arrayElement(domainConfig.locations || ['the community', 'online', 'worldwide']) as string;
+    
+    const templates = [
+      `${personaConfig.experience.charAt(0).toUpperCase() + personaConfig.experience.slice(1)} user passionate about ${activity}. Known for being ${trait}. Active in ${location}.`,
+      `${trait.charAt(0).toUpperCase() + trait.slice(1)} ${persona.replace('_', ' ')} focused on ${activity}. Based in ${location}.`,
+      `${personaConfig.experience.charAt(0).toUpperCase() + personaConfig.experience.slice(1)} level user specializing in ${activity}. ${trait.charAt(0).toUpperCase() + trait.slice(1)} and engaged.`
+    ];
+    
+    return faker.helpers.arrayElement(templates);
   }
 
   /**

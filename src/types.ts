@@ -18,6 +18,20 @@ export interface SeedConfig {
   customTestEmails?: string[]; // Custom test email addresses
   createTeamAccounts?: boolean; // Create team accounts for testing
   testUserPassword?: string; // Password for test users
+  
+  // NEW: MakerKit Integration & Existing User Support (SUPASEED-001)
+  userStrategy?: 'use-existing' | 'create-new' | 'hybrid'; // User creation strategy (default: 'create-new')
+  existingUsers?: {
+    preserve?: boolean; // Preserve existing users (default: true)
+    table?: string; // Table to query for existing users (default: 'accounts')
+    filter?: Record<string, any>; // Filter criteria for existing users
+    idField?: string; // ID field name (default: 'id')
+  };
+  additionalUsers?: {
+    count?: number; // Number of additional users to create (default: 5)
+    personas?: string[]; // User personas for realistic diversity
+    authIntegration?: 'makerkit' | 'supabase' | 'custom'; // Auth integration type (default: 'supabase')
+  };
   schema?: {
     framework?: 'makerkit' | 'simple' | 'custom';
     primaryUserTable?: 'accounts' | 'profiles' | 'users';
