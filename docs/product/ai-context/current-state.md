@@ -11,7 +11,7 @@
 - **Schema Compatibility**: MakerKit column mapping fully resolved (`account_id` detection)
 
 ## ⚠️ Active Decisions Needed
-- **Release Management**: v2.4.7 ready for production deployment
+- **Release Management**: v2.4.8 ready for production deployment
 - **Monitoring Strategy**: Plan real-world usage monitoring to catch future regressions early
 - **Next Feature**: Framework is stable - determine next enhancement priorities
 
@@ -25,12 +25,12 @@
 
 ## ➡️ Next Session Priority  
 1. **NAVIGATE**: `cd /Users/tylerbarnard/Developer/Apps/supa-seed/` (project location)
-2. **RELEASE**: Deploy v2.4.7 to npm - critical fixes are production ready
+2. **RELEASE**: Deploy v2.4.8 to npm - critical fixes are production ready
 3. **MONITOR**: Establish monitoring for user adoption and framework stability
 4. **OPTIMIZE**: Plan next enhancement phase based on user feedback
 
 ## 📊 Quick Stats
-- **Current Version**: v2.4.7 (memory management + schema mapping complete)
+- **Current Version**: v2.4.8 (memory management + schema mapping complete)
 - **TypeScript Errors**: 0 ✅ (clean compilation achieved)
 - **Core Features**: Working (seeding, MakerKit integration, CLI, memory management, schema mapping)
 - **Memory Usage**: SetupSeeder uses 512MB threshold with 25-user batches
@@ -52,4 +52,4 @@
 - **TypeScript**: Clean compilation with `tsc --noEmit`
 - **CLI**: All commands working properly
 - **Documentation**: AI agents can navigate and contribute effectively
-- **Release**: v2.4.7 ready for NPM publication 
+- **Release**: v2.4.8 ready for NPM publication 

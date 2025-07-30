@@ -9,7 +9,7 @@
 Automate database seeding for Supabase applications with framework-aware intelligence, realistic test data, and constraint compliance.
 
 ## Current Phase
-v2.4.7 - Memory management & schema mapping fixes for production stability
+v2.4.8 - Memory management & schema mapping fixes for production stability
 
 ## Key Constraints
 - **Technical**: MakerKit compatibility, RLS compliance, constraint-aware seeding

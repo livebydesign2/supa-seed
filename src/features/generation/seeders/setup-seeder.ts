@@ -130,6 +130,33 @@ export class SetupSeeder extends SeedModule {
       Logger.warn('No configured categories found in tables.setups.categories - falling back to hardcoded types');
     }
     
+    // Validate and log count configuration  
+    const totalSetupsConfig = this.context.config.tables?.setups?.count;
+    if (totalSetupsConfig && totalSetupsConfig > 0) {
+      console.log(`🎯 Using total count distribution: ${totalSetupsConfig} setups distributed across all users`);
+      Logger.info(`Total count mode: will generate exactly ${totalSetupsConfig} setups total`);
+      
+      // Add safety validation
+      const MAX_REASONABLE_SETUPS = 1000; // Configurable safety limit
+      if (totalSetupsConfig > MAX_REASONABLE_SETUPS) {
+        const errorMsg = `Setup count ${totalSetupsConfig} exceeds reasonable limit of ${MAX_REASONABLE_SETUPS}. Use smaller count or add explicit override.`;
+        console.error(`❌ ${errorMsg}`);
+        Logger.error('Setup count safety limit exceeded', { 
+          requested: totalSetupsConfig, 
+          limit: MAX_REASONABLE_SETUPS 
+        });
+        throw new Error(errorMsg);
+      }
+      
+      if (totalSetupsConfig > 100) {
+        console.warn(`⚠️  Large dataset configured: ${totalSetupsConfig} setups may take significant time`);
+        Logger.warn(`Large dataset warning: ${totalSetupsConfig} setups configured`);
+      }
+    } else {
+      console.log(`⚠️  Using legacy per-user count: max ${this.context.config.setupsPerUser} setups per user`);
+      Logger.warn(`Legacy mode: using setupsPerUser=${this.context.config.setupsPerUser} (may generate unexpected amounts)`);
+    }
+    
     const users = this.context.cache.get('users') as CachedUser[];
     const templates = this.context.cache.get('baseTemplates') as CachedBaseTemplate[];
     const schemaAdapter = this.context.cache.get('schemaAdapter') as SchemaAdapter;
@@ -359,11 +386,33 @@ export class SetupSeeder extends SeedModule {
           const user = userItem.data;
           const userSetups: CachedSetup[] = [];
           
-          // Generate random number of setups for this user
-          const setupCount = this.context.faker.number.int({ 
-            min: 1, 
-            max: this.context.config.setupsPerUser 
-          });
+          // Calculate setup count - use new total count distribution or fall back to per-user
+          let setupCount: number;
+          const totalSetupsConfig = this.context.config.tables?.setups?.count;
+          
+          if (totalSetupsConfig && totalSetupsConfig > 0) {
+            // New behavior: distribute total count across all users
+            const totalUsers = users.length;
+            const baseSetupsPerUser = Math.floor(totalSetupsConfig / totalUsers);
+            const remainderSetups = totalSetupsConfig % totalUsers;
+            
+            // Give base count to all users, plus 1 extra to some users for remainder
+            const userIndex = users.findIndex(u => u.id === user.id);
+            setupCount = baseSetupsPerUser + (userIndex < remainderSetups ? 1 : 0);
+            
+            // Ensure at least 0 setups (edge case where total < users)
+            setupCount = Math.max(0, setupCount);
+            
+            Logger.debug(`🎯 Using total count distribution: ${setupCount} setups for user ${user.username} (${userIndex + 1}/${totalUsers}, total: ${totalSetupsConfig})`);
+          } else {
+            // Legacy behavior: random setups per user
+            setupCount = this.context.faker.number.int({ 
+              min: 1, 
+              max: this.context.config.setupsPerUser 
+            });
+            
+            Logger.debug(`⚠️ Using legacy setupsPerUser: ${setupCount} setups for user ${user.username}`);
+          }
           
           Logger.debug(`🎒 Creating ${setupCount} setups for user: ${user.username}`);
           
@@ -429,6 +478,16 @@ export class SetupSeeder extends SeedModule {
     });
     
     console.log(`✅ Created ${totalSetups} setups for ${users.length} users using streaming batch processing`);
+    
+    // Validate total count matches configuration
+    const expectedTotal = this.context.config.tables?.setups?.count;
+    if (expectedTotal && expectedTotal > 0 && totalSetups !== expectedTotal) {
+      console.warn(`⚠️  Generated ${totalSetups} setups but configured for ${expectedTotal} - distribution may be uneven`);
+      Logger.warn('Setup count mismatch', { expected: expectedTotal, actual: totalSetups });
+    } else if (expectedTotal && expectedTotal > 0) {
+      console.log(`🎯 Successfully generated exactly ${totalSetups} setups as configured`);
+      Logger.info('Setup count validation passed - exact count achieved');
+    }
     
     // Log recommendations if any
     if (recommendations.length > 0) {

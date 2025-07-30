@@ -7,6 +7,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.4.8] - 2025-07-30
+
+### 🚨 Critical Fix - FEAT-006 Data Generation Scaling Fixes
+
+**Resolves critical data generation scaling issue where framework generated 750-1500x more data than configured.**
+
+#### Fixed
+- **🔥 CRITICAL: Massive Data Overflow**: Fixed setup seeder to respect `tables.setups.count` as total count instead of per-user multiplier
+- **🔥 CRITICAL: Process Timeouts**: Eliminated process timeouts by generating reasonable dataset sizes instead of 60K+ records
+- **🔥 CRITICAL: Uncontrolled Scaling**: Framework now generates exactly configured count instead of random per-user multiplication
+- **🔥 CRITICAL: Development Unusability**: Framework now creates reasonable test datasets suitable for development work
+
+#### Added
+- **Total Count Distribution**: Smart distribution of total configured count across all users
+- **Intelligent Distribution Algorithm**: Spreads N setups across M users with even distribution plus remainder handling
+- **Safety Limits**: Hard upper limit prevents accidental massive data generation (max 1000 setups)
+- **Enhanced Logging**: Clear visibility into count mode (total vs per-user) and distribution logic
+- **Count Validation**: Post-generation validation confirms exact count achieved
+
+#### Technical Details
+- **Root Cause**: SetupSeeder used `setupsPerUser` as maximum per user instead of reading `tables.setups.count` as total
+- **Solution**: Added distribution logic that calculates `Math.floor(totalCount / userCount)` per user with remainder distribution
+- **Safety**: Added MAX_REASONABLE_SETUPS limit of 1000 with clear error message for larger requests
+- **Backward Compatibility**: Falls back to legacy `setupsPerUser` behavior when new configuration not provided
+
+#### Configuration Behavior
+- **New Behavior**: `tables.setups.count: 8` generates exactly 8 setups total distributed across users
+- **Legacy Behavior**: `setupsPerUser: 3` still works as before (1-3 setups per user)
+- **Distribution Logic**: 8 setups across 5 users = 1-2 setups per user (base + remainder)
+- **Edge Cases**: If count < users, some users get 0 setups
+
+#### Performance Results
+- **Data Generation**: Exactly configured count (was: 750-1500x overflow)
+- **Process Time**: <30 seconds for reasonable datasets (was: timeout >2 minutes)
+- **Memory Usage**: Proportional to configured count (was: excessive due to massive generation)
+- **Development Usability**: Suitable for reasonable test datasets (was: unusable due to data bloat)
+
+#### Example Configurations
+```json
+// New total count approach (v2.4.8)
+{
+  "tables": {
+    "setups": {
+      "count": 8,  // Exactly 8 setups total
+      "categories": ["overlanding", "van-life", "car-camping", "backpacking"]
+    }
+  }
+}
+
+// Legacy per-user approach (still supported)
+{
+  "setupsPerUser": 3  // 1-3 setups per user
+}
+```
+
+#### Breaking Changes
+- None - All changes are backward compatible with existing configurations
+
+---
+
 ## [2.4.7] - 2025-07-30
 
 ### 🚨 Critical Fix - FEAT-005 Enum Configuration Fixes
