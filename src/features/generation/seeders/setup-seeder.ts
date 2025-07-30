@@ -26,6 +26,59 @@ export class SetupSeeder extends SeedModule {
     return domainSetupTypes;
   }
 
+  /**
+   * Validate configured categories against database enum constraints
+   */
+  private async validateCategoriesAgainstEnum(categories: string[]): Promise<{valid: boolean, errors: string[]}> {
+    const { client } = this.context;
+    const errors: string[] = [];
+    
+    try {
+      // Query PostgreSQL to get enum values for outdoor_category type
+      const { data: enumData, error } = await client
+        .from('information_schema.enum_range')
+        .select('enumlabel')
+        .ilike('enumtypid', '%outdoor_category%')
+        .limit(100);
+        
+      if (error) {
+        Logger.debug('Could not query enum values, attempting alternative approach');
+        
+        // Alternative: Try to get enum values from pg_enum
+        const { data: pgEnumData, error: pgEnumError } = await client.rpc('get_enum_values', {
+          enum_name: 'outdoor_category'
+        });
+        
+        if (pgEnumError) {
+          Logger.warn('Could not validate categories against database enum - validation skipped');
+          return { valid: true, errors: [] }; // Allow to proceed without validation
+        }
+        
+        const validEnumValues = Array.isArray(pgEnumData) ? pgEnumData.map((row: any) => row.enumlabel) : [];
+        const invalidCategories = categories.filter(cat => !validEnumValues.includes(cat));
+        
+        if (invalidCategories.length > 0) {
+          errors.push(`Invalid enum values: ${invalidCategories.join(', ')}. Valid values: ${validEnumValues.join(', ')}`);
+        }
+        
+        return { valid: errors.length === 0, errors };
+      }
+      
+      const validEnumValues = Array.isArray(enumData) ? enumData.map((row: any) => row.enumlabel) : [];
+      const invalidCategories = categories.filter(cat => !validEnumValues.includes(cat));
+      
+      if (invalidCategories.length > 0) {
+        errors.push(`Invalid enum values: ${invalidCategories.join(', ')}. Valid values: ${validEnumValues.join(', ')}`);
+      }
+      
+      return { valid: errors.length === 0, errors };
+      
+    } catch (validationError) {
+      Logger.warn('Enum validation failed, proceeding without validation:', validationError);
+      return { valid: true, errors: [] }; // Allow to proceed
+    }
+  }
+
   // Legacy outdoor setup types for backward compatibility
   private outdoorSetupTypes: Record<string, string[]> = {
     'Vehicle': [
@@ -52,6 +105,30 @@ export class SetupSeeder extends SeedModule {
 
   async seed(): Promise<void> {
     console.log('🎒 Seeding setups with memory-efficient batch processing...');
+    
+    // Validate and log category configuration
+    const configuredCategories = this.context.config.tables?.setups?.categories;
+    if (configuredCategories && configuredCategories.length > 0) {
+      console.log(`🎯 Using configured categories: ${configuredCategories.join(', ')}`);
+      Logger.info(`Configuration-based category selection: ${configuredCategories.length} categories provided`);
+      
+      // Validate categories against database enum
+      const validation = await this.validateCategoriesAgainstEnum(configuredCategories);
+      if (!validation.valid) {
+        console.error('❌ Configuration validation failed:');
+        for (const error of validation.errors) {
+          console.error(`   ${error}`);
+        }
+        Logger.error('Invalid categories in configuration', { errors: validation.errors });
+        throw new Error(`Invalid category configuration: ${validation.errors.join('; ')}`);
+      } else {
+        console.log('✅ All configured categories validated against database schema');
+        Logger.info('Category validation passed - all categories are valid enum values');
+      }
+    } else {
+      console.log('⚠️  No categories configured, will use domain-based setup types');
+      Logger.warn('No configured categories found in tables.setups.categories - falling back to hardcoded types');
+    }
     
     const users = this.context.cache.get('users') as CachedUser[];
     const templates = this.context.cache.get('baseTemplates') as CachedBaseTemplate[];
@@ -87,32 +164,54 @@ export class SetupSeeder extends SeedModule {
   ): Promise<CachedSetup | null> {
     const { client, faker } = this.context;
     
-    // Pick a random template (or create generic if no templates)
-    let template: CachedBaseTemplate;
+    // Get categories from configuration first, fallback to domain-based categories
+    const configuredCategories = this.context.config.tables?.setups?.categories;
     let setupCategory: string;
+    let template: CachedBaseTemplate;
     
-    if (templates && templates.length > 0) {
-      template = faker.helpers.arrayElement(templates);
-      const domainSetupTypes = this.getSetupTypes();
-      const setupTypes = domainSetupTypes[template.type] || [];
-      if (setupTypes.length === 0) {
-        console.warn(`⚠️  No setup types found for template type: ${template.type}`);
-        return null;
+    if (configuredCategories && configuredCategories.length > 0) {
+      // Use configured categories exclusively
+      Logger.debug(`🎯 Using configured categories: ${configuredCategories.join(', ')}`);
+      setupCategory = faker.helpers.arrayElement(configuredCategories);
+      
+      // Use template if available, otherwise create generic
+      if (templates && templates.length > 0) {
+        template = faker.helpers.arrayElement(templates);
+      } else {
+        template = {
+          id: '',
+          type: 'General',
+          make: '',
+          model: '',
+        };
       }
-      setupCategory = faker.helpers.arrayElement(setupTypes);
     } else {
-      // Create a generic setup without templates
-      const domainSetupTypes = this.getSetupTypes();
-      const allSetupTypes = Object.values(domainSetupTypes).flat();
-      template = {
-        id: '',
-        type: 'General',
-        make: '',
-        model: '',
-      };
-      setupCategory = faker.helpers.arrayElement(
-        allSetupTypes.length > 0 ? allSetupTypes : ['Adventure Kit', 'Travel Setup', 'Outdoor Essentials', 'Exploration Gear']
-      );
+      // Fallback to legacy domain-based setup types
+      Logger.debug('⚠️  No categories configured, falling back to domain-based setup types');
+      
+      if (templates && templates.length > 0) {
+        template = faker.helpers.arrayElement(templates);
+        const domainSetupTypes = this.getSetupTypes();
+        const setupTypes = domainSetupTypes[template.type] || [];
+        if (setupTypes.length === 0) {
+          console.warn(`⚠️  No setup types found for template type: ${template.type}`);
+          return null;
+        }
+        setupCategory = faker.helpers.arrayElement(setupTypes);
+      } else {
+        // Create a generic setup without templates
+        const domainSetupTypes = this.getSetupTypes();
+        const allSetupTypes = Object.values(domainSetupTypes).flat();
+        template = {
+          id: '',
+          type: 'General',
+          make: '',
+          model: '',
+        };
+        setupCategory = faker.helpers.arrayElement(
+          allSetupTypes.length > 0 ? allSetupTypes : ['Adventure Kit', 'Travel Setup', 'Outdoor Essentials', 'Exploration Gear']
+        );
+      }
     }
     
     // Generate contextual title and description

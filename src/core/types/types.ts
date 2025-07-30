@@ -77,6 +77,21 @@ export interface SeedConfig {
       memberships?: boolean;
     };
   };
+  
+  // Table-specific configuration
+  tables?: {
+    setups?: {
+      count?: number;
+      categories?: string[]; // User-provided categories for setup generation
+    };
+    users?: {
+      count?: number;
+    };
+    posts?: {
+      count?: number;
+      categories?: string[];
+    };
+  };
 }
 
 export interface SeedStats {

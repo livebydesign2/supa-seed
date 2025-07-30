@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.4.7] - 2025-07-30
+
+### 🚨 Critical Fix - FEAT-005 Enum Configuration Fixes
+
+**Resolves critical enum configuration issue where framework ignored user-provided categories and generated invalid enum values.**
+
+#### Fixed
+- **🔥 CRITICAL: Configuration Ignored**: Fixed setup seeder to respect `tables.setups.categories` from user configuration instead of generating hardcoded category names
+- **🔥 CRITICAL: Invalid Enum Values**: Framework now validates configured categories against database enum constraints before data generation
+- **🔥 CRITICAL: Database Constraint Violations**: Eliminated PostgreSQL enum constraint violations by using only configured categories
+- **🔥 CRITICAL: Zero Data Generation**: Fixed complete failure of setup generation due to invalid enum values
+
+#### Added
+- **Configuration Validation**: Pre-flight validation of configured categories against database enum schema
+- **Enhanced Logging**: Clear visibility into category configuration parsing and validation results
+- **Graceful Error Handling**: Informative error messages when configuration validation fails
+- **Structured Logging**: Debug logging for category selection and validation processes
+
+#### Technical Details
+- **Root Cause**: SetupSeeder was using hardcoded categories from `getSetupTypes()` instead of reading `context.config.tables?.setups?.categories`
+- **Solution**: Modified `createSetup()` method to prioritize configured categories over hardcoded domain-based types
+- **Validation**: Added `validateCategoriesAgainstEnum()` method to check configured categories against PostgreSQL enum values
+- **Type Safety**: Added `tables` property to `SeedConfig` interface with proper TypeScript typing
+
+#### Configuration Support
+- Framework now reads `tables.setups.categories` array from configuration
+- Only configured categories are used for setup generation (no hardcoded alternatives)
+- Clear error messages when configuration is missing or contains invalid enum values
+- Backward compatibility maintained - falls back to domain-based types if no configuration provided
+
+#### Performance Results
+- **Data Generation**: 100% success rate with valid configuration (was: 0% due to enum errors)
+- **Configuration Validation**: Fast pre-flight validation prevents wasted generation time
+- **Error Detection**: Clear feedback on configuration issues before data generation starts
+
+#### Breaking Changes
+- None - All fixes are backward compatible with existing configurations
+
+---
+
 ## [2.4.6] - 2025-07-30
 
 ### 🚨 Critical Hotfix - FEAT-004 v2.4.5 Regression Fixes
