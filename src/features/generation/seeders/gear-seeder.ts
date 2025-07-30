@@ -294,21 +294,13 @@ export class GearSeeder extends SeedModule {
     
     console.log(`🏷️  Using enum categories: ${availableEnumValues.join(', ')}`);
     
-    // Create category mapping from gear types to enum values
-    const categoryMapping = gearConfig?.categoryMapping || this.createDefaultCategoryMapping(availableEnumValues);
+    // Instead of mapping gear types to enums, distribute all gear across enum values
+    const allGearItems: any[] = [];
     
+    // Flatten all gear items into a single array
     for (const [gearType, items] of Object.entries(this.gearData)) {
-      // Map gear type to enum value
-      const enumValue = categoryMapping[gearType] || this.findBestEnumMatch(gearType, availableEnumValues);
-      
-      if (!enumValue) {
-        console.warn(`⚠️  No enum mapping found for gear type '${gearType}', skipping`);
-        continue;
-      }
-      
       for (const item of items) {
-        pool.push({
-          [categoryColumn || 'category']: enumValue,
+        allGearItems.push({
           gear_type: gearType,
           make: item.make,
           model: item.model,
@@ -318,6 +310,31 @@ export class GearSeeder extends SeedModule {
         });
       }
     }
+    
+    console.log(`📦 Distributing ${allGearItems.length} gear items across ${availableEnumValues.length} enum categories`);
+    
+    // Distribute gear items evenly across enum values
+    allGearItems.forEach((item, index) => {
+      const enumIndex = index % availableEnumValues.length;
+      const enumValue = availableEnumValues[enumIndex];
+      
+      pool.push({
+        [categoryColumn || 'category']: enumValue,
+        gear_type: item.gear_type,
+        make: item.make,
+        model: item.model,
+        price: item.price,
+        weight: item.weight,
+        description: item.description,
+      });
+    });
+    
+    // Log distribution summary
+    const distribution = availableEnumValues.map((enumValue: string) => {
+      const count = pool.filter(item => item[categoryColumn || 'category'] === enumValue).length;
+      return `${enumValue}: ${count}`;
+    });
+    console.log(`🗂️  Gear distribution: ${distribution.join(', ')}`);
     
     return pool;
   }

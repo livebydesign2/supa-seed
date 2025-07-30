@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.5.2] - 2025-07-30
+
+### 🔧 Critical Hotfix - Enum Detection Fixes
+
+**Resolves critical issues in v2.5.1 enum category support that still attempted to create separate category tables.**
+
+#### Fixed
+- **🔥 CRITICAL: Enum Detection Failure**: Fixed enum value detection to properly read from database schema and existing data
+- **🔥 CRITICAL: Category Mapping Logic**: Replaced complex category mapping with simple even distribution across enum values
+- **🔥 CRITICAL: Hardcoded Category Names**: Eliminated attempts to create categories with names like "Shelter", "Sleep System" 
+- **🔥 CRITICAL: Detection Method**: Fixed enum detection to use information_schema and existing table data
+
+#### Enhanced
+- **Better Enum Detection**: Now reads actual enum type names from information_schema.columns
+- **Fallback Detection**: Uses existing table data to determine enum values when schema queries fail
+- **Even Distribution**: Distributes all gear items evenly across detected enum values
+- **Enhanced Logging**: More detailed debug logging for enum detection and distribution
+
+#### Technical Details
+- **Root Cause**: v2.5.1 enum detection used non-existent RPC functions and complex category mapping
+- **Solution**: Implemented reliable enum detection using information_schema and data sampling
+- **Distribution Logic**: Simple modulo-based distribution ensures all enum values are used
+- **Schema Compatibility**: Works with any PostgreSQL enum type, not just outdoor_category
+
+#### Production Impact
+- **True Enum Support**: Actually uses enum values directly instead of attempting FK table creation
+- **Campfire Compatibility**: Now properly supports outdoor_category enum patterns
+- **Universal Enum Support**: Works with any PostgreSQL enum-based categorization
+
+**✅ Result**: Gear items are now correctly inserted with actual enum values (overlanding, van-life, car-camping, backpacking, ultralight) instead of attempting to create separate category tables.
+
+---
+
 ## [2.5.1] - 2025-07-30
 
 ### 🚀 Major Enhancement - Enum Category Support

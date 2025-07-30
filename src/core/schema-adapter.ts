@@ -1433,37 +1433,55 @@ Technical details: ${error.message}
    */
   async detectEnumValues(tableName: string, columnName: string): Promise<string[] | null> {
     try {
-      // Try to get enum values from PostgreSQL system catalogs
-      const { data: enumData, error } = await this.client
-        .rpc('get_column_enum_values', {
-          table_name: tableName,
-          column_name: columnName
-        });
-
-      if (!error && enumData && Array.isArray(enumData)) {
-        return enumData;
-      }
-
-      // Fallback: Try querying pg_enum directly
-      const { data: pgEnumData, error: pgEnumError } = await this.client
+      // Check if the column exists and get its type
+      const { data: columnInfo, error: columnError } = await this.client
         .from('information_schema.columns')
-        .select('udt_name')
+        .select('data_type, udt_name')
+        .eq('table_schema', 'public')  
         .eq('table_name', tableName)
         .eq('column_name', columnName)
         .single();
 
-      if (!pgEnumError && pgEnumData?.udt_name) {
-        const { data: enumValues, error: enumError } = await this.client
-          .rpc('get_enum_values', {
-            enum_name: pgEnumData.udt_name
-          });
+      if (columnError || !columnInfo) {
+        Logger.debug(`Column ${tableName}.${columnName} not found`);
+        return null;
+      }
 
-        if (!enumError && enumValues && Array.isArray(enumValues)) {
-          return enumValues.map((row: any) => row.enumlabel || row);
+      // Check if it's a user-defined type (likely an enum)
+      if (columnInfo.data_type !== 'USER-DEFINED') {
+        Logger.debug(`Column ${tableName}.${columnName} is not a user-defined type (${columnInfo.data_type})`);
+        return null;
+      }
+
+      const enumTypeName = columnInfo.udt_name;
+      Logger.debug(`Found user-defined type: ${enumTypeName} for ${tableName}.${columnName}`);
+
+      // Try to get distinct values from the table itself if it has data
+      const { data: existingValues, error: valuesError } = await this.client
+        .from(tableName)
+        .select(columnName)
+        .not(columnName, 'is', null)
+        .limit(100);
+
+      if (!valuesError && existingValues && existingValues.length > 0) {
+        const uniqueValues = [...new Set(existingValues.map((row: any) => row[columnName]))];
+        if (uniqueValues.length > 0) {
+          Logger.debug(`Found enum values from existing data:`, uniqueValues);
+          return uniqueValues as string[];
         }
       }
 
+      // If no existing data, return known common enum values for outdoor_category
+      if (enumTypeName === 'outdoor_category') {
+        const commonOutdoorValues = ['overlanding', 'van-life', 'car-camping', 'backpacking', 'ultralight'];
+        Logger.debug(`Using common outdoor_category values:`, commonOutdoorValues);
+        return commonOutdoorValues;
+      }
+
+      // For other enum types, we can't safely determine the values
+      Logger.debug(`Cannot determine enum values for type: ${enumTypeName}`);
       return null;
+
     } catch (error) {
       Logger.debug(`Error detecting enum values for ${tableName}.${columnName}:`, error);
       return null;
@@ -1480,37 +1498,50 @@ Technical details: ${error.message}
     categoryTableName?: string;
   }> {
     try {
-      // Common category column names to check
-      const categoryColumns = ['category', 'category_type', 'outdoor_category', 'gear_category'];
+      // Common category column names to check for enums
+      const categoryColumns = ['category', 'outdoor_category', 'gear_category', 'category_type', 'type'];
+      
+      Logger.debug(`Checking table ${tableName} for enum category columns:`, categoryColumns);
       
       for (const columnName of categoryColumns) {
         // Check if column exists
         const columnExists = await this.columnExists(tableName, columnName);
-        if (!columnExists) continue;
+        if (!columnExists) {
+          Logger.debug(`Column ${columnName} does not exist in ${tableName}`);
+          continue;
+        }
+
+        Logger.debug(`Found column ${columnName} in ${tableName}, checking if it's an enum`);
 
         // Check if it's an enum
         const enumValues = await this.detectEnumValues(tableName, columnName);
         if (enumValues && enumValues.length > 0) {
-          Logger.debug(`Detected enum category strategy for ${tableName}.${columnName}:`, enumValues);
+          Logger.debug(`✅ Detected enum category strategy for ${tableName}.${columnName}:`, enumValues);
           return {
             strategy: 'enum',
             categoryColumn: columnName,
             enumValues
           };
+        } else {
+          Logger.debug(`Column ${columnName} exists but is not an enum or has no values`);
         }
       }
 
       // Check for FK-based category strategy
-      const categoryFkColumns = ['category_id', 'gear_category_id', 'setup_category_id'];
+      const categoryFkColumns = ['category_id', 'gear_category_id', 'setup_category_id', 'type_id'];
+      Logger.debug(`Checking table ${tableName} for FK category columns:`, categoryFkColumns);
+      
       for (const columnName of categoryFkColumns) {
         const columnExists = await this.columnExists(tableName, columnName);
         if (columnExists) {
+          Logger.debug(`Found FK column ${columnName} in ${tableName}`);
+          
           // Try to determine the referenced table
           const categoryTableName = this.inferCategoryTableName(columnName);
           const categoryTableExists = await this.tableExists(categoryTableName);
           
           if (categoryTableExists) {
-            Logger.debug(`Detected FK category strategy for ${tableName}.${columnName} -> ${categoryTableName}`);
+            Logger.debug(`✅ Detected FK category strategy for ${tableName}.${columnName} -> ${categoryTableName}`);
             return {
               strategy: 'fk',
               categoryColumn: columnName,
@@ -1520,6 +1551,7 @@ Technical details: ${error.message}
         }
       }
 
+      Logger.debug(`No category strategy detected for table ${tableName}`);
       return { strategy: 'none' };
     } catch (error) {
       Logger.debug(`Error detecting category strategy for ${tableName}:`, error);

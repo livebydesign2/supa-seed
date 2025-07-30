@@ -14,21 +14,9 @@
       "categories": ["overlanding", "backpacking", "car-camping"]
     },
     "gear": {
-      "count": 10,
-      "categoryStrategy": "enum",
-      "enumCategories": ["overlanding", "van-life", "car-camping", "backpacking", "ultralight"],
-      "categoryMapping": {
-        "Shelter": "backpacking",
-        "Sleep System": "backpacking", 
-        "Cooking": "car-camping",
-        "Navigation": "ultralight",
-        "Safety": "ultralight",
-        "Clothing": "backpacking",
-        "Electronics": "overlanding",
-        "Tools": "car-camping",
-        "Hydration": "ultralight",
-        "Vehicle": "overlanding"
-      }
+      "count": 15,
+      "categoryStrategy": "auto",
+      "enumCategories": ["overlanding", "van-life", "car-camping", "backpacking", "ultralight"]
     }
   },
   "additionalUsers": {
