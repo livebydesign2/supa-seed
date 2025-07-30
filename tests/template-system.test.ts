@@ -9,13 +9,13 @@ import {
   TemplateVariable,
   RenderResult,
   TemplateEngineOptions
-} from '../src/templates/template-engine';
+} from '../src/features/generation/template-engine';
 
 import {
   DynamicVariableResolver,
   VariableResolutionContext,
   ResolutionResult
-} from '../src/templates/variable-resolver';
+} from '../src/features/generation/variable-resolver';
 
 import {
   TemplateValidator,
@@ -23,7 +23,7 @@ import {
   TemplateTest,
   TestSuite,
   ValidationRule
-} from '../src/templates/template-validator';
+} from '../src/features/generation/template-validator';
 
 import {
   TemplateMarketplace,
@@ -31,16 +31,16 @@ import {
   Repository,
   SearchQuery,
   InstallOptions
-} from '../src/templates/template-marketplace';
+} from '../src/features/generation/template-marketplace';
 
-import { SchemaInfo } from '../src/schema-adapter';
+import { SchemaInfo } from '../src/core/schema-adapter';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import * as rimraf from 'rimraf';
 
 // Mock Logger
-jest.mock('../src/utils/logger', () => ({
+jest.mock('../src/core/utils/logger', () => ({
   Logger: {
     debug: jest.fn(),
     info: jest.fn(),

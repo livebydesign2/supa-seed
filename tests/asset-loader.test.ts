@@ -3,13 +3,13 @@
  * Phase 1, Checkpoint A3 validation
  */
 
-import { AssetLoader, AssetLoadOptions, LoadedAsset } from '../src/assets/asset-loader';
+import { AssetLoader, AssetLoadOptions, LoadedAsset } from '../src/features/generation/assets/asset-loader';
 import { writeFile, mkdir, rm } from 'fs/promises';
 import path from 'path';
 import { tmpdir } from 'os';
 
 // Mock Logger
-jest.mock('../src/utils/logger', () => ({
+jest.mock('../src/core/utils/logger', () => ({
   Logger: {
     debug: jest.fn(),
     info: jest.fn(),

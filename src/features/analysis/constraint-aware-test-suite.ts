@@ -7,7 +7,7 @@
 import type { createClient } from '@supabase/supabase-js';
 import { Logger } from '../../core/utils/logger';
 import { ConstraintDiscoveryEngine, type ConstraintMetadata } from './constraint-discovery-engine';
-import { WorkflowGenerator, type WorkflowGenerationOptions } from './workflow-generator';
+import { WorkflowGenerator, type WorkflowGenerationOptions } from '../generation/workflow-generator';
 import { ConstraintAwareExecutor, type WorkflowConfiguration } from './constraint-aware-executor';
 
 type SupabaseClient = ReturnType<typeof createClient>;

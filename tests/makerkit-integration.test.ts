@@ -3,10 +3,10 @@
  * Focused testing of MakerKit-specific functionality and schema compatibility
  */
 
-import { describe, test, expect, beforeAll, afterAll, beforeEach } from 'jest';
+// Jest functions are available globally
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { MakerKitStrategy } from '../src/framework/strategies/makerkit-strategy';
-import { Logger } from '../src/utils/logger';
+import { MakerKitStrategy } from '../src/features/integration/strategies/makerkit-strategy';
+import { Logger } from '../src/core/utils/logger';
 
 // Test configuration
 const TEST_CONFIG = {

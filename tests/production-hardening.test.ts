@@ -7,27 +7,27 @@ import {
   ErrorHandler,
   SupaSeedError,
   withErrorHandling
-} from '../src/utils/error-handler';
+} from '../src/core/utils/error-handler';
 
 import {
   PerformanceMonitor,
   monitor,
   withPerformanceMonitoring
-} from '../src/utils/performance-monitor';
+} from '../src/core/utils/performance-monitor';
 
 import {
   MemoryManager,
   monitorMemory
-} from '../src/utils/memory-manager';
+} from '../src/core/utils/memory-manager';
 
 import {
   GracefulDegradation,
   withGracefulDegradation
-} from '../src/utils/graceful-degradation';
+} from '../src/core/utils/graceful-degradation';
 
 import {
   ConfigValidator
-} from '../src/utils/config-validator';
+} from '../src/core/utils/config-validator';
 
 import * as fs from 'fs';
 import * as path from 'path';
@@ -35,7 +35,7 @@ import * as os from 'os';
 import * as rimraf from 'rimraf';
 
 // Mock Logger
-jest.mock('../src/utils/logger', () => ({
+jest.mock('../src/core/utils/logger', () => ({
   Logger: {
     debug: jest.fn(),
     info: jest.fn(),

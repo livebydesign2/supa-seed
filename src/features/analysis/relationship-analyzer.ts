@@ -13,7 +13,7 @@ import {
   TableMetadata,
   SeedingOrderResult,
   SeedingOrderOptions
-} from './dependency-graph';
+} from '../../schema/dependency-graph';
 
 type SupabaseClient = ReturnType<typeof createClient>;
 

@@ -24,6 +24,28 @@ export interface TemplateResult {
   warnings?: string[];
 }
 
+export interface RenderResult extends TemplateResult {
+  // Alias for backward compatibility
+}
+
+export interface TemplateVariable {
+  name: string;
+  type: 'string' | 'number' | 'boolean' | 'array' | 'object';
+  required?: boolean;
+  defaultValue?: any;
+  description?: string;
+  validation?: {
+    pattern?: string;
+    min?: number;
+    max?: number;
+    enum?: any[];
+  };
+}
+
+export interface TemplateEngineOptions extends TemplateOptions {
+  // Alias for backward compatibility
+}
+
 /**
  * Basic template interface for external use
  */

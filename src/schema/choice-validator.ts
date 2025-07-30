@@ -5,7 +5,7 @@
 
 import { ConfigurationPrompt, ConfigurationOption, UserChoice, ConfigurationAction } from './interactive-configuration';
 import { SchemaChange } from './schema-evolution';
-import { Logger } from '../../core/utils/logger';
+import { Logger } from '../core/utils/logger';
 import * as fs from 'fs';
 import * as path from 'path';
 

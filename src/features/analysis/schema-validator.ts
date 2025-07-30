@@ -1,6 +1,6 @@
 import type { createClient } from '@supabase/supabase-js';
 import { Logger } from '../../core/utils/logger';
-import { SchemaAdapter } from '../core/schema-adapter';
+import { SchemaAdapter } from '../../core/schema-adapter';
 
 type SupabaseClient = ReturnType<typeof createClient>;
 

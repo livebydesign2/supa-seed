@@ -4,7 +4,7 @@
  */
 
 import { LoadedAsset } from './asset-loader';
-import { Logger } from '../../core/utils/logger';
+import { Logger } from '../../../core/utils/logger';
 
 export interface FieldMapping {
   sourceField: string;           // Field in asset metadata or special key like '$content', '$filename'

@@ -6,12 +6,12 @@
  */
 
 import type { createClient } from '@supabase/supabase-js';
-import { Logger } from '../../core/utils/logger';
+import { Logger } from '../core/utils/logger';
 import { 
   ConstraintDiscoveryEngine, 
   type ConstraintMetadata, 
   type BusinessRule as EngineBusinessRule 
-} from './constraint-discovery-engine';
+} from '../features/analysis/constraint-discovery-engine';
 
 type SupabaseClient = ReturnType<typeof createClient>;
 

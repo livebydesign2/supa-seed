@@ -1,5 +1,5 @@
-import { SeedModule, CachedSetup, GeneratedImage, ImageGenerationOptions } from '../core/types/types';
-import { generatePlaceholderImage, downloadUnsplashImage, optimizeImage } from '../../core/utils/image-utils';
+import { SeedModule, CachedSetup, GeneratedImage, ImageGenerationOptions } from '../../../core/types/types';
+import { generatePlaceholderImage, downloadUnsplashImage, optimizeImage } from '../../../core/utils/image-utils';
 
 export class MediaSeeder extends SeedModule {
   private readonly bucketName = 'setup-images';

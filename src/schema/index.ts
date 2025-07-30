@@ -18,30 +18,30 @@ export type {
 } from './schema-introspector';
 
 // Workflow building and execution
-export { WorkflowBuilder } from './workflow-builder';
-export { WorkflowExecutor } from './workflow-executor';
+export { WorkflowBuilder } from '../features/generation/workflow-builder';
+export { WorkflowExecutor } from '../features/generation/workflow-executor';
 export type {
   UserCreationWorkflow as LegacyUserCreationWorkflow,
   WorkflowStep as LegacyWorkflowStep,
   WorkflowField,
   WorkflowCondition,
   WorkflowBuilderConfig
-} from './workflow-builder';
+} from '../features/generation/workflow-builder';
 
 export type {
   WorkflowExecutionResult,
   ExecutionConfig
-} from './workflow-executor';
+} from '../features/generation/workflow-executor';
 
 // Constraint validation
-export { ConstraintValidator } from './constraint-validator';
+export { ConstraintValidator } from '../features/analysis/constraint-validator';
 export type {
   ValidationRule,
   ValidationResult,
   ValidationError,
   ValidationWarning,
   AutoFix
-} from './constraint-validator';
+} from '../features/analysis/constraint-validator';
 
 // Dynamic column mapping
 export { DynamicColumnMapper } from './dynamic-column-mapper';
@@ -95,11 +95,11 @@ export type {
 } from './architecture-test-suite';
 
 // v2.2.0: Constraint-aware architecture components
-export { ConstraintDiscoveryEngine } from './constraint-discovery-engine';
-export { ConstraintAwareExecutor } from './constraint-aware-executor';
-export { WorkflowGenerator } from './workflow-generator';
+export { ConstraintDiscoveryEngine } from '../features/analysis/constraint-discovery-engine';
+export { ConstraintAwareExecutor } from '../features/analysis/constraint-aware-executor';
+export { WorkflowGenerator } from '../features/generation/workflow-generator';
 export { V2_2_0_Migrator } from './v2-2-0-migrator';
-export { ConstraintAwareTestSuite } from './constraint-aware-test-suite';
+export { ConstraintAwareTestSuite } from '../features/analysis/constraint-aware-test-suite';
 
 export type {
   // Constraint discovery types
@@ -110,7 +110,7 @@ export type {
   PostgreSQLTrigger,
   TableDependency,
   DependencyGraph
-} from './constraint-discovery-engine';
+} from '../features/analysis/constraint-discovery-engine';
 
 export type {
   // Workflow execution types from constraint-aware-executor
@@ -120,13 +120,13 @@ export type {
   ConstraintCondition,
   ExecutionResult,
   ConstraintViolation
-} from './constraint-aware-executor';
+} from '../features/analysis/constraint-aware-executor';
 
 export type {
   // Workflow generation types
   WorkflowGenerationOptions,
   GeneratedWorkflowMetadata
-} from './workflow-generator';
+} from '../features/generation/workflow-generator';
 
 export type {
   // v2.2.0 Migration types
@@ -141,24 +141,24 @@ export type {
   TestResult as V2_2_0_TestResult,
   TestSuiteResult as V2_2_0_TestSuiteResult,
   AssertionResult
-} from './constraint-aware-test-suite';
+} from '../features/analysis/constraint-aware-test-suite';
 
 export type {
   ExecutionContext,
   StepResult,
   AutoFixApplied,
   ExecutionSummary
-} from './constraint-aware-executor';
+} from '../features/analysis/constraint-aware-executor';
 
 // Import the actual classes to use in factory functions
 import { SchemaDrivenAdapter } from './schema-driven-adapter';
 import { FrameworkAgnosticUserCreator } from './framework-agnostic-user-creator';
 import { ArchitectureTestSuite } from './architecture-test-suite';
-import { ConstraintDiscoveryEngine } from './constraint-discovery-engine';
-import { ConstraintAwareExecutor } from './constraint-aware-executor';
-import { WorkflowGenerator } from './workflow-generator';
+import { ConstraintDiscoveryEngine } from '../features/analysis/constraint-discovery-engine';
+import { ConstraintAwareExecutor } from '../features/analysis/constraint-aware-executor';
+import { WorkflowGenerator } from '../features/generation/workflow-generator';
 import { V2_2_0_Migrator } from './v2-2-0-migrator';
-import { ConstraintAwareTestSuite } from './constraint-aware-test-suite';
+import { ConstraintAwareTestSuite } from '../features/analysis/constraint-aware-test-suite';
 
 // Convenience factory function for easy setup
 export function createSchemaDrivenSeeder(client: any, config: Partial<any> = {}) {

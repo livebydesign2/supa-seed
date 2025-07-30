@@ -1,6 +1,6 @@
-import { SeedModule, CachedUser, CachedBaseTemplate, CachedSetup } from '../core/types/types';
-import { SchemaAdapter } from '../core/schema-adapter';
-import { getDomainConfig } from '../domains';
+import { SeedModule, CachedUser, CachedBaseTemplate, CachedSetup } from '../../../core/types/types';
+import { SchemaAdapter } from '../../../core/schema-adapter';
+import { getDomainConfig } from '../../../domains';
 
 export class SetupSeeder extends SeedModule {
   private getSetupTypes(): Record<string, string[]> {

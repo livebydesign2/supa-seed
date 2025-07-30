@@ -10,14 +10,14 @@ import {
   AIAssetGenerator
 } from '../src/ai';
 
-import { SchemaInfo } from '../src/schema-adapter';
+import { SchemaInfo } from '../src/core/schema-adapter';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import * as rimraf from 'rimraf';
 
 // Mock Logger
-jest.mock('../src/utils/logger', () => ({
+jest.mock('../src/core/utils/logger', () => ({
   Logger: {
     debug: jest.fn(),
     info: jest.fn(),

@@ -10,12 +10,12 @@ import type {
   SmartDetectionConfig,
   ExtensionsLayerConfig
 } from './config-layers';
-import type { FlexibleSeedConfig } from '../core/types/config-types';
+import type { FlexibleSeedConfig } from '../types/config-types';
 // Advanced customization types not available in v2.4.1
 type DeepOverrideConfig = any;
 type CustomizationResult = any;
 import type { LayeredConfigValidationResult } from './config-validator';
-import { Logger } from '../../core/utils/logger';
+import { Logger } from '../utils/logger';
 import { performance } from 'perf_hooks';
 
 /**

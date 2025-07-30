@@ -16,30 +16,30 @@ import {
   TableConstraints,
   StrategyConstraintResult
 } from '../strategy-interface';
-import { ConstraintDiscoveryEngine } from '../../schema/constraint-discovery-engine';
-import { ConstraintRegistry } from '../../schema/constraint-registry';
-import { BusinessLogicAnalyzer } from '../../schema/business-logic-analyzer';
-import { RLSCompliantSeeder } from '../../schema/rls-compliant-seeder';
-import { RelationshipAnalyzer } from '../../schema/relationship-analyzer';
-import { JunctionTableHandler } from '../../schema/junction-table-handler';
-import { MultiTenantManager } from '../../schema/multi-tenant-manager';
-import { StorageIntegrationManager } from '../../storage/storage-integration-manager';
-import { Logger } from '../../utils/logger';
+import { ConstraintDiscoveryEngine } from '../../analysis/constraint-discovery-engine';
+import { ConstraintRegistry } from '../../analysis/constraint-registry';
+import { BusinessLogicAnalyzer } from '../../analysis/business-logic-analyzer';
+import { RLSCompliantSeeder } from '../../../schema/rls-compliant-seeder';
+import { RelationshipAnalyzer } from '../../analysis/relationship-analyzer';
+import { JunctionTableHandler } from '../../../schema/junction-table-handler';
+import { MultiTenantManager } from '../../../schema/multi-tenant-manager';
+import { StorageIntegrationManager } from '../../generation/storage/storage-integration-manager';
+import { Logger } from '../../../core/utils/logger';
 import type {
   BusinessLogicAnalysisResult,
   RLSComplianceOptions,
   RLSComplianceResult,
   UserContext
-} from '../../schema/business-logic-types';
+} from '../../analysis/business-logic-types';
 import type {
   RelationshipAnalysisResult
-} from '../../schema/relationship-analyzer';
+} from '../../analysis/relationship-analyzer';
 import type {
   JunctionTableDetectionResult,
   JunctionSeedingOptions,
   JunctionSeedingResult
-} from '../../schema/junction-table-handler';
-import type { DependencyGraph } from '../../schema/dependency-graph';
+} from '../../../schema/junction-table-handler';
+import type { DependencyGraph } from '../../../schema/dependency-graph';
 import type {
   TenantDiscoveryResult,
   TenantSeedingResult,
@@ -47,14 +47,14 @@ import type {
   TenantDataGenerationOptions,
   TenantInfo,
   TenantScopeInfo
-} from '../../schema/tenant-types';
+} from '../../../schema/tenant-types';
 import type {
   StorageIntegrationResult,
   StorageConfig,
   StoragePermissionCheck,
   StorageQuotaInfo,
   MediaAttachment
-} from '../../storage/storage-types';
+} from '../../generation/storage/storage-types';
 
 type SupabaseClient = ReturnType<typeof createClient>;
 

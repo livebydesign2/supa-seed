@@ -8,11 +8,11 @@ import {
   MakerKitCompatibilityConfig,
   StandardTestUser,
   MakerKitValidationResult
-} from '../src/compatibility/makerkit-compatibility';
-import { SchemaAdapter } from '../src/schema-adapter';
+} from '../src/features/integration/makerkit-compatibility';
+import { SchemaAdapter } from '../src/core/schema-adapter';
 
 // Mock Logger
-jest.mock('../src/utils/logger', () => ({
+jest.mock('../src/core/utils/logger', () => ({
   Logger: {
     debug: jest.fn(),
     info: jest.fn(),

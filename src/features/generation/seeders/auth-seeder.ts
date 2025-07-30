@@ -1,5 +1,5 @@
-import { SeedModule } from '../core/types/types';
-import { hashPassword } from '../../core/utils/auth-utils';
+import { SeedModule } from '../../../core/types/types';
+import { hashPassword } from '../../../core/utils/auth-utils';
 
 export class AuthSeeder extends SeedModule {
   async seed(): Promise<void> {

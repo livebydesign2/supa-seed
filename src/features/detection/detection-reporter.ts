@@ -8,7 +8,7 @@ import { Logger } from '../../core/utils/logger';
 // Import UnifiedDetectionResult from detection-integration since it's defined there
 import type { UnifiedDetectionResult } from './detection-integration';
 import type { AutoConfigurationResult } from './auto-configurator';
-import type { FlexibleSeedConfig } from '../core/types/config-types';
+import type { FlexibleSeedConfig } from '../../core/types/config-types';
 
 /**
  * Detection report options

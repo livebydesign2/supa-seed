@@ -3,8 +3,8 @@
  * Handles configuration for storage integration across different frameworks
  */
 
-import type { StorageConfig } from '../storage/storage-types';
-import { DOMAIN_CONFIGURATIONS, DEFAULT_STORAGE_CONFIG } from '../storage/storage-types';
+import type { StorageConfig } from '../../features/generation/storage/storage-types';
+import { DOMAIN_CONFIGURATIONS, DEFAULT_STORAGE_CONFIG } from '../../features/generation/storage/storage-types';
 
 export interface FrameworkStorageConfig {
   framework: string;

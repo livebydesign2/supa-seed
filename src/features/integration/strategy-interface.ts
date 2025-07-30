@@ -24,8 +24,8 @@ import type {
   JunctionTableDetectionResult,
   JunctionSeedingOptions,
   JunctionSeedingResult
-} from '../../features/analysis/junction-table-handler';
-import type { DependencyGraph } from '../../features/analysis/dependency-graph';
+} from '../../schema/junction-table-handler';
+import type { DependencyGraph } from '../../schema/dependency-graph';
 import type {
   TenantDiscoveryResult,
   TenantSeedingResult,
@@ -33,14 +33,14 @@ import type {
   TenantDataGenerationOptions,
   TenantInfo,
   TenantScopeInfo
-} from '../../features/analysis/tenant-types';
+} from '../../schema/tenant-types';
 import type {
   StorageIntegrationResult,
   StorageConfig,
   StoragePermissionCheck,
   StorageQuotaInfo,
   MediaAttachment
-} from '../storage/storage-types';
+} from '../generation/storage/storage-types';
 
 type SupabaseClient = ReturnType<typeof createClient>;
 

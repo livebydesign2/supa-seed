@@ -4,7 +4,7 @@
  * Part of Task 1.5.4: Add complex multi-table constraint resolution strategies
  */
 
-import { Logger } from '../../core/utils/logger';
+import { Logger } from '../core/utils/logger';
 import { createClient } from '@supabase/supabase-js';
 import { AdvancedSlugManager } from './slug-management-system';
 import {
@@ -13,7 +13,7 @@ import {
   CheckConstraint,
   ForeignKeyConstraint,
   UniqueConstraint
-} from './constraint-types';
+} from '../features/analysis/constraint-types';
 
 /**
  * Configuration for multi-table constraint resolution

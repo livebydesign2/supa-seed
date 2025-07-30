@@ -3,11 +3,11 @@
  * Phase 2, Checkpoint B3 validation
  */
 
-import { AssetDataMapper, FieldMapping, MappingConfig } from '../src/assets/asset-data-mapper';
-import { LoadedAsset } from '../src/assets/asset-loader';
+import { AssetDataMapper, FieldMapping, MappingConfig } from '../src/features/generation/assets/asset-data-mapper';
+import { LoadedAsset } from '../src/features/generation/assets/asset-loader';
 
 // Mock Logger
-jest.mock('../src/utils/logger', () => ({
+jest.mock('../src/core/utils/logger', () => ({
   Logger: {
     debug: jest.fn(),
     info: jest.fn(),

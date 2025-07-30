@@ -7,7 +7,7 @@ import { glob } from 'glob';
 import { readFile, stat } from 'fs/promises';
 import { parse as parseYaml } from 'yaml';
 import path from 'path';
-import { Logger } from '../../core/utils/logger';
+import { Logger } from '../../../core/utils/logger';
 
 export interface AssetMetadata {
   title?: string;

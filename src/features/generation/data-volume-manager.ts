@@ -3,7 +3,7 @@
  * Manages realistic data volume configuration and generation patterns
  */
 
-import { ExtendedSeedConfig } from '../core/types/config-types';
+import { ExtendedSeedConfig } from '../../core/types/config-types';
 import { Logger } from '../../core/utils/logger';
 
 export interface DataVolumeProfile {

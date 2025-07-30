@@ -12,10 +12,10 @@ import {
   ResolutionContext
 } from '../src/associations/constraint-enforcement';
 import { DistributionTarget, DistributionAssignment } from '../src/associations/distribution-algorithms';
-import { LoadedAsset } from '../src/assets/asset-loader';
+import { LoadedAsset } from '../src/features/generation/assets/asset-loader';
 
 // Mock Logger
-jest.mock('../src/utils/logger', () => ({
+jest.mock('../src/core/utils/logger', () => ({
   Logger: {
     debug: jest.fn(),
     info: jest.fn(),

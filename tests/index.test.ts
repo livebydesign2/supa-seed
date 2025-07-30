@@ -1,11 +1,17 @@
 import { SupaSeedFramework, createDefaultConfig } from '../src/index';
-import { SeedConfig } from '../src/types';
+import { SeedConfig } from '../src/core/types/types';
 
 describe('SupaSeedFramework', () => {
+  const getTestConfig = (): SeedConfig => ({
+    ...createDefaultConfig(),
+    supabaseUrl: process.env.TEST_SUPABASE_URL || 'http://127.0.0.1:54321',
+    supabaseServiceKey: process.env.TEST_SUPABASE_SERVICE_KEY || 'test-key'
+  });
+
   describe('Configuration Validation', () => {
     it('should throw error for missing supabaseUrl', () => {
       const config = {
-        ...global.testConfig,
+        ...getTestConfig(),
         supabaseUrl: '',
       };
 
@@ -16,7 +22,7 @@ describe('SupaSeedFramework', () => {
 
     it('should throw error for missing supabaseServiceKey', () => {
       const config = {
-        ...global.testConfig,
+        ...getTestConfig(),
         supabaseServiceKey: '',
       };
 
@@ -27,7 +33,7 @@ describe('SupaSeedFramework', () => {
 
     it('should throw error for invalid URL format', () => {
       const config = {
-        ...global.testConfig,
+        ...getTestConfig(),
         supabaseUrl: 'not-a-url',
       };
 
@@ -38,7 +44,7 @@ describe('SupaSeedFramework', () => {
 
     it('should throw error for invalid user count', () => {
       const config = {
-        ...global.testConfig,
+        ...getTestConfig(),
         userCount: 0,
       };
 
@@ -48,7 +54,7 @@ describe('SupaSeedFramework', () => {
     });
 
     it('should create framework with valid configuration', () => {
-      expect(() => new SupaSeedFramework(global.testConfig)).not.toThrow();
+      expect(() => new SupaSeedFramework(getTestConfig())).not.toThrow();
     });
   });
 
@@ -84,7 +90,7 @@ describe('SupaSeedFramework', () => {
     let framework: SupaSeedFramework;
 
     beforeEach(() => {
-      framework = new SupaSeedFramework(global.testConfig);
+      framework = new SupaSeedFramework(getTestConfig());
     });
 
     it('should have seed method', () => {

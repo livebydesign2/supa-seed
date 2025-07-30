@@ -4,7 +4,7 @@
  */
 
 import type { createClient } from '@supabase/supabase-js';
-import { SchemaAdapter, SchemaInfo } from '../core/schema-adapter';
+import { SchemaAdapter, SchemaInfo } from '../../core/schema-adapter';
 import { StrategyRegistry, StrategySelection } from './strategy-registry';
 import { DatabaseSchema, SeedingStrategy, UserData, User, SeedingResult } from './strategy-interface';
 import { MakerKitStrategy } from './strategies/makerkit-strategy';

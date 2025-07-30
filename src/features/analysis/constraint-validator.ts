@@ -10,7 +10,7 @@ import {
   ConstraintRule, 
   DatabaseTable, 
   DatabaseConstraint 
-} from './schema-introspector';
+} from '../../schema/schema-introspector';
 import { Logger } from '../../core/utils/logger';
 
 type SupabaseClient = ReturnType<typeof createClient>;

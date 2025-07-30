@@ -3,7 +3,7 @@
  * Manages advanced data generation patterns and domain-specific configurations
  */
 
-import { ExtendedSeedConfig } from '../core/types/config-types';
+import { ExtendedSeedConfig } from '../../core/types/config-types';
 import { Logger } from '../../core/utils/logger';
 
 export interface DataGenerationPattern {

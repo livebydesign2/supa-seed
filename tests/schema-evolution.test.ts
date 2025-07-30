@@ -17,7 +17,7 @@ import {
 import { SupabaseClient } from '@supabase/supabase-js';
 
 // Mock Logger
-jest.mock('../src/utils/logger', () => ({
+jest.mock('../src/core/utils/logger', () => ({
   Logger: {
     debug: jest.fn(),
     info: jest.fn(),
@@ -27,7 +27,7 @@ jest.mock('../src/utils/logger', () => ({
 }));
 
 // Mock SchemaAdapter
-jest.mock('../src/schema-adapter', () => ({
+jest.mock('../src/core/schema-adapter', () => ({
   SchemaAdapter: jest.fn().mockImplementation(() => ({
     getSchemaInfo: jest.fn()
   }))

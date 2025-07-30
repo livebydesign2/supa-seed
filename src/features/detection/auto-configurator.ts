@@ -5,7 +5,7 @@
  */
 
 import { Logger } from '../../core/utils/logger';
-import type { FlexibleSeedConfig } from '../core/types/config-types';
+import type { FlexibleSeedConfig } from '../../core/types/config-types';
 import type {
   PlatformArchitectureType,
   ContentDomainType,

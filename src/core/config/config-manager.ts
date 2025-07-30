@@ -1,16 +1,16 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { FlexibleSeedConfig, ConfigProfile, ConfigDetectionResult, ExtendedSeedConfig } from './config-types';
-import { SchemaAdapter } from './schema-adapter';
-import { FrameworkAdapter } from './framework/framework-adapter';
+import { FlexibleSeedConfig, ConfigProfile, ConfigDetectionResult, ExtendedSeedConfig } from '../types/config-types';
+import { SchemaAdapter } from '../schema-adapter';
+import { FrameworkAdapter } from '../../features/integration/framework-adapter';
 // SchemaEvolutionDetector removed - feature not available in v2.4.1
-import { DataVolumeManager } from './data/data-volume-manager';
-import { CustomRelationshipManager } from './schema/custom-relationship-manager';
-import { DataGenerationPatternManager } from './data/data-generation-pattern-manager';
+import { DataVolumeManager } from '../../features/generation/data-volume-manager';
+import { CustomRelationshipManager } from '../../schema/custom-relationship-manager';
+import { DataGenerationPatternManager } from '../../features/generation/data-generation-pattern-manager';
 import type { createClient } from '@supabase/supabase-js';
-import type { ConstraintHandler } from './schema/constraint-types';
-import type { SeedingStrategy } from './framework/strategy-interface';
-import { Logger } from './utils/logger';
+import type { ConstraintHandler } from '../../features/analysis/constraint-types';
+import type { SeedingStrategy } from '../../features/integration/strategy-interface';
+import { Logger } from '../utils/logger';
 
 type SupabaseClient = ReturnType<typeof createClient>;
 

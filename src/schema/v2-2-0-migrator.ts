@@ -5,19 +5,19 @@
  */
 
 import type { createClient } from '@supabase/supabase-js';
-import { Logger } from '../../core/utils/logger';
+import { Logger } from '../core/utils/logger';
 import { ConfigMigrator, type ModernConfig, type MigrationResult } from './config-migrator';
 import { 
   ConstraintDiscoveryEngine, 
   type ConstraintMetadata 
-} from './constraint-discovery-engine';
+} from '../features/analysis/constraint-discovery-engine';
 import { 
   WorkflowGenerator, 
   type WorkflowGenerationOptions 
-} from './workflow-generator';
+} from '../features/generation/workflow-generator';
 import { 
   type WorkflowConfiguration 
-} from './constraint-aware-executor';
+} from '../features/analysis/constraint-aware-executor';
 
 type SupabaseClient = ReturnType<typeof createClient>;
 

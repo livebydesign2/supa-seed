@@ -5,10 +5,10 @@
  */
 
 import type { createClient } from '@supabase/supabase-js';
-import { ExtendedSeedConfig, FlexibleSeedConfig } from '../core/types/config-types';
-import { SchemaAdapter } from '../core/schema-adapter';
-import { FrameworkAdapter } from '../features/integration/framework-adapter';
-import { Logger } from '../../core/utils/logger';
+import { ExtendedSeedConfig, FlexibleSeedConfig } from '../types/config-types';
+import { SchemaAdapter } from '../schema-adapter';
+import { FrameworkAdapter } from '../../features/integration/framework-adapter';
+import { Logger } from '../utils/logger';
 import type {
   LayeredConfiguration,
   UniversalCoreConfig,

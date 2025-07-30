@@ -9,7 +9,7 @@ import {
   TablePattern, 
   DatabaseColumn 
 } from './schema-introspector';
-import { Logger } from '../../core/utils/logger';
+import { Logger } from '../core/utils/logger';
 
 export interface SemanticField {
   name: string;

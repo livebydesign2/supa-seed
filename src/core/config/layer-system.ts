@@ -4,7 +4,7 @@
  * Core layer management, composition, and conflict resolution
  */
 
-import { Logger } from '../../core/utils/logger';
+import { Logger } from '../utils/logger';
 import type {
   LayeredConfiguration,
   UniversalCoreConfig,
@@ -17,7 +17,7 @@ import type {
   LayerChangeEvent,
   ConfigurationTemplate
 } from './config-layers';
-import type { PlatformArchitectureType, ContentDomainType } from '../features/detection/detection-types';
+import type { PlatformArchitectureType, ContentDomainType } from '../../features/detection/detection-types';
 
 /**
  * Default Universal Core Configuration

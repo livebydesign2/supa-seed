@@ -4,7 +4,7 @@
  * Replaces framework-specific business logic with configurable execution patterns
  */
 
-import { SchemaIntrospector, SchemaIntrospectionResult, TablePattern, ConstraintRule } from './schema-introspector';
+import { SchemaIntrospector, SchemaIntrospectionResult, TablePattern, ConstraintRule } from '../../schema/schema-introspector';
 import { Logger } from '../../core/utils/logger';
 
 export interface WorkflowStep {

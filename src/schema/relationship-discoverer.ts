@@ -11,7 +11,7 @@ import {
   DatabaseTable, 
   DatabaseConstraint 
 } from './schema-introspector';
-import { Logger } from '../../core/utils/logger';
+import { Logger } from '../core/utils/logger';
 
 type SupabaseClient = ReturnType<typeof createClient>;
 

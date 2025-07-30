@@ -1,5 +1,5 @@
-import { SeedModule } from '../core/types/types';
-import { Logger } from '../../core/utils/logger';
+import { SeedModule } from '../../../core/types/types';
+import { Logger } from '../../../core/utils/logger';
 
 export abstract class BaseSeeder extends SeedModule {
   /**

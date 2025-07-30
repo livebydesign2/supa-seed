@@ -1,4 +1,4 @@
-import { SeedModule, CachedSetup } from '../core/types/types';
+import { SeedModule, CachedSetup } from '../../../core/types/types';
 
 export class GearSeeder extends SeedModule {
   private gearData = {

@@ -1,12 +1,12 @@
-import { SeedModule, CachedUser } from '../core/types/types';
-import { generateUsername, generateTestEmail } from '../../core/utils/auth-utils';
-import { SchemaAdapter } from '../core/schema-adapter';
-import { getDomainConfig } from '../domains';
+import { SeedModule, CachedUser } from '../../../core/types/types';
+import { generateUsername, generateTestEmail } from '../../../core/utils/auth-utils';
+import { SchemaAdapter } from '../../../core/schema-adapter';
+import { getDomainConfig } from '../../../domains';
 import { 
   MakerKitCompatibilityLayer, 
   MakerKitCompatibilityConfig,
   StandardTestUser 
-} from '../compatibility/makerkit-compatibility';
+} from '../../integration/makerkit-compatibility';
 
 export class UserSeeder extends SeedModule {
   private schemaAdapter!: SchemaAdapter;

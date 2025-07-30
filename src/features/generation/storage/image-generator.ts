@@ -3,7 +3,7 @@
  * Handles image generation from external APIs (Unsplash, Pixabay) and mock images
  */
 
-import { Logger } from '../../core/utils/logger';
+import { Logger } from '../../../core/utils/logger';
 import {
   ImageGenerationOptions,
   GeneratedImage,

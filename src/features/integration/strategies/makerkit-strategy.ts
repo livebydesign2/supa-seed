@@ -16,62 +16,62 @@ import {
   TableConstraints,
   StrategyConstraintResult
 } from '../strategy-interface';
-import { IdentityManager } from '../../auth/identity-manager';
-import { DevelopmentWebhookManager } from '../../webhooks/development-webhook-manager';
+import { IdentityManager } from '../../../auth/identity-manager';
+import { DevelopmentWebhookManager } from '../../../webhooks/development-webhook-manager';
 import type { 
   CompleteUserData, 
   CompleteUserResult, 
   IdentityProviderType,
   AuthFlowConfig 
-} from '../../auth/auth-types';
+} from '../../../auth/auth-types';
 // MFA types removed - functionality not fully implemented
 import type {
   DevelopmentWebhookConfig,
   WebhookEndpoint,
   PlatformWebhookConfig
-} from '../../webhooks/webhook-types';
-import { ConstraintDiscoveryEngine } from '../../schema/constraint-discovery-engine';
-import { ConstraintRegistry } from '../../schema/constraint-registry';
-import { BusinessLogicAnalyzer } from '../../schema/business-logic-analyzer';
-import { RLSCompliantSeeder } from '../../schema/rls-compliant-seeder';
-import { RLSComplianceEngine } from '../../security/rls-compliance-engine';
-import { RLSComplianceValidator } from '../../security/rls-compliance-validator';
+} from '../../../webhooks/webhook-types';
+import { ConstraintDiscoveryEngine } from '../../analysis/constraint-discovery-engine';
+import { ConstraintRegistry } from '../../analysis/constraint-registry';
+import { BusinessLogicAnalyzer } from '../../analysis/business-logic-analyzer';
+import { RLSCompliantSeeder } from '../../../schema/rls-compliant-seeder';
+import { RLSComplianceEngine } from '../../analysis/rls-compliance-engine';
+import { RLSComplianceValidator } from '../../analysis/rls-compliance-validator';
 import type { 
   ComplianceEngineResult, 
   ComplianceEngineConfig, 
   ComplianceStatus 
-} from '../../security/rls-compliance-engine';
+} from '../../analysis/rls-compliance-engine';
 import type { 
   DetailedComplianceReport, 
   ComplianceValidationOptions 
-} from '../../security/rls-compliance-validator';
-import { RelationshipAnalyzer } from '../../schema/relationship-analyzer';
-import { JunctionTableHandler } from '../../schema/junction-table-handler';
+} from '../../analysis/rls-compliance-validator';
+import { RelationshipAnalyzer } from '../../analysis/relationship-analyzer';
+import { JunctionTableHandler } from '../../../schema/junction-table-handler';
 import type { UnifiedDetectionResult } from '../../detection/detection-integration';
-import { MultiTenantManager } from '../../schema/multi-tenant-manager';
-import { StorageIntegrationManager } from '../../storage/storage-integration-manager';
-import { Logger } from '../../utils/logger';
+import { MultiTenantManager } from '../../../schema/multi-tenant-manager';
+import { StorageIntegrationManager } from '../../generation/storage/storage-integration-manager';
+import { Logger } from '../../../core/utils/logger';
 import { DetectionIntegrationEngine } from '../../detection/detection-integration';
 import { AutoConfigurator } from '../../detection/auto-configurator';
 import type {
   AutoConfigurationResult
 } from '../../detection/auto-configurator';
-import type { FlexibleSeedConfig } from '../../config-types';
+import type { FlexibleSeedConfig } from '../../../core/types/config-types';
 import type {
   BusinessLogicAnalysisResult,
   RLSComplianceOptions,
   RLSComplianceResult,
   UserContext
-} from '../../schema/business-logic-types';
+} from '../../analysis/business-logic-types';
 import type {
   RelationshipAnalysisResult
-} from '../../schema/relationship-analyzer';
+} from '../../analysis/relationship-analyzer';
 import type {
   JunctionTableDetectionResult,
   JunctionSeedingOptions,
   JunctionSeedingResult
-} from '../../schema/junction-table-handler';
-import type { DependencyGraph } from '../../schema/dependency-graph';
+} from '../../../schema/junction-table-handler';
+import type { DependencyGraph } from '../../../schema/dependency-graph';
 import type {
   TenantDiscoveryResult,
   TenantSeedingResult,
@@ -79,7 +79,7 @@ import type {
   TenantDataGenerationOptions,
   TenantInfo,
   TenantScopeInfo
-} from '../../schema/tenant-types';
+} from '../../../schema/tenant-types';
 import type {
   StorageIntegrationResult,
   StorageConfig,
@@ -87,7 +87,7 @@ import type {
   StorageQuotaInfo,
   MediaAttachment,
   DOMAIN_CONFIGURATIONS
-} from '../../storage/storage-types';
+} from '../../generation/storage/storage-types';
 
 type SupabaseClient = ReturnType<typeof createClient>;
 
@@ -2734,7 +2734,7 @@ export class MakerKitStrategy implements SeedingStrategy {
     data: any,
     constraints: any[]
   ): Promise<ConstraintHandlingResult> {
-    const { MultiTableConstraintResolver } = await import('../../schema/multi-table-constraint-resolver');
+    const { MultiTableConstraintResolver } = await import('../../../schema/multi-table-constraint-resolver');
     const resolver = new MultiTableConstraintResolver(this.client, {
       enableCascadeResolution: true,
       enableDependencyCreation: true,
@@ -2772,7 +2772,7 @@ export class MakerKitStrategy implements SeedingStrategy {
    * Generate intelligent slugs for team accounts
    */
   async generateTeamAccountSlug(data: any): Promise<string> {
-    const { AdvancedSlugManager } = await import('../../schema/slug-management-system');
+    const { AdvancedSlugManager } = await import('../../../schema/slug-management-system');
     const slugManager = new AdvancedSlugManager(this.client);
 
     const baseName = data.name || data.organization_name || data.team_name || 'team';
@@ -2807,7 +2807,7 @@ export class MakerKitStrategy implements SeedingStrategy {
     constraintReport: any;
     debuggingSession?: string;
   }> {
-    const { ConstraintDebuggingUtilities } = await import('../../schema/constraint-debugging-utilities');
+    const { ConstraintDebuggingUtilities } = await import('../../analysis/constraint-debugging-utilities');
     const debuggingUtility = new ConstraintDebuggingUtilities(this.client);
 
     try {

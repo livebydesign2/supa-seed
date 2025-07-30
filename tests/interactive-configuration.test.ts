@@ -41,7 +41,7 @@ import * as os from 'os';
 import * as rimraf from 'rimraf';
 
 // Mock Logger
-jest.mock('../src/utils/logger', () => ({
+jest.mock('../src/core/utils/logger', () => ({
   Logger: {
     debug: jest.fn(),
     info: jest.fn(),

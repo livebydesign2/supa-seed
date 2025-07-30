@@ -12,7 +12,7 @@ import {
   type BusinessRule,
   type TableDependency,
   type DependencyGraph
-} from './constraint-discovery-engine';
+} from '../analysis/constraint-discovery-engine';
 import {
   type WorkflowConfiguration,
   type UserCreationWorkflow,
@@ -20,7 +20,7 @@ import {
   type ConstraintCondition,
   type FieldMapping,
   type ErrorAction
-} from './constraint-aware-executor';
+} from '../analysis/constraint-aware-executor';
 
 type SupabaseClient = ReturnType<typeof createClient>;
 

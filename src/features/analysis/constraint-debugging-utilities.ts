@@ -7,8 +7,8 @@
 import { Logger } from '../../core/utils/logger';
 import { createClient } from '@supabase/supabase-js';
 import { ConstraintHandlers } from './constraint-handlers';
-import { MultiTableConstraintResolver } from './multi-table-constraint-resolver';
-import { AdvancedSlugManager } from './slug-management-system';
+import { MultiTableConstraintResolver } from '../../schema/multi-table-constraint-resolver';
+import { AdvancedSlugManager } from '../../schema/slug-management-system';
 import {
   ConstraintHandlingResult,
   ConstraintType,

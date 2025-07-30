@@ -7,7 +7,7 @@
 import type { createClient } from '@supabase/supabase-js';
 import { SchemaDrivenAdapter } from './schema-driven-adapter';
 import { DynamicColumnMapper } from './dynamic-column-mapper';
-import { Logger } from '../../core/utils/logger';
+import { Logger } from '../core/utils/logger';
 import * as fs from 'fs';
 import * as path from 'path';
 

@@ -3,12 +3,12 @@
  * Tests performance characteristics and scalability
  */
 
-import { describe, test, expect, beforeAll, afterAll } from 'jest';
+// Jest functions are available globally
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { SupaSeedFramework } from '../src/index';
-import { MakerKitStrategy } from '../src/framework/strategies/makerkit-strategy';
-import { Logger } from '../src/utils/logger';
-import type { SeedConfig } from '../src/types';
+import { MakerKitStrategy } from '../src/features/integration/strategies/makerkit-strategy';
+import { Logger } from '../src/core/utils/logger';
+import type { SeedConfig } from '../src/core/types/types';
 
 // Performance test configuration
 const PERF_CONFIG: SeedConfig = {

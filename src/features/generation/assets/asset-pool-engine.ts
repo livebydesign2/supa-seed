@@ -4,7 +4,7 @@
  */
 
 import { AssetLoader, LoadedAsset, AssetLoadOptions, AssetLoadResult } from './asset-loader';
-import { Logger } from '../../core/utils/logger';
+import { Logger } from '../../../core/utils/logger';
 import path from 'path';
 
 export interface AssetPool {

@@ -3,10 +3,10 @@
  * Phase 1, Checkpoint A1 validation
  */
 
-import { SchemaAdapter, SchemaInfo } from '../src/schema-adapter';
+import { SchemaAdapter, SchemaInfo } from '../src/core/schema-adapter';
 
 // Mock Logger to avoid chalk import issues
-jest.mock('../src/utils/logger', () => ({
+jest.mock('../src/core/utils/logger', () => ({
   Logger: {
     debug: jest.fn(),
     info: jest.fn(),

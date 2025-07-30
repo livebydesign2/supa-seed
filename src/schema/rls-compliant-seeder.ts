@@ -4,8 +4,8 @@
  */
 
 import type { createClient } from '@supabase/supabase-js';
-import { Logger } from '../../core/utils/logger';
-import { BusinessLogicAnalyzer } from './business-logic-analyzer';
+import { Logger } from '../core/utils/logger';
+import { BusinessLogicAnalyzer } from '../features/analysis/business-logic-analyzer';
 import { 
   RLSPolicyInfo, 
   BusinessLogicAnalysisResult,
@@ -15,7 +15,7 @@ import {
   RLSValidationResult,
   RLSPolicyViolation,
   RLSFixSuggestion
-} from './business-logic-types';
+} from '../features/analysis/business-logic-types';
 
 type SupabaseClient = ReturnType<typeof createClient>;
 

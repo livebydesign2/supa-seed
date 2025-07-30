@@ -6,11 +6,11 @@
 
 import type { createClient } from '@supabase/supabase-js';
 import { SchemaIntrospector, SchemaIntrospectionResult } from './schema-introspector';
-import { WorkflowBuilder, UserCreationWorkflow, WorkflowBuilderConfig } from './workflow-builder';
-import { WorkflowExecutor, WorkflowExecutionResult, ExecutionConfig } from './workflow-executor';
-import { ConstraintValidator, ValidationResult } from './constraint-validator';
+import { WorkflowBuilder, UserCreationWorkflow, WorkflowBuilderConfig } from '../features/generation/workflow-builder';
+import { WorkflowExecutor, WorkflowExecutionResult, ExecutionConfig } from '../features/generation/workflow-executor';
+import { ConstraintValidator, ValidationResult } from '../features/analysis/constraint-validator';
 import { DynamicColumnMapper, TableColumnMap, MappingConfig } from './dynamic-column-mapper';
-import { Logger } from '../../core/utils/logger';
+import { Logger } from '../core/utils/logger';
 
 type SupabaseClient = ReturnType<typeof createClient>;
 

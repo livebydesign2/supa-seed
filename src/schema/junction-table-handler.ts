@@ -4,7 +4,7 @@
  */
 
 import type { createClient } from '@supabase/supabase-js';
-import { Logger } from '../../core/utils/logger';
+import { Logger } from '../core/utils/logger';
 import { DependencyGraph, ForeignKeyRelationship } from './dependency-graph';
 
 type SupabaseClient = ReturnType<typeof createClient>;

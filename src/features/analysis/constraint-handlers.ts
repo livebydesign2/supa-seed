@@ -13,7 +13,7 @@ import {
   UniqueConstraint,
   ConstraintType
 } from './constraint-types';
-import { registerMakerKitConstraintHandlers } from './makerkit-constraint-handlers';
+import { registerMakerKitConstraintHandlers } from '../../schema/makerkit-constraint-handlers';
 
 export class ConstraintHandlers {
   private static handlers: Map<string, ConstraintHandler> = new Map();

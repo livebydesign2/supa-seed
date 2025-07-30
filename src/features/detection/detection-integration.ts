@@ -14,8 +14,8 @@ import { DetectionCacheManager, DetectionCacheUtils } from './detection-cache';
 import { AutoConfigurator, type AutoConfigurationResult, type AutoConfigurationOptions } from './auto-configurator';
 
 // Import existing detection systems
-import { SchemaIntrospector, type SchemaIntrospectionResult } from '../../features/analysis/schema-introspector';
-import { MakerKitDetector, type MakerKitDetectionResult } from '../features/integration/strategies/makerkit-detector';
+import { SchemaIntrospector, type SchemaIntrospectionResult } from '../../schema/schema-introspector';
+import { MakerKitDetector, type MakerKitDetectionResult } from '../../features/integration/strategies/makerkit-detector';
 
 // Import new architecture detection system
 import { ArchitectureDetectionEngine } from './architecture-detector';

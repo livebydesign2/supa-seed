@@ -1,4 +1,4 @@
-import { ImageGenerationOptions, GeneratedImage } from '../core/types/types';
+import { ImageGenerationOptions, GeneratedImage } from '../types/types';
 
 /**
  * Generate a placeholder image buffer for seeding

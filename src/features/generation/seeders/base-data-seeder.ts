@@ -1,7 +1,7 @@
 import { BaseSeeder } from './base-seeder';
-import { Logger } from '../../core/utils/logger';
-import { getDomainConfig } from '../domains';
-import { SchemaAdapter } from '../core/schema-adapter';
+import { Logger } from '../../../core/utils/logger';
+import { getDomainConfig } from '../../../domains';
+import { SchemaAdapter } from '../../../core/schema-adapter';
 
 export class BaseDataSeeder extends BaseSeeder {
   

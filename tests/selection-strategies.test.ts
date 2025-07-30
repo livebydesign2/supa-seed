@@ -3,11 +3,11 @@
  * Phase 2, Checkpoint B2 validation
  */
 
-import { AssetSelectionEngine, SelectionOptions, WeightedSelectionConfig } from '../src/assets/selection-strategies';
-import { LoadedAsset } from '../src/assets/asset-loader';
+import { AssetSelectionEngine, SelectionOptions, WeightedSelectionConfig } from '../src/features/generation/assets/selection-strategies';
+import { LoadedAsset } from '../src/features/generation/assets/asset-loader';
 
 // Mock Logger
-jest.mock('../src/utils/logger', () => ({
+jest.mock('../src/core/utils/logger', () => ({
   Logger: {
     debug: jest.fn(),
     info: jest.fn(),

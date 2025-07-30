@@ -5,7 +5,7 @@
 
 import type { createClient } from '@supabase/supabase-js';
 import { DatabaseSchema, FunctionInfo, ConstraintInfo } from '../strategy-interface';
-import { Logger } from '../../utils/logger';
+import { Logger } from '../../../core/utils/logger';
 
 type SupabaseClient = ReturnType<typeof createClient>;
 

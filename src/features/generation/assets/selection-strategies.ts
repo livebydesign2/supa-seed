@@ -4,7 +4,7 @@
  */
 
 import { LoadedAsset } from './asset-loader';
-import { Logger } from '../../core/utils/logger';
+import { Logger } from '../../../core/utils/logger';
 
 export interface SelectionResult {
   selected: LoadedAsset[];

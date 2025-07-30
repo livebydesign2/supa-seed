@@ -4,7 +4,7 @@
  * Part of Task 1.5.2: Create MakerKit-specific constraint handlers
  */
 
-import { Logger } from '../../core/utils/logger';
+import { Logger } from '../core/utils/logger';
 import {
   ConstraintHandler,
   ConstraintHandlingResult,
@@ -13,7 +13,7 @@ import {
   ForeignKeyConstraint,
   UniqueConstraint,
   ConstraintType
-} from './constraint-types';
+} from '../features/analysis/constraint-types';
 
 /**
  * Advanced MakerKit Cross-Table Constraint Handler
