@@ -4,8 +4,8 @@
  */
 
 import { SupabaseClient } from '@supabase/supabase-js';
-import { SchemaInfo, SchemaAdapter } from '../schema-adapter';
-import { Logger } from '../utils/logger';
+import { SchemaInfo, SchemaAdapter } from '../core/schema-adapter';
+import { Logger } from '../../core/utils/logger';
 
 export interface TableSchema {
   name: string;

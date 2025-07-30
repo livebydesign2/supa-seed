@@ -3,7 +3,7 @@
  * Phase 5, Checkpoint E1 - Local AI integration for asset generation
  */
 
-import { Logger } from '../utils/logger';
+import { Logger } from '../core/utils/logger';
 import * as http from 'http';
 import * as https from 'https';
 

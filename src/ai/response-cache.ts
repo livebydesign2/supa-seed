@@ -3,7 +3,7 @@
  * Phase 5, Checkpoint E1 - Intelligent caching to avoid regeneration and improve performance
  */
 
-import { Logger } from '../utils/logger';
+import { Logger } from '../core/utils/logger';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';

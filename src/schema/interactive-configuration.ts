@@ -4,7 +4,7 @@
  */
 
 import { SchemaChange, ConfigurationImpact, MigrationSuggestion } from './schema-evolution';
-import { Logger } from '../utils/logger';
+import { Logger } from '../../core/utils/logger';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as readline from 'readline';

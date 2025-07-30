@@ -5,7 +5,7 @@
  */
 
 import type { createClient } from '@supabase/supabase-js';
-import { Logger } from '../utils/logger';
+import { Logger } from '../../core/utils/logger';
 import { ConfigMigrator, type ModernConfig, type MigrationResult } from './config-migrator';
 import { 
   ConstraintDiscoveryEngine, 

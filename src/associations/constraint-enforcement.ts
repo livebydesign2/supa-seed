@@ -3,9 +3,9 @@
  * Phase 3, Checkpoint C2 - Advanced constraint validation and conflict resolution
  */
 
-import { LoadedAsset } from '../assets/asset-loader';
+import { LoadedAsset } from '../features/generation/assets/asset-loader';
 import { DistributionTarget, DistributionAssignment } from './distribution-algorithms';
-import { Logger } from '../utils/logger';
+import { Logger } from '../core/utils/logger';
 
 export interface ConstraintRule {
   id: string;

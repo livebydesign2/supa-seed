@@ -3,14 +3,14 @@
 import { program } from 'commander';
 import ora from 'ora';
 import { SupaSeedFramework, createDefaultConfig } from './index';
-import { FrameworkAdapter } from './framework/framework-adapter';
-import { ConfigManager } from './config-manager';
+import { FrameworkAdapter } from './features/integration/framework-adapter';
+import { ConfigManager } from './core/config/config-manager';
 import { createClient } from '@supabase/supabase-js';
 import { loadConfiguration } from './config';
-import { Logger } from './utils/logger';
-import { createEnhancedSupabaseClient } from './utils/enhanced-supabase-client';
+import { Logger } from './core/utils/logger';
+import { createEnhancedSupabaseClient } from './core/utils/enhanced-supabase-client';
 // Extension commands not available in v2.4.1
-import type { SeedConfig } from './types';
+import type { SeedConfig } from './core/types/types';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -442,9 +442,9 @@ async function main() {
         if (options.format !== 'cli' || options.strategy !== 'comprehensive' || options.noConfig === false) {
           try {
             // Import enhanced detection system
-            const { DetectionIntegrationEngine } = await import('./detection/detection-integration');
-            const { AutoConfigurator } = await import('./detection/auto-configurator');
-            const { DetectionReporter } = require('./detection/detection-reporter');
+            const { DetectionIntegrationEngine } = await import('./features/detection/detection-integration');
+            const { AutoConfigurator } = await import('./features/detection/auto-configurator');
+            const { DetectionReporter } = require('./features/detection/detection-reporter');
             
             spinner.text = 'Running enhanced platform detection...';
             
@@ -549,7 +549,7 @@ async function main() {
         const client = createEnhancedSupabaseClient(config.config.supabaseUrl, config.config.supabaseServiceKey);
         
         // Import constraint discovery engine
-        const { ConstraintDiscoveryEngine } = await import('./schema/constraint-discovery-engine');
+        const { ConstraintDiscoveryEngine } = await import('./features/analysis/constraint-discovery-engine');
         const constraintEngine = new ConstraintDiscoveryEngine(client as any);
 
         // Get table names to analyze
@@ -614,7 +614,7 @@ async function main() {
         const client = createEnhancedSupabaseClient(config.config.supabaseUrl, config.config.supabaseServiceKey);
         
         // Import workflow generator
-        const { WorkflowGenerator } = await import('./schema/workflow-generator');
+        const { WorkflowGenerator } = await import('./features/generation/workflow-generator');
         const workflowGenerator = new WorkflowGenerator(client as any);
 
         // Get table names
@@ -1359,7 +1359,7 @@ async function main() {
         }
 
         // Import detection cache system
-        const { DetectionCacheManager, DetectionCacheUtils } = await import('./detection/detection-cache');
+        const { DetectionCacheManager, DetectionCacheUtils } = await import('./features/detection/detection-cache');
         
         const cacheManager = new DetectionCacheManager();
         const stats = await cacheManager.getStatistics();
@@ -1415,7 +1415,7 @@ async function main() {
         const spinner = ora('Clearing detection cache...').start();
 
         // Import detection cache system
-        const { DetectionCacheManager } = await import('./detection/detection-cache');
+        const { DetectionCacheManager } = await import('./features/detection/detection-cache');
         
         const cacheManager = new DetectionCacheManager();
         await cacheManager.clear();

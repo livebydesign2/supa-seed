@@ -4,7 +4,7 @@
  * Part of Task 1.5.2: Create MakerKit-specific constraint handlers
  */
 
-import { Logger } from '../utils/logger';
+import { Logger } from '../../core/utils/logger';
 import {
   ConstraintHandler,
   ConstraintHandlingResult,

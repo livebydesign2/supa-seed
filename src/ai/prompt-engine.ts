@@ -3,9 +3,9 @@
  * Phase 5, Checkpoint E1 - Intelligent prompts for seeding and template generation
  */
 
-import { SchemaInfo } from '../schema-adapter';
-import { Template } from '../templates/template-engine';
-import { Logger } from '../utils/logger';
+import { SchemaInfo } from '../core/schema-adapter';
+import { Template } from '../features/generation/template-engine';
+import { Logger } from '../core/utils/logger';
 
 export interface PromptContext {
   schema?: SchemaInfo;

@@ -4,7 +4,7 @@
  * Part of Task 1.5.3: Implement advanced slug management system for team accounts
  */
 
-import { Logger } from '../utils/logger';
+import { Logger } from '../../core/utils/logger';
 import { createClient } from '@supabase/supabase-js';
 
 /**

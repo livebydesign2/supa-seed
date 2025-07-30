@@ -1,9 +1,9 @@
 import { config as dotenvConfig } from 'dotenv';
 import { readFileSync, existsSync } from 'fs';
 import { resolve } from 'path';
-import { Logger } from './utils/logger';
-import { FlexibleSeedConfig } from './config-types';
-import { SeedConfig } from './types';
+import { Logger } from './core/utils/logger';
+import { FlexibleSeedConfig } from './core/types/config-types';
+import { SeedConfig } from './core/types/types';
 
 export interface ConfigLoadResult {
   config: SeedConfig;

@@ -3,10 +3,10 @@
  * Phase 3, Checkpoint C3 - Comprehensive error recovery and progress reporting
  */
 
-import { LoadedAsset } from '../assets/asset-loader';
+import { LoadedAsset } from '../features/generation/assets/asset-loader';
 import { DistributionTarget, DistributionAssignment, DistributionResult } from './distribution-algorithms';
 import { ConstraintViolation, EnforcementResult } from './constraint-enforcement';
-import { Logger } from '../utils/logger';
+import { Logger } from '../core/utils/logger';
 
 export interface FallbackAsset extends LoadedAsset {
   fallbackType: 'synthetic' | 'template' | 'default';

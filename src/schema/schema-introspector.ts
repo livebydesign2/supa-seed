@@ -6,7 +6,7 @@
  */
 
 import type { createClient } from '@supabase/supabase-js';
-import { Logger } from '../utils/logger';
+import { Logger } from '../../core/utils/logger';
 import { 
   ConstraintDiscoveryEngine, 
   type ConstraintMetadata, 

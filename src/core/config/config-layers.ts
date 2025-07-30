@@ -1,0 +1,597 @@
+/**
+ * Configuration Layer Types for SupaSeed v2.5.0
+ * Implements Task 5.1.1: Create layered configuration types and interfaces
+ * Part of FR-5.1: Implement 3-layer configuration (Universal Core + Smart Detection + Extensions)
+ */
+
+import type { PlatformArchitectureType, ContentDomainType } from '../../features/detection/detection-types';
+import type { ExtensionsConfig } from '../../extensions/extension-config';
+import type { UserArchetype, ArchetypeGenerationConfig } from '../../archetypes/archetype-types';
+
+/**
+ * Configuration layer types for the 3-layer architecture
+ */
+export type ConfigurationLayerType = 'universal' | 'detection' | 'extensions';
+
+/**
+ * Layer priority levels for conflict resolution
+ */
+export type LayerPriority = 'lowest' | 'low' | 'medium' | 'high' | 'highest';
+
+/**
+ * Configuration merge strategies for resolving conflicts
+ */
+export type MergeStrategy = 
+  | 'override'        // Later layers completely override earlier layers
+  | 'merge'           // Deep merge objects, array concatenation
+  | 'fallback'        // Use earlier layers only if later layers are undefined
+  | 'validate'        // Validate consistency across layers
+  | 'custom';         // Custom merge function
+
+/**
+ * Layer 1: Universal Core Configuration
+ * Always active, provides MakerKit compatibility and core functionality
+ */
+export interface UniversalCoreConfig {
+  /** Configuration layer metadata */
+  layer: {
+    type: 'universal';
+    priority: LayerPriority;
+    enabled: boolean;
+    readonly: boolean;
+  };
+
+  /** MakerKit compatibility settings */
+  makerkit: {
+    /** Enable MakerKit integration */
+    enabled: boolean;
+    
+    /** Account type for MakerKit integration */
+    accountType: 'individual' | 'team' | 'hybrid';
+    
+    /** Complete authentication flow (auth.users + auth.identities + MFA) */
+    completeAuthFlow: boolean;
+    
+    /** All MakerKit constraint patterns */
+    constraintCompliance: boolean;
+    
+    /** 100% RLS policy respect */
+    rlsCompliance: boolean;
+    
+    /** Development support (webhooks, localStorage, etc.) */
+    developmentSupport: boolean;
+    
+    /** Multi-factor authentication support */
+    mfaSupport: boolean;
+    
+    /** Identity provider support */
+    identityProviders: {
+      email: boolean;
+      google: boolean;
+      github: boolean;
+      facebook: boolean;
+      apple: boolean;
+      discord: boolean;
+      custom: string[];
+    };
+    
+    /** Database compliance settings */
+    databaseCompliance: {
+      enforceConstraints: boolean;
+      validateForeignKeys: boolean;
+      respectTimestamps: boolean;
+      handleNullables: boolean;
+      supportUUIDs: boolean;
+    };
+  };
+
+  /** Core seeding parameters */
+  seeding: {
+    /** Default user generation count */
+    defaultUserCount: number;
+    
+    /** Content generation ratios */
+    contentRatios: {
+      publicContent: number;    // 0-1 ratio
+      privateContent: number;   // 0-1 ratio
+      sharedContent: number;    // 0-1 ratio
+    };
+    
+    /** Data relationships */
+    relationships: {
+      generateRelationships: boolean;
+      relationshipDensity: number; // 0-1
+      respectConstraints: boolean;
+    };
+    
+    /** Safety and validation */
+    safety: {
+      validateBeforeInsert: boolean;
+      dryRunMode: boolean;
+      rollbackOnError: boolean;
+      maxRetries: number;
+    };
+  };
+
+  /** Security configuration */
+  security: {
+    /** RLS compliance settings */
+    rlsCompliance: boolean;
+    
+    /** Row-level security policies */
+    policies: {
+      enforceUserScope: boolean;
+      validatePermissions: boolean;
+      auditAccess: boolean;
+    };
+  };
+
+  /** Webhook configuration */
+  webhook: {
+    /** Enable webhook support */
+    enabled: boolean;
+    
+    /** Webhook authentication */
+    authentication: {
+      enabled: boolean;
+      method: 'jwt' | 'api-key' | 'custom';
+      secretKey?: string;
+    };
+    
+    /** Webhook endpoints */
+    endpoints: {
+      beforeInsert?: string;
+      afterInsert?: string;
+      onError?: string;
+    };
+  };
+
+  /** Environment configuration */
+  environment: {
+    /** Target environment type */
+    type: 'development' | 'staging' | 'production';
+    
+    /** Debug and logging settings */
+    debugging: {
+      enableVerboseLogging: boolean;
+      logQueries: boolean;
+      logPerformance: boolean;
+      validateResults: boolean;
+    };
+    
+    /** Performance settings */
+    performance: {
+      batchSize: number;
+      parallelism: number;
+      timeout: number; // milliseconds
+      memoryLimit: number; // MB
+    };
+  };
+}
+
+/**
+ * Layer 2: Smart Detection Configuration
+ * Auto-configured based on platform and domain detection
+ */
+export interface SmartDetectionConfig {
+  /** Configuration layer metadata */
+  layer: {
+    type: 'detection';
+    priority: LayerPriority;
+    enabled: boolean;
+    autoGenerated: boolean;
+    confidence: number; // 0-1
+    lastDetected: Date;
+  };
+
+  /** Platform architecture detection */
+  platform: {
+    /** Detected or overridden architecture */
+    architecture: PlatformArchitectureType | 'auto';
+    
+    /** Detection confidence score */
+    confidence: number;
+    
+    /** Domain identification */
+    domain: ContentDomainType | 'auto';
+    
+    /** Evidence supporting detection */
+    evidence: {
+      tablePatterns: string[];
+      relationshipPatterns: string[];
+      constraintPatterns: string[];
+      namingConventions: string[];
+    };
+    
+    /** Architecture-specific settings */
+    architectureSettings: {
+      individual?: {
+        focusOnPersonalContent: boolean;
+        enableSocialFeatures: boolean;
+        contentSharingRatio: number;
+      };
+      team?: {
+        enableTeamCollaboration: boolean;
+        teamSizeRange: { min: number; max: number };
+        workspaceManagement: boolean;
+        permissionComplexity: 'simple' | 'moderate' | 'complex';
+      };
+      hybrid?: {
+        balanceRatio: number; // 0-1, individual vs team focus
+        enableFlexibleRoles: boolean;
+        supportMultiContext: boolean;
+      };
+    };
+  };
+
+  /** Content domain detection */
+  domain: {
+    /** Detected or overridden domain */
+    domain: ContentDomainType | 'auto';
+    
+    /** Detection confidence score */
+    confidence: number;
+    
+    /** Domain-specific evidence */
+    evidence: {
+      tableNames: string[];
+      columnPatterns: string[];
+      dataTypes: string[];
+      businessLogicHints: string[];
+    };
+    
+    /** Domain-specific settings */
+    domainSettings: {
+      outdoor?: {
+        gearFocus: boolean;
+        locationData: boolean;
+        weatherAwareness: boolean;
+        safetyEmphasis: boolean;
+      };
+      saas?: {
+        productivityFocus: boolean;
+        integrationHeavy: boolean;
+        analyticsEnabled: boolean;
+        workflowOptimization: boolean;
+      };
+      ecommerce?: {
+        productCatalogs: boolean;
+        inventoryManagement: boolean;
+        orderProcessing: boolean;
+        paymentIntegration: boolean;
+      };
+      social?: {
+        networkingEmphasis: boolean;
+        contentSharing: boolean;
+        communityFeatures: boolean;
+        realTimeInteraction: boolean;
+      };
+      generic?: {
+        adaptiveContent: boolean;
+        broadCompatibility: boolean;
+        minimalAssumptions: boolean;
+      };
+    };
+  };
+
+  /** Auto-configuration settings */
+  autoConfiguration: {
+    /** Enable automatic configuration updates */
+    enabled: boolean;
+    
+    /** Auto-detection confidence threshold */
+    confidenceThreshold: number;
+    
+    /** Auto-apply configuration changes */
+    autoApply: boolean;
+    
+    /** Configuration strategy */
+    strategy: 'conservative' | 'balanced' | 'aggressive';
+  };
+
+  /** Auto-generated configuration optimizations */
+  optimizations: {
+    /** Performance optimizations based on detected scale */
+    performance: {
+      suggestedBatchSize: number;
+      suggestedParallelism: number;
+      estimatedDataVolume: 'small' | 'medium' | 'large' | 'enterprise';
+    };
+    
+    /** Content generation optimizations */
+    content: {
+      suggestedUserCount: number;
+      suggestedContentRatios: {
+        public: number;
+        private: number;
+        shared: number;
+      };
+      recommendedArchetypes: string[];
+    };
+    
+    /** Feature recommendations */
+    features: {
+      enabledFeatures: string[];
+      disabledFeatures: string[];
+      optionalFeatures: string[];
+    };
+  };
+}
+
+/**
+ * Layer 3: Extensions Configuration
+ * Pluggable extensions and customizations
+ */
+export interface ExtensionsLayerConfig {
+  /** Allow dynamic property access */
+  [key: string]: any;
+  
+  /** Configuration layer metadata */
+  layer: {
+    type: 'extensions';
+    priority: LayerPriority;
+    enabled: boolean;
+    userConfigured: boolean;
+    lastModified: Date;
+  };
+
+  /** Domain extensions configuration */
+  domainExtensions: ExtensionsConfig;
+
+  /** User archetype configuration */
+  archetypes: {
+    /** Enabled archetype system */
+    enabled: boolean;
+    
+    /** Archetype generation configuration */
+    generationConfig: ArchetypeGenerationConfig;
+    
+    /** Custom archetype definitions */
+    customArchetypes: UserArchetype[];
+    
+    /** Archetype selection strategy */
+    selectionStrategy: {
+      strategy: 'automatic' | 'weighted' | 'manual' | 'template';
+      weights?: Record<string, number>;
+      templates?: string[];
+      customSelection?: string[];
+    };
+  };
+
+  /** Custom data generators */
+  customGenerators: {
+    /** Custom content generators */
+    contentGenerators: {
+      name: string;
+      type: string;
+      enabled: boolean;
+      configuration: Record<string, any>;
+    }[];
+    
+    /** Custom relationship generators */
+    relationshipGenerators: {
+      name: string;
+      tables: string[];
+      enabled: boolean;
+      configuration: Record<string, any>;
+    }[];
+    
+    /** Custom media generators */
+    mediaGenerators: {
+      name: string;
+      mediaTypes: string[];
+      enabled: boolean;
+      configuration: Record<string, any>;
+    }[];
+  };
+
+  /** Integration configurations */
+  integrations: {
+    /** External API integrations */
+    apis: {
+      name: string;
+      endpoint: string;
+      authentication: Record<string, any>;
+      enabled: boolean;
+      configuration: Record<string, any>;
+    }[];
+    
+    /** Storage integrations */
+    storage: {
+      providers: {
+        name: string;
+        type: 'supabase' | 's3' | 'cloudinary' | 'custom';
+        configuration: Record<string, any>;
+        enabled: boolean;
+      }[];
+    };
+    
+    /** Analytics integrations */
+    analytics: {
+      providers: {
+        name: string;
+        type: 'supabase' | 'mixpanel' | 'amplitude' | 'custom';
+        configuration: Record<string, any>;
+        enabled: boolean;
+      }[];
+    };
+  };
+
+  /** Custom business logic */
+  businessLogic: {
+    /** Custom validation rules */
+    validationRules: {
+      table: string;
+      field?: string;
+      rule: string;
+      severity: 'error' | 'warning' | 'info';
+      enabled: boolean;
+    }[];
+    
+    /** Custom data transformations */
+    transformations: {
+      source: string;
+      target: string;
+      transformation: string;
+      enabled: boolean;
+    }[];
+    
+    /** Custom constraints */
+    constraints: {
+      name: string;
+      description: string;
+      validation: string;
+      enabled: boolean;
+    }[];
+  };
+}
+
+/**
+ * Complete layered configuration combining all three layers
+ */
+export interface LayeredConfiguration {
+  /** Configuration metadata */
+  metadata: {
+    version: string;
+    createdAt: Date;
+    lastModified: Date;
+    source: 'auto-generated' | 'user-configured' | 'template' | 'imported';
+    checksum: string;
+  };
+
+  /** Layer 1: Universal Core */
+  universal: UniversalCoreConfig;
+
+  /** Layer 2: Smart Detection */
+  detection: SmartDetectionConfig;
+
+  /** Layer 3: Extensions */
+  extensions: ExtensionsLayerConfig;
+
+  /** Layer composition settings */
+  composition: {
+    /** Merge strategy for layer conflicts */
+    mergeStrategy: MergeStrategy;
+    
+    /** Custom merge functions for specific paths */
+    customMerges: Record<string, MergeStrategy>;
+    
+    /** Validation rules for layer consistency */
+    validationRules: {
+      enforceCompatibility: boolean;
+      allowConflicts: boolean;
+      requireConfirmation: string[]; // Config paths requiring user confirmation
+    };
+    
+    /** Layer activation settings */
+    layerActivation: {
+      universal: { enabled: boolean; readonly: boolean };
+      detection: { enabled: boolean; autoUpdate: boolean };
+      extensions: { enabled: boolean; userControlled: boolean };
+    };
+  };
+}
+
+/**
+ * Configuration layer status and health information
+ */
+export interface LayerStatus {
+  /** Layer identification */
+  layer: ConfigurationLayerType;
+  
+  /** Status information */
+  status: {
+    enabled: boolean;
+    healthy: boolean;
+    lastUpdated: Date;
+    errors: string[];
+    warnings: string[];
+  };
+  
+  /** Performance metrics */
+  performance: {
+    loadTime: number; // milliseconds
+    memoryUsage: number; // bytes
+    cacheHitRate: number; // 0-1
+  };
+  
+  /** Validation results */
+  validation: {
+    valid: boolean;
+    errors: { path: string; message: string; severity: 'error' | 'warning' }[];
+    suggestions: { path: string; suggestion: string; impact: 'low' | 'medium' | 'high' }[];
+  };
+}
+
+/**
+ * Configuration layer change event
+ */
+export interface LayerChangeEvent {
+  /** Event metadata */
+  timestamp: Date;
+  layer: ConfigurationLayerType;
+  changeType: 'created' | 'updated' | 'deleted' | 'enabled' | 'disabled';
+  
+  /** Change details */
+  changes: {
+    path: string;
+    oldValue: any;
+    newValue: any;
+    source: 'auto' | 'user' | 'system' | 'import';
+  }[];
+  
+  /** Impact assessment */
+  impact: {
+    severity: 'low' | 'medium' | 'high' | 'critical';
+    affectedLayers: ConfigurationLayerType[];
+    requiresRegeneration: boolean;
+    backwardCompatible: boolean;
+  };
+}
+
+/**
+ * Configuration template for common platform scenarios
+ */
+export interface ConfigurationTemplate {
+  /** Template identification */
+  id: string;
+  name: string;
+  description: string;
+  version: string;
+  
+  /** Target platform characteristics */
+  targets: {
+    architectures: PlatformArchitectureType[];
+    domains: ContentDomainType[];
+    complexity: 'simple' | 'moderate' | 'complex' | 'enterprise';
+  };
+  
+  /** Template configuration layers */
+  layers: {
+    universal?: Partial<UniversalCoreConfig>;
+    detection?: Partial<SmartDetectionConfig>;
+    extensions?: Partial<ExtensionsLayerConfig>;
+  };
+  
+  /** Template metadata */
+  metadata: {
+    author: string;
+    tags: string[];
+    usageCount: number;
+    rating: number;
+    lastUpdated: Date;
+    compatibility: {
+      minimumVersion: string;
+      maximumVersion?: string;
+      dependencies: string[];
+    };
+  };
+  
+  /** Template customization options */
+  customization: {
+    requiredFields: string[];
+    optionalFields: string[];
+    defaults: Record<string, any>;
+    validation: Record<string, any>;
+  };
+}

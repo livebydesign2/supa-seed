@@ -1,16 +1,16 @@
 import { createClient } from '@supabase/supabase-js';
 import { faker } from '@faker-js/faker';
-import { SeedConfig, SeedModule, SeedContext } from './types';
-import { AuthSeeder } from './seeders/auth-seeder';
-import { BaseDataSeeder } from './seeders/base-data-seeder';
-import { UserSeeder } from './seeders/user-seeder';
-import { SetupSeeder } from './seeders/setup-seeder';
-import { GearSeeder } from './seeders/gear-seeder';
-import { MediaSeeder } from './seeders/media-seeder';
-import { SchemaAdapter } from './schema-adapter';
-import { Logger } from './utils/logger';
-import { SchemaValidator } from './validation/schema-validator';
-import { createEnhancedSupabaseClient } from './utils/enhanced-supabase-client';
+import { SeedConfig, SeedModule, SeedContext } from './core/types/types';
+import { AuthSeeder } from './features/generation/seeders/auth-seeder';
+import { BaseDataSeeder } from './features/generation/seeders/base-data-seeder';
+import { UserSeeder } from './features/generation/seeders/user-seeder';
+import { SetupSeeder } from './features/generation/seeders/setup-seeder';
+import { GearSeeder } from './features/generation/seeders/gear-seeder';
+import { MediaSeeder } from './features/generation/seeders/media-seeder';
+import { SchemaAdapter } from './core/schema-adapter';
+import { Logger } from './core/utils/logger';
+import { SchemaValidator } from './features/analysis/schema-validator';
+import { createEnhancedSupabaseClient } from './core/utils/enhanced-supabase-client';
 
 export class SupaSeedFramework {
   private client: any; // Use any to avoid type conflicts with enhanced client
@@ -425,12 +425,12 @@ export function createDefaultConfig(overrides: Partial<SeedConfig> = {}): SeedCo
 }
 
 // Export types and classes for library usage
-export * from './types';
-export * from './config-types';
-export { ConfigManager } from './config-manager';
-export { SchemaAdapter } from './schema-adapter';
+export * from './core/types/types';
+export * from './core/types/config-types';
+export { ConfigManager } from './core/config/config-manager';
+export { SchemaAdapter } from './core/schema-adapter';
 export { AuthSeeder, BaseDataSeeder, UserSeeder, SetupSeeder, GearSeeder, MediaSeeder };
 
 // Export framework strategy system
-export * from './framework/strategy-interface';
-export { StrategyRegistry } from './framework/strategy-registry'; 
+export * from './features/integration/strategy-interface';
+export { StrategyRegistry } from './features/integration/strategy-registry'; 

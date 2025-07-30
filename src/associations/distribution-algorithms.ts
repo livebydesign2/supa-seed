@@ -3,8 +3,8 @@
  * Phase 3, Checkpoint C1 - Smart asset-to-entity distribution
  */
 
-import { LoadedAsset } from '../assets/asset-loader';
-import { Logger } from '../utils/logger';
+import { LoadedAsset } from '../features/generation/assets/asset-loader';
+import { Logger } from '../core/utils/logger';
 
 export interface DistributionTarget {
   id: string;

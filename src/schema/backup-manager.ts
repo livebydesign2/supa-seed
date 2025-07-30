@@ -3,7 +3,7 @@
  * Phase 4, Checkpoint D2 - Advanced backup management with versioning and restoration
  */
 
-import { Logger } from '../utils/logger';
+import { Logger } from '../../core/utils/logger';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';

@@ -6,9 +6,9 @@
 import { OllamaClient, ollamaClient } from './ollama-client';
 import { DomainPromptEngine, promptEngine as defaultPromptEngine, GenerationRequest, PromptContext } from './prompt-engine';
 import { AIResponseCache, aiCache } from './response-cache';
-import { SchemaInfo } from '../schema-adapter';
-import { Template } from '../templates/template-engine';
-import { Logger } from '../utils/logger';
+import { SchemaInfo } from '../core/schema-adapter';
+import { Template } from '../features/generation/template-engine';
+import { Logger } from '../core/utils/logger';
 
 export interface GenerationOptions {
   useCache?: boolean;

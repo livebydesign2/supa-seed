@@ -7,7 +7,7 @@
 import type { createClient } from '@supabase/supabase-js';
 import { SchemaDrivenAdapter, UserCreationRequest, UserCreationResponse } from './schema-driven-adapter';
 import { SchemaIntrospectionResult } from './schema-introspector';
-import { Logger } from '../utils/logger';
+import { Logger } from '../../core/utils/logger';
 
 type SupabaseClient = ReturnType<typeof createClient>;
 

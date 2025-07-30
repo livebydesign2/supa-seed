@@ -4,8 +4,8 @@
  */
 
 import type { createClient } from '@supabase/supabase-js';
-import { ExtendedSeedConfig } from '../config-types';
-import { Logger } from '../utils/logger';
+import { ExtendedSeedConfig } from '../core/types/config-types';
+import { Logger } from '../../core/utils/logger';
 
 type SupabaseClient = ReturnType<typeof createClient>;
 
