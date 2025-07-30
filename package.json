@@ -24,6 +24,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "echo 'Linting not configured yet'",
     "validate": "npm run typecheck && npm run test",
+    "version:update": "bash scripts/update-version.sh",
     "_prepublishOnly": "npm run clean && npm run build",
     "seed": "tsx src/cli.ts seed",
     "seed:minimal": "tsx src/cli.ts seed --users 3 --setups 1 --images 1",
