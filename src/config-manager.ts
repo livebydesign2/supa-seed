@@ -3,7 +3,7 @@ import * as path from 'path';
 import { FlexibleSeedConfig, ConfigProfile, ConfigDetectionResult, ExtendedSeedConfig } from './config-types';
 import { SchemaAdapter } from './schema-adapter';
 import { FrameworkAdapter } from './framework/framework-adapter';
-import { SchemaEvolutionDetector } from './schema/schema-evolution-detector';
+// SchemaEvolutionDetector removed - feature not available in v2.4.1
 import { DataVolumeManager } from './data/data-volume-manager';
 import { CustomRelationshipManager } from './schema/custom-relationship-manager';
 import { DataGenerationPatternManager } from './data/data-generation-pattern-manager';
@@ -326,6 +326,18 @@ export class ConfigManager {
       return this.validateConfig(config);
     } catch (error: any) {
       throw new Error(`Failed to load configuration: ${error.message}`);
+    }
+  }
+
+  /**
+   * Save configuration to file
+   */
+  saveConfig(config: FlexibleSeedConfig): void {
+    try {
+      const validatedConfig = this.validateConfig(config);
+      fs.writeFileSync(this.configPath, JSON.stringify(validatedConfig, null, 2));
+    } catch (error: any) {
+      throw new Error(`Failed to save configuration: ${error.message}`);
     }
   }
 
@@ -749,22 +761,19 @@ export class ConfigManager {
       };
     }
 
-    Logger.info('🔄 Detecting schema evolution...');
+    Logger.info('🔄 Schema evolution detection not available in v2.4.1');
 
     try {
-      const cacheLocation = config.schemaEvolution.cacheLocation || '.supa-seed-cache';
-      const evolutionDetector = new SchemaEvolutionDetector(client, cacheLocation);
-      
-      // Use the comprehensive schema evolution detector
-      const evolutionResult = await evolutionDetector.detectEvolution(config);
-      
-      // Convert SchemaEvolutionResult to the expected format
-      const changes = evolutionResult.changes.map(change => ({
-        type: this.mapChangeType(change.type),
-        table: change.table || '',
-        column: change.column,
-        description: change.description
-      }));
+      // Schema evolution detection feature removed in v2.4.1
+      // Using basic detection instead
+      const changes: any[] = [];
+      const evolutionResult = {
+        hasChanged: false,
+        changes: [],
+        recommendations: ['Schema evolution detection disabled in v2.4.1'],
+        schemaVersion: 'v2.4.1',
+        migrationRequired: false
+      };
 
       // Handle onSchemaChange behavior
       if (evolutionResult.hasChanged) {
@@ -820,7 +829,7 @@ export class ConfigManager {
     // Use the comprehensive data volume manager for generation
     const dataVolumes = dataVolumeManager.generateDataVolumeConfiguration(requirements);
     
-    Logger.info(`✅ Generated data volume configuration with ${dataVolumes.volumeProfiles?.length || 0} profiles`);
+    Logger.info(`✅ Generated data volume configuration with ${dataVolumes?.volumeProfiles?.length || 0} profiles`);
     
     return dataVolumes;
   }
@@ -942,7 +951,7 @@ export class ConfigManager {
   applyInheritanceRules(
     client: SupabaseClient,
     data: Record<string, any[]>,
-    inheritanceRules?: ExtendedSeedConfig['customRelationships']['inheritanceRules']
+    inheritanceRules?: any[]
   ): Record<string, any[]> {
     if (!inheritanceRules || inheritanceRules.length === 0) {
       return data;

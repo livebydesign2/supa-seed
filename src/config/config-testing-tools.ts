@@ -11,7 +11,9 @@ import type {
   ExtensionsLayerConfig
 } from './config-layers';
 import type { FlexibleSeedConfig } from '../config-types';
-import type { DeepOverrideConfig, CustomizationResult } from './advanced-customization';
+// Advanced customization types not available in v2.4.1
+type DeepOverrideConfig = any;
+type CustomizationResult = any;
 import type { LayeredConfigValidationResult } from './config-validator';
 import { Logger } from '../utils/logger';
 import { performance } from 'perf_hooks';

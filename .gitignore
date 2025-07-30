@@ -66,4 +66,23 @@ test-results/
 coverage/
 
 # Internal project documentation
-docs/gitignore/ 
+docs/gitignore/
+
+# Problematic template and extension files (exclude from tracking)
+src/cli/template-commands.ts
+src/cli/extension-commands.ts
+src/cli/security-commands.ts
+src/config/config-templates.ts
+src/config/advanced-customization.ts
+src/config/template-*.ts
+src/config/conflict-resolution.ts
+src/config/layered-config-manager.ts
+src/config/zero-config.ts
+src/extensions/
+src/archetypes/
+src/schema/schema-evolution-detector.ts
+src/security/
+src/templates/
+src/auth/mfa-*.ts
+src/webhooks/
+src/data/auth-data-generator.ts 

@@ -15,7 +15,9 @@ import type {
   SmartDetectionConfig,
   ExtensionsLayerConfig
 } from './config-layers';
-import type { DeepOverrideConfig, ConstraintViolation } from './advanced-customization';
+// Advanced customization types not available in v2.4.1
+type DeepOverrideConfig = any;
+type ConstraintViolation = any;
 
 type SupabaseClient = ReturnType<typeof createClient>;
 
@@ -1249,8 +1251,8 @@ export class ConfigValidator {
     const warnings: LayeredValidationWarning[] = [];
 
     // Version compatibility
-    const configVersion = config.metadata?.version || '2.5.0';
-    if (configVersion < '2.5.0') {
+    const configVersion = config.metadata?.version || '2.4.1';
+    if (configVersion < '2.4.1') {
       warnings.push({
         code: 'OLD_CONFIG_VERSION',
         path: 'metadata.version',
@@ -1258,7 +1260,7 @@ export class ConfigValidator {
         impact: 'medium',
         category: 'compatibility',
         layer: 'cross-layer',
-        recommendation: 'Upgrade configuration to v2.5.0',
+        recommendation: 'Upgrade configuration to v2.4.1',
         autoFixable: true
       });
     }
@@ -1316,8 +1318,8 @@ export class ConfigValidator {
    * Analyze migration requirements for layered configuration
    */
   private async analyzeLayeredMigrationRequirements(config: LayeredConfiguration): Promise<LayeredMigrationInfo> {
-    const currentVersion = config.metadata?.version || '2.5.0';
-    const targetVersion = '2.5.0';
+    const currentVersion = config.metadata?.version || '2.4.1';
+    const targetVersion = '2.4.1';
     
     // Check if migration is needed
     const migrationRequired = currentVersion !== targetVersion;

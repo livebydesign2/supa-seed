@@ -1,0 +1,27 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "src/index.ts",
+    "src/cli.ts",
+    "src/types.ts",
+    "src/config-types.ts",
+    "src/schema-adapter.ts",
+    "src/config-manager.ts",
+    "src/seeders/**/*.ts",
+    "src/framework/strategies/makerkit-strategy.ts",
+    "src/framework/strategies/generic-strategy.ts",
+    "src/framework/strategy-interface.ts",
+    "src/extensions/domains/outdoor-extension.ts",
+    "src/extensions/domains/outdoor-user-archetypes.ts",
+    "src/utils/**/*.ts",
+    "src/schema/index.ts",
+    "src/schema/config-migrator.ts",
+    "src/schema/v2-2-0-migrator.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "**/*.test.ts",
+    "tests/**/*"
+  ]
+}

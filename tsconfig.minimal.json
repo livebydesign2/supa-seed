@@ -1,0 +1,23 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "src/index.ts",
+    "src/types.ts",
+    "src/schema-adapter.ts", 
+    "src/utils/**/*.ts",
+    "src/schema/index.ts",
+    "src/schema/config-migrator.ts",
+    "src/schema/v2-2-0-migrator.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist", 
+    "**/*.test.ts",
+    "tests/**/*",
+    "src/cli.ts",
+    "src/config-manager.ts",
+    "src/config-types.ts",
+    "src/data/**/*",
+    "src/framework/**/*"
+  ]
+}

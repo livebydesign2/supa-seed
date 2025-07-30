@@ -1,0 +1,26 @@
+# Pre-commit configuration for SupaSeed
+# Install with: pip install pre-commit && pre-commit install
+
+repos:
+  - repo: local
+    hooks:
+      - id: typescript-check
+        name: TypeScript Check
+        entry: npm run typecheck
+        language: system
+        types: [typescript]
+        stages: [commit]
+        
+      - id: build-check
+        name: Build Check
+        entry: npm run build:check
+        language: system
+        files: '^src/.*\.(ts|js)$'
+        stages: [commit]
+        
+      - id: test-check
+        name: Test Check
+        entry: npm test
+        language: system
+        stages: [commit]
+        pass_filenames: false

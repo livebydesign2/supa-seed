@@ -1,6 +1,6 @@
 {
   "name": "supa-seed",
-  "version": "2.4.0",
+  "version": "2.4.1",
   "description": "A constraint-aware, framework-agnostic database seeding framework with deep PostgreSQL business logic discovery and MakerKit integration support",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -18,9 +18,13 @@
   ],
   "scripts": {
     "build": "tsc",
+    "build:check": "tsc --noEmit",
     "dev": "tsc --watch",
     "clean": "rimraf dist",
-    "prepublishOnly": "npm run clean && npm run build",
+    "typecheck": "tsc --noEmit",
+    "lint": "echo 'Linting not configured yet'",
+    "validate": "npm run typecheck && npm run test",
+    "prepublishOnly": "npm run clean && npm run validate && npm run build",
     "seed": "tsx src/cli.ts seed",
     "seed:minimal": "tsx src/cli.ts seed --users 3 --setups 1 --images 1",
     "seed:standard": "tsx src/cli.ts seed --users 10 --setups 3 --images 3",
@@ -34,7 +38,12 @@
     "generate:workflows": "tsx src/cli.ts generate-workflows",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "jest --coverage",
+    "test:comprehensive": "jest tests/comprehensive-test-suite.test.ts",
+    "test:makerkit": "jest tests/makerkit-integration.test.ts",
+    "test:performance": "jest tests/performance-benchmarks.test.ts --testTimeout=60000",
+    "test:all": "jest tests/",
+    "benchmark": "npm run test:performance"
   },
   "keywords": [
     "supabase",

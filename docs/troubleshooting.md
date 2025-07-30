@@ -1,6 +1,6 @@
-# 🔧 Supa-Seed v2.2.0 Troubleshooting Guide
+# 🔧 SupaSeed v2.4.1 Troubleshooting Guide
 
-Comprehensive troubleshooting guide for production features, common issues, and advanced debugging.
+Comprehensive troubleshooting guide for MakerKit integration, common issues, and advanced debugging.
 
 ## 🚨 Emergency Quick Fixes
 
@@ -114,6 +114,12 @@ psql -f node_modules/supa-seed/schema.sql
 **Table Creation Issues:**
 ```sql
 -- Check table existence manually
+-- For MakerKit: Check required tables
+SELECT schemaname, tablename 
+FROM pg_tables 
+WHERE tablename IN ('accounts', 'setups', 'categories');
+
+-- For Traditional Supabase: Check profiles table too  
 SELECT schemaname, tablename 
 FROM pg_tables 
 WHERE tablename IN ('accounts', 'profiles', 'setups', 'categories');
@@ -128,8 +134,10 @@ WHERE table_name = 'accounts';
 **Symptoms:** Row Level Security preventing inserts
 
 ```sql
--- Temporarily disable RLS for seeding (NOT for production)
+-- For MakerKit: Focus on accounts table
 ALTER TABLE accounts DISABLE ROW LEVEL SECURITY;
+
+-- For Traditional Supabase: Include profiles
 ALTER TABLE profiles DISABLE ROW LEVEL SECURITY;
 
 -- Or create permissive policy for service role
@@ -658,7 +666,7 @@ A: Visit [GitHub Issues](https://github.com/livebydesign2/supa-seed/issues) with
 When encountering issues:
 
 - [ ] Run `supa-seed health --detailed`
-- [ ] Check `supa-seed --version` (should be v2.0.0)
+- [ ] Check `supa-seed --version` (should be v2.4.1)
 - [ ] Verify database connectivity with `supa-seed detect`
 - [ ] Validate configuration with `supa-seed validate-config`
 - [ ] Check memory usage with `supa-seed memory status`
@@ -668,4 +676,90 @@ When encountering issues:
 
 **Most issues can be resolved by following this systematic approach!**
 
-🔧 **Happy troubleshooting with supa-seed v2.0.0!**
+## 🏗️ MakerKit-Specific Issues
+
+### **"Bio and username fields not saving"**
+
+**Symptoms:** User data appears to save but bio/username fields are missing
+
+```bash
+# Check if using MakerKit-compatible config
+grep -A 5 "framework.*makerkit" supa-seed.config.json
+
+# Expected configuration:
+{
+  "schema": {
+    "framework": "makerkit",
+    "primaryUserTable": "accounts"
+  }
+}
+```
+
+**Solution:** Ensure bio/username data is stored in `public_data` JSONB field:
+
+```sql
+-- Check accounts table structure  
+\d+ accounts
+
+-- Verify public_data field exists and contains user data
+SELECT email, public_data->'bio', public_data->'username' 
+FROM accounts 
+WHERE public_data IS NOT NULL 
+LIMIT 5;
+```
+
+### **"Personal account constraint violations"**
+
+**Symptoms:** Errors about `is_personal_account` field during user creation
+
+```bash
+# Check if MakerKit strategy is being used
+supa-seed seed --verbose 2>&1 | grep -i "makerkit\|personal"
+
+# Expected: Should show MakerKit strategy initialization
+```
+
+**Solution:** Ensure accounts are created with `is_personal_account = true`:
+
+```sql
+-- Check constraint on accounts table
+SELECT conname, pg_get_constraintdef(oid) 
+FROM pg_constraint 
+WHERE conrelid = 'accounts'::regclass;
+
+-- Verify personal accounts are created correctly
+SELECT email, is_personal_account, slug 
+FROM accounts 
+WHERE is_personal_account = true 
+LIMIT 5;
+```
+
+### **"Setup generation failing with account_id errors"**
+
+**Symptoms:** Setups not creating due to foreign key constraint errors
+
+```bash
+# Check setup table configuration
+grep -A 10 "setupsTable" supa-seed.config.json
+
+# Should show:
+# "setupsTable": {
+#   "userField": "account_id"  
+# }
+```
+
+**Solution:** Verify account_id relationships:
+
+```sql
+-- Check foreign key constraints on setups table
+SELECT conname, pg_get_constraintdef(oid) 
+FROM pg_constraint 
+WHERE conrelid = 'setups'::regclass 
+AND contype = 'f';
+
+-- Verify accounts exist for setup creation
+SELECT COUNT(*) as account_count FROM accounts;
+SELECT COUNT(*) as setup_count FROM setups;
+```
+
+🔧 **Happy troubleshooting with SupaSeed v2.4.1!**

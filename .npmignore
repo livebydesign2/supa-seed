@@ -1,0 +1,80 @@
+# Exclude from npm package distribution
+
+# Source files not needed in published package
+src/
+tests/
+*.test.ts
+*.test.js
+
+# Development and build files
+tsconfig.json
+tsconfig.release.json
+jest.config.js
+.babelrc
+.eslintrc*
+.prettierrc*
+
+# Documentation and project files
+README.md
+CHANGELOG.md
+docs/
+examples/
+.github/
+
+# Environment and config files
+.env*
+*.config.json
+supa-seed.config.json
+
+# IDE and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Git files
+.git/
+.gitignore
+
+# CI/CD files
+.github/
+.travis.yml
+.circleci/
+
+# Coverage and testing
+coverage/
+.nyc_output/
+test-results/
+
+# Temporary files
+temp/
+tmp/
+*.tmp
+*.temp
+logs/
+*.log
+
+# Node modules (should be excluded by default but just in case)
+node_modules/
+
+# Problematic template and extension files with TypeScript errors
+src/cli/template-commands.ts
+src/cli/extension-commands.ts
+src/cli/security-commands.ts
+src/config/config-templates.ts
+src/config/advanced-customization.ts
+src/config/template-*.ts
+src/config/conflict-resolution.ts
+src/config/layered-config-manager.ts
+src/config/zero-config.ts
+src/extensions/
+src/archetypes/
+src/schema/schema-evolution-detector.ts
+src/security/
+src/templates/
+src/auth/mfa-*.ts
+src/webhooks/
+src/data/auth-data-generator.ts
+
+# SQL files (not needed in distribution)
+sql/

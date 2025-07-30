@@ -1,6 +1,6 @@
-# 📦 Supa-Seed v2.2.0 Installation Guide
+# 📦 SupaSeed v2.4.1 Installation Guide
 
-Complete installation and setup guide for the constraint-aware database seeding platform.
+Complete installation and setup guide for the modern database seeding framework with MakerKit integration.
 
 ## 🎯 Prerequisites
 
@@ -28,7 +28,7 @@ psql --version    # Should be v12+
 npm install -g supa-seed
 
 # Verify installation
-supa-seed --version  # Should show v2.2.0
+supa-seed --version  # Should show v2.4.1
 
 # Check available commands
 supa-seed --help
@@ -141,11 +141,11 @@ EOF
 
 Supa-seed includes multiple schema options:
 
-| Schema File | Use Case | Features |
-|-------------|----------|----------|
-| `schema.sql` | General projects | Full feature set, recommended |
-| `schema-makerkit.sql` | MakerKit projects | MakerKit v3 compatible |
-| `schema-minimal.sql` | Testing/Demo | Minimal tables only |
+| Framework | Schema Detection | Features |
+|-----------|------------------|----------|
+| **MakerKit** | Auto-detected | Accounts-only architecture, JSONB public_data support |
+| **Generic Supabase** | Auto-detected | Traditional profiles + accounts setup |
+| **Custom** | Manual configuration | Flexible schema mapping |
 
 ### **Local Supabase Schema Setup**
 
@@ -179,9 +179,10 @@ psql "postgresql://postgres:[PASSWORD]@db.[PROJECT_ID].supabase.co:5432/postgres
 # Test schema with supa-seed
 supa-seed detect --verbose
 
-# Expected output:
-# ✅ All required tables found!
-# Framework detected: custom/makerkit
+# Expected output for MakerKit:
+# ✅ Framework detected: MakerKit
+# ✅ Accounts table found
+# ✅ Schema compatibility verified
 ```
 
 ## ⚙️ Configuration
@@ -217,20 +218,21 @@ Create `supa-seed.config.json`:
 {
   "supabaseUrl": "http://127.0.0.1:54321",
   "supabaseServiceKey": "your-service-role-key",
-  "environment": "local",
-  "userCount": 10,
+  "userCount": 12,
   "setupsPerUser": 3,
-  "imagesPerSetup": 2,
-  "enableRealImages": false,
-  "ai": {
-    "enabled": false,
-    "ollamaUrl": "http://localhost:11434",
-    "fallbackToFaker": true
+  "domain": "outdoor",
+  "userStrategy": "hybrid",
+  "schema": {
+    "framework": "makerkit",
+    "primaryUserTable": "accounts",
+    "setupsTable": {
+      "userField": "account_id"
+    }
   },
-  "performance": {
-    "batchSize": 100,
-    "enableMonitoring": true,
-    "memoryLimit": 512
+  "extensions": {
+    "outdoor": {
+      "enabled": true
+    }
   }
 }
 ```
@@ -437,7 +439,7 @@ supa-seed seed --no-ai
 
 ### **Breaking Changes**
 
-⚠️ **Important**: v2.2.0 includes constraint-aware features and maintains v2.1.0 compatibility
+⚠️ **Important**: v2.4.1 includes full MakerKit integration and maintains backward compatibility
 
 #### **Configuration Format**
 ```bash
@@ -476,9 +478,9 @@ supa-seed detect --verbose
    npm uninstall -g supa-seed
    ```
 
-3. **Install v2.0.0**
+3. **Install v2.4.1**
    ```bash
-   npm install -g supa-seed@2.0.0
+   npm install -g supa-seed@2.4.1
    ```
 
 4. **Update configuration**
@@ -553,4 +555,4 @@ supa-seed seed
 
 **Installation complete!** You now have a fully functional enterprise-grade database seeding platform.
 
-🌱 **Happy seeding with supa-seed v2.2.0!**
+🌱 **Happy seeding with SupaSeed v2.4.1!**

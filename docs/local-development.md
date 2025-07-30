@@ -1,89 +1,155 @@
-# Local Development with Supa-seed
+# Local Development with SupaSeed v2.4.1
 
-## ✅ JWT Authentication Issues RESOLVED in v2.0.3
+## 🏗️ MakerKit Integration Complete
 
-**Great news!** The JWT authentication issues with service role keys in local Supabase environments have been **fully resolved** in supa-seed v2.0.3.
+**SupaSeed v2.4.1** provides seamless local development with full MakerKit integration, hybrid user strategies, and comprehensive framework detection.
 
-### **What's Fixed:**
-- ✅ **Service role keys now work** in local Supabase environments
-- ✅ **Enhanced JWT validation** with unified handling for all key types
-- ✅ **Automatic local environment detection** and specialized client configuration
-- ✅ **Better error messages** if authentication still fails
+### **Key Features:**
+- ✅ **Full MakerKit Support**: Accounts-only architecture with JSONB public_data
+- ✅ **Hybrid User Strategy**: Combines existing + new user generation  
+- ✅ **Framework Auto-Detection**: Automatically detects MakerKit vs generic Supabase
+- ✅ **Outdoor Domain Content**: 36+ realistic setups across 12 personas
+- ✅ **Local & Cloud Ready**: Works seamlessly in both environments
 
-### **Upgrade to Get the Fix:**
+### **Quick Start:**
 ```bash
-npm install supa-seed@latest
+npm install -g supa-seed@2.4.1
 ```
 
-## JWT Authentication in Local Environments
+## Local Development Setup
 
-**Historical Note**: Previous versions of supa-seed had JWT authentication issues with service role keys in local Supabase environments. This has been resolved in v2.0.3.
+### 🎯 **MakerKit + Local Supabase**
 
-### 🎯 **Current Status: Both Keys Work**
-
-As of v2.0.3, **both service role keys and anon keys work perfectly** in local environments:
-
-```bash
-# Both keys work now! Use whichever you prefer:
-
-# Option 1: Service role key (now works!)
-SERVICE_KEY=$(supabase status | grep 'service_role key:' | cut -d: -f2 | xargs)
-npx supa-seed detect --url "http://127.0.0.1:54321" --key "$SERVICE_KEY"
-
-# Option 2: Anon key (always worked, still works)
-ANON_KEY=$(supabase status | grep 'anon key:' | cut -d: -f2 | xargs)
-npx supa-seed detect --url "http://127.0.0.1:54321" --key "$ANON_KEY"
-```
-
-### 🎯 **How the Fix Works**
-
-- **Enhanced client creation** with specialized local environment handling
-- **Unified JWT validation** treats both key types consistently
-- **Automatic detection** of local Supabase environments (127.0.0.1, localhost, :54321)
-- **Improved client options** for better local development support
-
-### 🔧 **Legacy Error Symptoms (Pre-v2.0.3)**
-
-If you're still using an older version and see errors like:
-```
-JWSError JWSInvalidSignature
-Table 'accounts' not found in local environment: JWSError JWSInvalidSignature
-```
-
-**Solution**: Upgrade to v2.0.3 or later:
-```bash
-npm install supa-seed@latest
-```
-
-### 💡 **Quick Commands for v2.0.3+**
+For MakerKit projects with local Supabase development:
 
 ```bash
-# Test with service role key (now works!)
-npx supa-seed detect --verbose --url "http://127.0.0.1:54321" --key "$(supabase status | grep 'service_role key:' | cut -d: -f2 | xargs)"
+# 1. Start local Supabase
+supabase start
 
-# Or test with anon key (still works perfectly)
-npx supa-seed detect --verbose --url "http://127.0.0.1:54321" --key "$(supabase status | grep 'anon key:' | cut -d: -f2 | xargs)"
+# 2. Auto-detect MakerKit framework and create config
+supa-seed init --detect
+
+# 3. Seed with hybrid strategy (preserves existing accounts)
+supa-seed seed
+
+# Expected result: 
+# - Uses existing accounts if any
+# - Creates additional users to reach target count
+# - Generates realistic outdoor setups
 ```
 
-### 🚀 **Expected Results**
+### 🏗️ **Framework Detection**
 
-With v2.0.3+, both keys should produce identical successful output:
+SupaSeed automatically detects your framework and configures accordingly:
 
+```bash
+# Run framework detection
+supa-seed detect --verbose
+
+# For MakerKit, you'll see:
+# ✅ Framework: MakerKit v3+
+# ✅ Primary table: accounts  
+# ✅ Accounts-only architecture detected
+# ✅ JSONB public_data field available
 ```
-📋 Enhanced schema detected: {
-  primaryUserTable: 'accounts',
-  makerkitVersion: 'v2',
-  frameworkType: 'makerkit',
-  customTables: 7,
-  relationships: 2
+
+### ⚙️ **Configuration for MakerKit**
+
+The generated config will be optimized for MakerKit:
+
+```json
+{
+  "supabaseUrl": "http://127.0.0.1:54321",
+  "supabaseServiceKey": "your-local-service-key",
+  "userCount": 12,
+  "setupsPerUser": 3,
+  "domain": "outdoor", 
+  "userStrategy": "hybrid",
+  "schema": {
+    "framework": "makerkit",
+    "primaryUserTable": "accounts",
+    "setupsTable": {
+      "userField": "account_id"
+    }
+  }
 }
-
-📊 Database Schema Analysis:
-   🏗️  Framework detected: makerkit
-   👤 Has accounts table: ✅
-   📝 Has setups table: ✅
 ```
 
-## Cloud Environments
+### 🎯 **User Strategy Options**
 
-For production/staging environments, service role keys work as expected. This issue is specific to local development environments.
+- **`hybrid`** (default): Uses existing accounts + creates new ones to reach target
+- **`create-new`**: Creates entirely new accounts 
+- **`use-existing`**: Only uses existing accounts in database
+
+### 🚀 **Verification**
+
+After seeding, verify the results:
+
+```bash
+# Check seeding results
+supa-seed status
+
+# Should show:
+# 👥 Users: 12 accounts (X existing + Y new)
+# 🏔️  Setups: 36 outdoor scenarios 
+# 📊 Personas: 12 diverse archetypes
+# ✅ All data successfully created
+```
+
+## Advanced Local Development
+
+### 🧪 **Testing Different Strategies**
+
+```bash
+# Test with create-new strategy
+supa-seed seed --user-strategy create-new --users 5
+
+# Test with use-existing only  
+supa-seed seed --user-strategy use-existing
+
+# Test with different domains
+supa-seed seed --domain saas --users 8
+```
+
+### 🔧 **Development Workflow**
+
+```bash
+# 1. Clean existing data
+supa-seed cleanup --force
+
+# 2. Seed fresh data
+supa-seed seed
+
+# 3. Check status  
+supa-seed status
+
+# 4. Export for backup (optional)
+supa-seed export --format json > backup.json
+```
+
+### 🏗️  **MakerKit Schema Compatibility**
+
+SupaSeed handles MakerKit's unique schema requirements:
+
+- **Accounts-only**: No `profiles` table dependency
+- **Personal accounts**: Sets `is_personal_account = true` 
+- **JSONB fields**: Stores bio/username in `public_data`
+- **Constraint handling**: Manages unique constraints gracefully
+
+### 📊 **Performance Optimization**
+
+For local development, these settings provide optimal performance:
+
+```json
+{
+  "performance": {
+    "batchSize": 50,
+    "enableMonitoring": true,
+    "memoryLimit": 256
+  }
+}
+```
+
+## Cloud Environment Support
+
+SupaSeed works seamlessly with both local and cloud Supabase environments. For production deployments, ensure you're using the service role key and proper configuration.

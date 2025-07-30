@@ -58,7 +58,6 @@ import { Logger } from '../../utils/logger';
 import { DetectionIntegrationEngine } from '../../detection/detection-integration';
 import { AutoConfigurator } from '../../detection/auto-configurator';
 import type {
-  UnifiedDetectionResult,
   AutoConfigurationResult
 } from '../../detection/auto-configurator';
 import type { FlexibleSeedConfig } from '../../config-types';
@@ -1653,7 +1652,7 @@ export class MakerKitStrategy implements SeedingStrategy {
       // MakerKit integration
       useMakerKitTriggers: true,
       createAccountRecords: true,
-      createProfileRecords: true,
+      createProfileRecords: false, // MakerKit uses accounts table only, no profiles
       
       // Testing and development
       autoConfirmUsers: true,
@@ -2653,7 +2652,7 @@ export class MakerKitStrategy implements SeedingStrategy {
         });
       
       return data && (data as any[]).length > 0;
-    } catch {
+    } catch (error) {
       return false;
     }
   }
@@ -3095,16 +3094,16 @@ export class MakerKitStrategy implements SeedingStrategy {
     for (const table of tables) {
       try {
         const constraints = await this.discoverConstraints([table]);
-        if (constraints.hasConstraints) {
+        if (constraints.success && constraints.businessRules.length > 0) {
           stats.tablesWithConstraints++;
         }
 
         // Use generic constraint analysis since specific properties may not exist
-        const constraintCount = constraints.analysisSummary?.totalConstraints || 0;
+        const constraintCount = constraints.businessRules.length || 0;
         stats.constraintsByType.total = (stats.constraintsByType.total || 0) + constraintCount;
 
         // Simplified constraint analysis
-        if (constraints.recommendation && constraints.recommendation.includes('MakerKit')) {
+        if (constraints.recommendations && constraints.recommendations.some(rec => rec.includes('MakerKit'))) {
           stats.makerkitSpecificConstraints++;
         }
         

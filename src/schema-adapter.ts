@@ -517,9 +517,13 @@ Technical details: ${error.message}
       updated_at: new Date().toISOString(),
     };
 
-    // Add optional fields if provided
-    if (userData.username) accountData.username = userData.username;
-    if (userData.bio) accountData.bio = userData.bio;
+    // Add optional fields if provided - MakerKit accounts table structure
+    if (userData.bio || userData.username) {
+      // For MakerKit, additional data like bio and username go in public_data JSONB field
+      accountData.public_data = {};
+      if (userData.bio) accountData.public_data.bio = userData.bio;
+      if (userData.username) accountData.public_data.username = userData.username;
+    }
     if (userData.picture_url) accountData.picture_url = userData.picture_url;
 
     // For MakerKit-style accounts, use primary_owner_user_id
@@ -628,7 +632,7 @@ Technical details: ${error.message}
             id: crypto.randomUUID(),
             name: `${userData.name}'s Account`,
             primary_owner_user_id: userId,
-            slug: userData.username || userData.email.split('@')[0],
+            slug: null, // CRITICAL: MakerKit constraint requires slug = null for personal accounts
             is_personal_account: true, // CRITICAL: Must be true for profile creation to succeed
           });
         

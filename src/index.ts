@@ -231,16 +231,19 @@ export class SupaSeedFramework {
     console.log('🧹 Cleaning up existing seed data...');
     
     try {
-      // Get test accounts first
+      // Get test accounts first - look for any test domains
       const { data: testAccounts } = await this.client
         .from('accounts')
-        .select('id')
-        .like('email', '%.test');
+        .select('id, email')
+        .or('email.like.%.test,email.like.%supaseed%,email.like.%wildernest%,email.like.%campfire%,email.like.%makerkit%,email.like.%demo,email.like.%fresh-test%');
 
       if (!testAccounts?.length) {
         console.log('ℹ️  No test data found to clean up');
         return;
       }
+
+      console.log(`🔍 Found ${testAccounts.length} test accounts to clean up:`);
+      testAccounts.forEach((acc: any) => console.log(`   - ${acc.email} (${acc.id})`));
 
       const testAccountIds = testAccounts.map((acc: any) => acc.id);
 
@@ -271,6 +274,16 @@ export class SupaSeedFramework {
         .from('accounts')
         .delete()
         .in('id', testAccountIds);
+
+      // Clean auth.users - this is critical for avoiding duplicate email errors
+      for (const accountId of testAccountIds) {
+        try {
+          await this.client.auth.admin.deleteUser(accountId);
+        } catch (error) {
+          // Some users might not exist in auth.users, that's okay
+          console.log(`ℹ️  Auth user ${accountId} not found or already deleted`);
+        }
+      }
 
       console.log('✅ Cleanup completed');
     } catch (error) {

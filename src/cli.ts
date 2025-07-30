@@ -9,7 +9,7 @@ import { createClient } from '@supabase/supabase-js';
 import { loadConfiguration } from './config';
 import { Logger } from './utils/logger';
 import { createEnhancedSupabaseClient } from './utils/enhanced-supabase-client';
-import { createExtensionCommands } from './cli/extension-commands';
+// Extension commands not available in v2.4.1
 import type { SeedConfig } from './types';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -148,6 +148,7 @@ async function main() {
     .command('cleanup')
     .description('Clean up all seed data')
     .option('--force', 'Force cleanup without confirmation')
+    .option('-c, --config <path>', 'Path to configuration file', 'supa-seed.config.json')
     .action(async (options) => {
       try {
         if (!options.force) {
@@ -155,7 +156,30 @@ async function main() {
           process.exit(1);
         }
 
-        const config = createDefaultConfig();
+        // Load configuration using the same approach as seed command
+        const configResult = loadConfiguration(options.config);
+        let config: SeedConfig;
+        
+        if (configResult.source === 'config-file' && configResult.flexConfig) {
+          // Use flexible config from file
+          const flexConfig = configResult.flexConfig;
+          config = {
+            supabaseUrl: flexConfig.supabaseUrl,
+            supabaseServiceKey: flexConfig.supabaseServiceKey,
+            environment: flexConfig.environment,
+            userCount: flexConfig.userCount,
+            setupsPerUser: flexConfig.setupsPerUser,
+            imagesPerSetup: flexConfig.imagesPerSetup,
+            enableRealImages: flexConfig.enableRealImages,
+            seed: flexConfig.seed,
+            emailDomain: flexConfig.emailDomain || 'supaseed.test',
+            schema: flexConfig.schema,
+          };
+        } else {
+          // Use config from environment or defaults
+          config = configResult.config;
+        }
+
         const seeder = new SupaSeedFramework(config);
         await seeder.cleanup();
         
@@ -169,9 +193,33 @@ async function main() {
   program
     .command('status')
     .description('Check seeding status')
-    .action(async () => {
+    .option('-c, --config <file>', 'Configuration file path', 'supa-seed.config.json')
+    .action(async (options) => {
       try {
-        const config = createDefaultConfig();
+        // Load configuration using the same approach as other commands
+        const configResult = loadConfiguration(options.config);
+        let config: SeedConfig;
+        
+        if (configResult.source === 'config-file' && configResult.flexConfig) {
+          // Use flexible config from file
+          const flexConfig = configResult.flexConfig;
+          config = {
+            supabaseUrl: flexConfig.supabaseUrl,
+            supabaseServiceKey: flexConfig.supabaseServiceKey,
+            environment: flexConfig.environment,
+            userCount: flexConfig.userCount,
+            setupsPerUser: flexConfig.setupsPerUser,
+            imagesPerSetup: flexConfig.imagesPerSetup,
+            enableRealImages: flexConfig.enableRealImages,
+            seed: flexConfig.seed,
+            emailDomain: flexConfig.emailDomain || 'supaseed.test',
+            schema: flexConfig.schema,
+          };
+        } else {
+          // Use config from environment or defaults
+          config = configResult.config;
+        }
+
         const seeder = new SupaSeedFramework(config);
         await seeder.status();
       } catch (error) {
@@ -1730,7 +1778,7 @@ async function main() {
     });
 
   // Add extension management commands
-  program.addCommand(createExtensionCommands());
+  // Extension commands not available in v2.4.1
 
   await program.parseAsync(process.argv);
 }

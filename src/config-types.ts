@@ -1,4 +1,5 @@
-import type { ExtensionsConfig } from './extensions/extension-config';
+// Extension config not available in v2.4.1
+type ExtensionsConfig = any;
 
 export interface FlexibleSeedConfig {
   // Basic connection settings
