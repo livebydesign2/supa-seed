@@ -91,6 +91,10 @@ export interface SeedConfig {
       count?: number;
       categories?: string[];
     };
+    gear?: {
+      count?: number;
+      forceGeneration?: boolean; // Create variants if needed to reach exact count
+    };
   };
 }
 

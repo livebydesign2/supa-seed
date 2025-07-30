@@ -101,58 +101,206 @@ export class GearSeeder extends SeedModule {
   private async seedGearItems(): Promise<void> {
     const { client } = this.context;
     
-    let totalCreated = 0;
+    // NEW: Get configuration for gear generation
+    const gearConfig = this.context.config.tables?.gear;
+    const requestedCount = gearConfig?.count || 0;
+    const forceGeneration = gearConfig?.forceGeneration || false;
     
-    for (const [categoryName, items] of Object.entries(this.gearData)) {
-      // Get the category ID
-      const { data: category } = await client
-        .from('gear_categories')
-        .select('id')
-        .eq('name', categoryName)
-        .single();
+    console.log(`🎯 Gear configuration: count=${requestedCount}, forceGeneration=${forceGeneration}`);
+    
+    if (requestedCount <= 0) {
+      console.log('ℹ️  No gear items requested (count=0), skipping gear generation');
+      return;
+    }
+    
+    // Get or create gear categories
+    const categoryMap = await this.ensureGearCategories();
+    
+    // Create a flat list of all available gear items with categories
+    const availableGearItems = this.createGearItemPool(categoryMap);
+    console.log(`📦 Available gear pool: ${availableGearItems.length} items across ${Object.keys(categoryMap).length} categories`);
+    
+    if (availableGearItems.length === 0) {
+      console.warn('⚠️  No gear items available for generation');
+      return;
+    }
+    
+    // Generate the requested number of gear items
+    const itemsToCreate = this.selectGearItems(availableGearItems, requestedCount, forceGeneration);
+    console.log(`🔄 Creating ${itemsToCreate.length} gear items...`);
+    
+    let totalCreated = 0;
+    let totalSkipped = 0;
+    
+    for (const itemData of itemsToCreate) {
+      try {
+        // Check if item already exists (unless force generation is enabled)
+        if (!forceGeneration) {
+          const { data: existingItem } = await client
+            .from('gear_items')
+            .select('id')
+            .eq('make', itemData.make)
+            .eq('model', itemData.model)
+            .single();
 
-      if (!category) {
-        console.warn(`⚠️  Category '${categoryName}' not found, skipping`);
-        continue;
-      }
-
-      for (const item of items) {
-        // Check if item already exists
-        const { data: existingItem } = await client
-          .from('gear_items')
-          .select('id')
-          .eq('make', item.make)
-          .eq('model', item.model)
-          .single();
-
-        if (existingItem) {
-          continue; // Skip if already exists
+          if (existingItem) {
+            totalSkipped++;
+            continue;
+          }
         }
 
         const { error } = await client
           .from('gear_items')
           .insert({
-            category_id: category.id,
-            make: item.make,
-            model: item.model,
-            price: item.price,
-            weight: item.weight,
-            description: `${item.make} ${item.model} - Professional grade outdoor gear`,
+            category_id: itemData.category_id,
+            make: itemData.make,
+            model: itemData.model,
+            price: itemData.price,
+            weight: itemData.weight,
+            description: itemData.description,
           });
 
         if (error) {
-          console.error(`❌ Failed to create gear item ${item.make} ${item.model}:`, error);
+          console.error(`❌ Failed to create gear item ${itemData.make} ${itemData.model}:`, error);
         } else {
           totalCreated++;
         }
+      } catch (error) {
+        console.error(`❌ Error creating gear item ${itemData.make} ${itemData.model}:`, error);
       }
     }
 
-    console.log(`   ✅ Created ${totalCreated} new gear items`);
+    console.log(`   ✅ Created ${totalCreated} new gear items (${totalSkipped} skipped as duplicates)`);
+    
+    // Validate we created the expected count
+    if (totalCreated < requestedCount && !forceGeneration) {
+      console.warn(`⚠️  Created fewer items than requested (${totalCreated}/${requestedCount}) - likely due to existing duplicates`);
+      console.warn(`💡 Use "forceGeneration": true to create variants and reach exact count`);
+    } else if (totalCreated === requestedCount) {
+      console.log(`🎯 Successfully generated exactly ${requestedCount} gear items as requested`);
+    }
+  }
+
+  /**
+   * Ensure all gear categories exist in the database
+   */
+  private async ensureGearCategories(): Promise<Record<string, string>> {
+    const { client } = this.context;
+    const categoryMap: Record<string, string> = {};
+    
+    console.log('🔍 Checking gear categories...');
+    
+    for (const categoryName of Object.keys(this.gearData)) {
+      try {
+        // Try to get existing category
+        let { data: category } = await client
+          .from('gear_categories')
+          .select('id')
+          .eq('name', categoryName)
+          .single();
+        
+        // Create category if it doesn't exist
+        if (!category) {
+          console.log(`📝 Creating missing category: ${categoryName}`);
+          const { data: newCategory, error } = await client
+            .from('gear_categories')
+            .insert({ name: categoryName })
+            .select('id')
+            .single();
+          
+          if (error) {
+            console.warn(`⚠️  Failed to create category '${categoryName}':`, error);
+            continue;
+          }
+          category = newCategory;
+        }
+        
+        if (category?.id) {
+          categoryMap[categoryName] = category.id as string;
+        }
+      } catch (error) {
+        console.warn(`⚠️  Error handling category '${categoryName}':`, error);
+      }
+    }
+    
+    console.log(`✅ Available categories: ${Object.keys(categoryMap).join(', ')}`);
+    return categoryMap;
+  }
+
+  /**
+   * Create a pool of all available gear items with their category IDs
+   */
+  private createGearItemPool(categoryMap: Record<string, string>): any[] {
+    const pool: any[] = [];
+    
+    for (const [categoryName, items] of Object.entries(this.gearData)) {
+      const categoryId = categoryMap[categoryName];
+      if (!categoryId) {
+        console.warn(`⚠️  No category ID for '${categoryName}', skipping items`);
+        continue;
+      }
+      
+      for (const item of items) {
+        pool.push({
+          category_id: categoryId,
+          category_name: categoryName,
+          make: item.make,
+          model: item.model,
+          price: item.price,
+          weight: item.weight,
+          description: `${item.make} ${item.model} - Professional grade outdoor gear`,
+        });
+      }
+    }
+    
+    return pool;
+  }
+
+  /**
+   * Select specific number of gear items from the pool
+   */
+  private selectGearItems(availableItems: any[], requestedCount: number, forceGeneration: boolean): any[] {
+    const { faker } = this.context;
+    
+    if (requestedCount >= availableItems.length) {
+      // If requesting more items than available, we need to create variants
+      if (forceGeneration) {
+        return this.createGearVariants(availableItems, requestedCount);
+      } else {
+        console.log(`ℹ️  Requested ${requestedCount} items but only ${availableItems.length} available - returning all available`);
+        return [...availableItems];
+      }
+    }
+    
+    // Randomly select the requested number of items
+    return faker.helpers.arrayElements(availableItems, requestedCount);
+  }
+
+  /**
+   * Create variants of existing gear items to reach requested count
+   */
+  private createGearVariants(baseItems: any[], requestedCount: number): any[] {
+    const { faker } = this.context;
+    const result: any[] = [...baseItems]; // Start with all base items
+    
+    // Create variants until we reach requested count
+    while (result.length < requestedCount) {
+      const baseItem = faker.helpers.arrayElement(baseItems);
+      const variant = {
+        ...baseItem,
+        model: `${baseItem.model} (Variant ${result.length - baseItems.length + 1})`,
+        price: baseItem.price * faker.number.float({ min: 0.8, max: 1.2 }), // ±20% price variation
+      };
+      result.push(variant);
+    }
+    
+    return result.slice(0, requestedCount); // Ensure exact count
   }
 
   private async associateGearWithSetups(setups: CachedSetup[]): Promise<void> {
     const { client, faker } = this.context;
+    
+    console.log(`🔗 Creating gear-setup associations for ${setups.length} setups...`);
     
     // Get all gear items
     const { data: allGear } = await client
@@ -166,6 +314,8 @@ export class GearSeeder extends SeedModule {
       console.log('⚠️  No gear items found, skipping associations');
       return;
     }
+    
+    console.log(`📦 Found ${allGear.length} gear items available for associations`);
 
     let totalAssociations = 0;
 
@@ -200,7 +350,7 @@ export class GearSeeder extends SeedModule {
       }
     }
 
-    console.log(`   ✅ Created ${totalAssociations} gear associations`);
+    console.log(`   ✅ Created ${totalAssociations} gear-setup associations (avg ${Math.round(totalAssociations / setups.length)} per setup)`);
   }
 
   private selectRelevantGear(setup: CachedSetup, allGear: any[]): any[] {
