@@ -1777,8 +1777,7 @@ async function main() {
       }
     });
 
-  // Add extension management commands
-  // Extension commands not available in v2.4.1
+  // Extension commands removed in v2.4.2
 
   await program.parseAsync(process.argv);
 }

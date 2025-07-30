@@ -226,7 +226,7 @@ export async function createConstraintAwareSeeder(client: any, options: {
 }
 
 // Version and metadata
-export const CURRENT_VERSION = '2.4.1';
+export const CURRENT_VERSION = '2.4.2';
 export const CONSTRAINT_AWARE_VERSION = '2.2.0';
 export const SCHEMA_FIRST_VERSION = '2.1.0'; // Maintained for compatibility
 
