@@ -27,10 +27,14 @@ export function generateSecurePassword(): string {
 }
 
 /**
- * Generate a valid email address for seeding
+ * Generate a valid email address for seeding with guaranteed uniqueness
  */
 export function generateTestEmail(username: string, domain: string = 'supaseed.test'): string {
-  return `${username.toLowerCase()}@${domain}`;
+  // Add timestamp + random to ensure uniqueness (faker is seeded so usernames repeat)
+  const timestamp = Date.now().toString().slice(-6);
+  const randomId = Math.floor(Math.random() * 10000);
+  const uniqueUsername = `${username.toLowerCase()}_${timestamp}_${randomId}`;
+  return `${uniqueUsername}@${domain}`;
 }
 
 /**

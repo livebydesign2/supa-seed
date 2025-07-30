@@ -7,13 +7,16 @@ import {
   MakerKitCompatibilityConfig,
   StandardTestUser 
 } from '../../integration/makerkit-compatibility';
+import * as crypto from 'crypto';
 
 export class UserSeeder extends SeedModule {
   private schemaAdapter!: SchemaAdapter;
   private makerkitCompatibility!: MakerKitCompatibilityLayer;
+  private userCounter = 0; // Counter for truly unique user generation
 
   async seed(): Promise<void> {
     try {
+      
       // Initialize schema adapter with config override
       this.schemaAdapter = new SchemaAdapter(this.context.client, this.context.config);
       await this.schemaAdapter.detectSchema();
@@ -278,8 +281,14 @@ export class UserSeeder extends SeedModule {
     // Generate realistic profile based on persona
     const firstName = faker.person.firstName();
     const lastName = faker.person.lastName();
-    const username = `${personaConfig.usernamePrefix}_${firstName.toLowerCase()}_${lastName.toLowerCase().slice(0, 3)}`;
-    const email = `${username}@${this.context.config.emailDomain || 'supaseed.test'}`;
+    
+    // Create truly unique email to prevent conflicts (faker is seeded so names repeat)
+    this.userCounter++;
+    const uuid = crypto.randomUUID().replace(/-/g, '').substring(0, 12);
+    const timestamp = Date.now();
+    // Use timestamp + UUID instead of faker names to ensure absolute uniqueness
+    const username = `user_${this.userCounter}_${timestamp}_${uuid}`;
+    const email = `${username}@${this.context.config.emailDomain || 'supaseed-personas.test'}`;
     const bio = this.generatePersonaBio(persona, personaConfig, domainConfig);
     const name = `${firstName} ${lastName}`;
 
@@ -512,8 +521,15 @@ export class UserSeeder extends SeedModule {
     // Generate realistic profile based on domain
     const firstName = faker.person.firstName();
     const lastName = faker.person.lastName();
-    const username = generateUsername(firstName, lastName, domainConfig.usernameSuffixes);
-    const email = generateTestEmail(username, this.context.config.emailDomain);
+    
+    // Use truly unique approach with UUID to prevent any collision
+    this.userCounter++;
+    const uuid = crypto.randomUUID().replace(/-/g, '').substring(0, 12);
+    const timestamp = Date.now();
+    const username = `user_${this.userCounter}_${timestamp}_${uuid}`;
+    const email = `${username}@${this.context.config.emailDomain || 'supaseed.test'}`;
+    
+    
     const bio = this.generateUserBio(domainConfig);
     const name = `${firstName} ${lastName}`;
     

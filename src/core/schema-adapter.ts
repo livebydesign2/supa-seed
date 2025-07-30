@@ -536,11 +536,37 @@ Technical details: ${error.message}
       accountData.id = userId;
     }
 
+    // Check if account already exists before trying to create it
+    const { data: existingAccount } = await this.client
+      .from('accounts')
+      .select('email, id')
+      .eq('email', userData.email)
+      .single();
+
+    if (existingAccount) {
+      Logger.debug(`Account for ${userData.email} already exists, using existing record`);
+      return { id: existingAccount.id as string, success: true };
+    }
+
     const { error: accountError } = await this.client
       .from('accounts')
       .insert(accountData);
 
     if (accountError) {
+      // If it's a duplicate key error, check if the record was actually created
+      if (accountError.code === '23505') {
+        const { data: createdAccount } = await this.client
+          .from('accounts')
+          .select('email, id')
+          .eq('email', userData.email)
+          .single();
+          
+        if (createdAccount) {
+          Logger.debug(`Account for ${userData.email} was created despite duplicate key error`);
+          return { id: createdAccount.id as string, success: true };
+        }
+      }
+      
       Logger.debug('Account creation error:', accountError);
       return { id: '', success: false, error: `Account creation failed: ${accountError.message}` };
     }
@@ -835,6 +861,11 @@ Technical details: ${error.message}
       return this.configOverride.schema.setupsTable.userField;
     }
     
+    // Check for MakerKit patterns - they use account_id for user references
+    if (this.hasMakerKitPattern()) {
+      return 'account_id';
+    }
+    
     const strategy = this.getUserCreationStrategy();
     
     switch (strategy) {
@@ -846,6 +877,15 @@ Technical details: ${error.message}
       default:
         return 'account_id';
     }
+  }
+  
+  /**
+   * Detect if this is a MakerKit schema pattern
+   */
+  private hasMakerKitPattern(): boolean {
+    // If we detect accounts table as primary user table, it's likely MakerKit
+    const primaryTable = this.schemaInfo?.primaryUserTable;
+    return primaryTable === 'accounts';
   }
 
   /**
