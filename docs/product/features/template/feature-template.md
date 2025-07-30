@@ -15,7 +15,7 @@
 
 1. **📊 Show Current Progress**: Display current task status and blockers
 2. **🔍 Research & Understand**: Read context files and codebase patterns  
-3. **📋 Create Todo List**: Use `todo_write` tool for multi-step tasks
+3. **📋 Create Todo List**: Use `todowrite` tool for multi-step tasks
 4. **📝 Document Progress**: Update this file as you work
 5. **🧪 Test Your Work**: Validate implementation and fix errors
 6. **💾 Add & Commit**: Git commit changes with descriptive messages

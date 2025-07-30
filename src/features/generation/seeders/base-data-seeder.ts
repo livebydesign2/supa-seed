@@ -2,8 +2,39 @@ import { BaseSeeder } from './base-seeder';
 import { Logger } from '../../../core/utils/logger';
 import { getDomainConfig } from '../../../domains';
 import { SchemaAdapter } from '../../../core/schema-adapter';
+import { createTableMappingResolver } from '../../../schema/table-mapping-resolver';
 
 export class BaseDataSeeder extends BaseSeeder {
+  
+  /**
+   * Get the correct table name for base templates using dynamic mapping
+   */
+  private async getBaseTemplateTableName(): Promise<string> {
+    try {
+      const framework = this.context.config.schema?.framework || 'makerkit';
+      const resolver = createTableMappingResolver(this.context.client, {
+        framework,
+        validateWithDatabase: true
+      });
+      
+      const result = await resolver.resolveTableName('setup_types', 'baseTemplateTable');
+      
+      if (result.warnings.length > 0) {
+        Logger.warn('⚠️ Base template table mapping warnings:', result.warnings);
+      }
+      
+      Logger.debug(`🗺️ Base template table resolved: setup_types -> ${result.actualTableName}`, {
+        framework,
+        exists: result.exists,
+        source: result.source
+      });
+      
+      return result.actualTableName;
+    } catch (error) {
+      Logger.warn(`⚠️ Failed to resolve base template table name, using fallback 'base_templates':`, error);
+      return 'base_templates';
+    }
+  }
   
   /**
    * Check if a column exists in a table (helper method)
@@ -131,8 +162,11 @@ export class BaseDataSeeder extends BaseSeeder {
     // Get schema adapter to check column existence
     const schemaAdapter = this.context.cache.get('schemaAdapter') as SchemaAdapter;
     
+    // Get the correct table name for base templates
+    const baseTemplateTableName = await this.getBaseTemplateTableName();
+    
     // Check what description column to use based on config and existence
-    const descriptionColumn = await this.getColumnMapping('base_templates', 'description', ['info', 'details', 'notes']);
+    const descriptionColumn = await this.getColumnMapping(baseTemplateTableName, 'description', ['info', 'details', 'notes']);
     const hasDescriptionColumn = descriptionColumn !== null;
     
     const baseTemplateData = [
@@ -221,8 +255,10 @@ export class BaseDataSeeder extends BaseSeeder {
       async () => {
         const { client } = this.context;
         
+        const baseTemplateTableName = await this.getBaseTemplateTableName();
+        
         const { data: existingTemplates, error: selectError } = await client
-          .from('base_templates')
+          .from(baseTemplateTableName)
           .select('make, model, type');
 
         if (selectError) {
@@ -239,7 +275,7 @@ export class BaseDataSeeder extends BaseSeeder {
 
         if (newTemplates.length > 0) {
           const { error: insertError } = await client
-            .from('base_templates')
+            .from(baseTemplateTableName)
             .insert(newTemplates);
 
           if (insertError) {
@@ -260,12 +296,12 @@ export class BaseDataSeeder extends BaseSeeder {
 
         // Cache templates for other seeders
         const { data: allTemplates } = await client
-          .from('base_templates')
+          .from(baseTemplateTableName)
           .select('*');
 
         this.context.cache.set('baseTemplates', allTemplates || []);
       },
-      'base_templates',
+      await this.getBaseTemplateTableName(),
       'Base templates are optional for basic seeding'
     );
     

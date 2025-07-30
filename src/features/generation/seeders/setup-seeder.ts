@@ -1,6 +1,10 @@
 import { SeedModule, CachedUser, CachedBaseTemplate, CachedSetup } from '../../../core/types/types';
 import { SchemaAdapter } from '../../../core/schema-adapter';
 import { getDomainConfig } from '../../../domains';
+import { StreamingBatchProcessor, BatchItem, BatchResult } from '../../../core/batch-processor';
+import { Logger } from '../../../core/utils/logger';
+import MemoryManager from '../../../core/utils/memory-manager';
+import { createQueryTranslator } from '../../../schema/query-translator';
 
 export class SetupSeeder extends SeedModule {
   private getSetupTypes(): Record<string, string[]> {
@@ -33,7 +37,7 @@ export class SetupSeeder extends SeedModule {
   };
 
   async seed(): Promise<void> {
-    console.log('🎒 Seeding setups...');
+    console.log('🎒 Seeding setups with memory-efficient batch processing...');
     
     const users = this.context.cache.get('users') as CachedUser[];
     const templates = this.context.cache.get('baseTemplates') as CachedBaseTemplate[];
@@ -58,25 +62,8 @@ export class SetupSeeder extends SeedModule {
       console.log('⚠️  No base templates found in cache, creating default setups instead');
     }
 
-    const createdSetups: CachedSetup[] = [];
-
-    for (const user of users) {
-      const setupCount = this.context.faker.number.int({ 
-        min: 1, 
-        max: this.context.config.setupsPerUser 
-      });
-      
-      for (let i = 0; i < setupCount; i++) {
-        const setup = await this.createSetup(user, templates, schemaAdapter);
-        if (setup) {
-          createdSetups.push(setup);
-          this.context.stats.setupsCreated++;
-        }
-      }
-    }
-
-    this.context.cache.set('setups', createdSetups);
-    console.log(`✅ Created ${createdSetups.length} setups`);
+    // Use streaming batch processing to prevent OOM
+    await this.processSetupsInBatches(users, templates, schemaAdapter);
   }
 
   private async createSetup(
@@ -139,8 +126,15 @@ export class SetupSeeder extends SeedModule {
     }
 
     try {
-      const { data, error } = await client
-        .from('setups')
+      // Use query translator for dynamic table mapping
+      const framework = this.context.config.schema?.framework || 'makerkit';
+      const translator = createQueryTranslator(client, {
+        framework,
+        enableValidation: true,
+        enableCaching: true
+      });
+      
+      const { data, error } = await (await translator.from('setups'))
         .insert(setupData)
         .select('id')
         .single();
@@ -221,5 +215,120 @@ export class SetupSeeder extends SeedModule {
     } else {
       return `A carefully curated ${category.toLowerCase()} kit ${experience}. This setup has served me well across ${context}. Every item has earned its place through real-world use.`;
     }
+  }
+
+  private async processSetupsInBatches(
+    users: CachedUser[],
+    templates: CachedBaseTemplate[],
+    schemaAdapter: SchemaAdapter
+  ): Promise<void> {
+    const createdSetups: CachedSetup[] = [];
+    
+    // Configure batch processor for memory efficiency
+    const batchProcessor = new StreamingBatchProcessor<CachedUser, CachedSetup[]>({
+      defaultBatchSize: 25, // Smaller batches for setup generation
+      memoryThresholdMB: 512, // Lower threshold for setup processing
+      minBatchSize: 5,
+      maxBatchSize: 50,
+      forceGCBetweenBatches: true,
+      batchDelayMs: 50 // Brief pause between batches
+    });
+
+    // Create a processor function for each batch of users
+    const userBatchProcessor = async (userBatch: BatchItem<CachedUser>[]): Promise<BatchResult<CachedSetup[]>[]> => {
+      const batchResults: BatchResult<CachedSetup[]>[] = [];
+      
+      for (const userItem of userBatch) {
+        const batchStartTime = Date.now();
+        const memoryBefore = process.memoryUsage().heapUsed / 1024 / 1024;
+        
+        try {
+          const user = userItem.data;
+          const userSetups: CachedSetup[] = [];
+          
+          // Generate random number of setups for this user
+          const setupCount = this.context.faker.number.int({ 
+            min: 1, 
+            max: this.context.config.setupsPerUser 
+          });
+          
+          Logger.debug(`🎒 Creating ${setupCount} setups for user: ${user.username}`);
+          
+          // Create setups for this user
+          for (let i = 0; i < setupCount; i++) {
+            const setup = await this.createSetup(user, templates, schemaAdapter);
+            if (setup) {
+              userSetups.push(setup);
+              this.context.stats.setupsCreated++;
+            }
+          }
+          
+          const processingTime = Date.now() - batchStartTime;
+          const memoryAfter = process.memoryUsage().heapUsed / 1024 / 1024;
+          
+          batchResults.push({
+            success: true,
+            result: userSetups,
+            processingTimeMs: processingTime,
+            memoryUsageMB: memoryAfter
+          });
+          
+        } catch (error) {
+          Logger.error(`❌ Failed to create setups for user ${userItem.data.username}:`, error);
+          
+          batchResults.push({
+            success: false,
+            error: error as Error,
+            processingTimeMs: Date.now() - batchStartTime,
+            memoryUsageMB: process.memoryUsage().heapUsed / 1024 / 1024
+          });
+        }
+      }
+      
+      return batchResults;
+    };
+
+    Logger.info(`🔄 Processing ${users.length} users in memory-efficient batches...`);
+    
+    // Process all users through the batch processor
+    const { results, stats, recommendations } = await batchProcessor.processAll(users, userBatchProcessor);
+    
+    // Collect all successful results
+    let totalSetups = 0;
+    for (const result of results) {
+      if (result.success && result.result) {
+        createdSetups.push(...result.result);
+        totalSetups += result.result.length;
+      }
+    }
+    
+    // Cache the results
+    this.context.cache.set('setups', createdSetups);
+    
+    // Log completion with memory statistics
+    Logger.info(`✅ Setup seeding completed:`, {
+      totalUsers: users.length,
+      totalSetups: totalSetups,
+      batchesProcessed: stats.batchesCompleted,
+      peakMemoryMB: stats.peakMemoryUsageMB.toFixed(1),
+      avgMemoryMB: stats.averageMemoryUsageMB.toFixed(1),
+      totalTimeMs: stats.totalProcessingTimeMs
+    });
+    
+    console.log(`✅ Created ${totalSetups} setups for ${users.length} users using streaming batch processing`);
+    
+    // Log recommendations if any
+    if (recommendations.length > 0) {
+      Logger.info('💡 Performance recommendations:', recommendations);
+    }
+    
+    // Force final cleanup and log memory usage
+    const finalMemoryStats = MemoryManager.getMemoryStats();
+    Logger.info('📊 Final memory usage after setup seeding:', {
+      heapUsedMB: finalMemoryStats.usage.heapUsedMB.toFixed(1),
+      heapTotalMB: finalMemoryStats.usage.heapTotalMB.toFixed(1),
+      percentageUsed: finalMemoryStats.percentageUsed.toFixed(1),
+      recommendations: finalMemoryStats.recommendations
+    });
   }
 } 
