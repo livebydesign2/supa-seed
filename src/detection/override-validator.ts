@@ -390,26 +390,31 @@ export class OverrideValidator {
    */
   private validateDomainSpecificConfigurations(
     domain: ContentDomainType,
-    domainSpecific: NonNullable<FlexibleSeedConfig['detection']>['contentDomain']['domainSpecific'],
+    domainSpecific: NonNullable<NonNullable<FlexibleSeedConfig['detection']>['contentDomain']>['domainSpecific'],
     detectionResults: UnifiedDetectionResult
   ): { reasoning: string[]; warnings: string[]; confidence: number } {
     const reasoning: string[] = [];
     const warnings: string[] = [];
     let confidence = 1.0;
     
-    const domainConfig = domainSpecific[domain];
+    if (!domainSpecific) {
+      return { reasoning, warnings, confidence };
+    }
+    
+    const domainConfig = domainSpecific[domain as keyof typeof domainSpecific];
     if (!domainConfig) {
       return { reasoning, warnings, confidence };
     }
     
     switch (domain) {
-      case 'outdoor':
-        if (domainConfig.gearCategories && domainConfig.gearCategories.length > 0) {
-          reasoning.push(`Outdoor domain configured with ${domainConfig.gearCategories.length} gear categories`);
+      case 'outdoor': {
+        const outdoorConfig = domainConfig as NonNullable<typeof domainSpecific>['outdoor'];
+        if (outdoorConfig?.gearCategories && outdoorConfig.gearCategories.length > 0) {
+          reasoning.push(`Outdoor domain configured with ${outdoorConfig.gearCategories.length} gear categories`);
           
           // Check if categories are realistic for outdoor domain
           const validOutdoorCategories = ['camping', 'hiking', 'climbing', 'backpacking', 'skiing', 'kayaking'];
-          const invalidCategories = domainConfig.gearCategories.filter(cat => 
+          const invalidCategories = outdoorConfig.gearCategories.filter((cat: string) => 
             !validOutdoorCategories.includes(cat.toLowerCase())
           );
           
@@ -419,8 +424,8 @@ export class OverrideValidator {
           }
         }
         
-        if (domainConfig.priceRange) {
-          const { min, max } = domainConfig.priceRange;
+        if (outdoorConfig?.priceRange) {
+          const { min, max } = outdoorConfig.priceRange;
           if (min < 0 || max < min) {
             warnings.push(`Invalid price range specified: ${min}-${max}`);
             confidence *= 0.8;
@@ -431,41 +436,48 @@ export class OverrideValidator {
           reasoning.push(`Price range configured: $${min}-$${max}`);
         }
         break;
+      }
         
-      case 'saas':
-        if (domainConfig.workspaceType) {
-          reasoning.push(`SaaS domain configured for ${domainConfig.workspaceType} workspace`);
+      case 'saas': {
+        const saasConfig = domainConfig as NonNullable<typeof domainSpecific>['saas'];
+        if (saasConfig?.workspaceType) {
+          reasoning.push(`SaaS domain configured for ${saasConfig.workspaceType} workspace`);
           
           // Validate workspace type consistency with platform architecture
           const detectedArchitecture = detectionResults.architecture.architectureType;
-          if (domainConfig.workspaceType === 'team-collaboration' && detectedArchitecture === 'individual') {
+          if (saasConfig.workspaceType === 'team-collaboration' && detectedArchitecture === 'individual') {
             warnings.push(`Team collaboration workspace type may not match individual platform architecture`);
             confidence *= 0.8;
           }
         }
         break;
+      }
         
-      case 'ecommerce':
-        if (domainConfig.storeType) {
-          reasoning.push(`E-commerce domain configured as ${domainConfig.storeType} store`);
+      case 'ecommerce': {
+        const ecommerceConfig = domainConfig as NonNullable<typeof domainSpecific>['ecommerce'];
+        if (ecommerceConfig?.storeType) {
+          reasoning.push(`E-commerce domain configured as ${ecommerceConfig.storeType} store`);
         }
         
-        if (domainConfig.productCategories && domainConfig.productCategories.length === 0) {
+        if (ecommerceConfig?.productCategories && ecommerceConfig.productCategories.length === 0) {
           warnings.push(`E-commerce domain specified but no product categories configured`);
           confidence *= 0.9;
         }
         break;
+      }
         
-      case 'social':
-        if (domainConfig.platformType) {
-          reasoning.push(`Social domain configured as ${domainConfig.platformType} platform`);
+      case 'social': {
+        const socialConfig = domainConfig as NonNullable<typeof domainSpecific>['social'];
+        if (socialConfig?.platformType) {
+          reasoning.push(`Social domain configured as ${socialConfig.platformType} platform`);
         }
         
-        if (domainConfig.contentTypes && domainConfig.contentTypes.length === 0) {
+        if (socialConfig?.contentTypes && socialConfig.contentTypes.length === 0) {
           warnings.push(`Social domain specified but no content types configured`);
           confidence *= 0.9;
         }
         break;
+      }
     }
     
     return { reasoning, warnings, confidence };

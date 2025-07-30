@@ -885,9 +885,9 @@ export class ConfigValidator {
         score: 100,
         validationTime: 0,
         layers: {
-          universal: await this.validateConfigurationLayer(config.layers.universal, 'universal', options),
-          detection: await this.validateConfigurationLayer(config.layers.detection, 'detection', options),
-          extensions: await this.validateConfigurationLayer(config.layers.extensions, 'extensions', options)
+          universal: await this.validateConfigurationLayer(config.universal, 'universal', options),
+          detection: await this.validateConfigurationLayer(config.detection, 'detection', options),
+          extensions: await this.validateConfigurationLayer(config.extensions, 'extensions', options)
         },
         errors: [],
         warnings: [],
@@ -1040,7 +1040,7 @@ export class ConfigValidator {
     }
 
     // Webhook configuration validation
-    if (layer.webhook?.enabled && !layer.webhook.endpoints?.length) {
+    if (layer.webhook?.enabled && !Object.keys(layer.webhook.endpoints || {}).length) {
       warnings.push({
         code: 'WEBHOOK_NO_ENDPOINTS',
         path: 'layers.universal.webhook.endpoints',
@@ -1162,7 +1162,7 @@ export class ConfigValidator {
     }
 
     // Archetype system validation
-    if (layer.archetypes?.enabled && !layer.archetypes.profiles?.length) {
+    if (layer.archetypes?.enabled && !layer.archetypes.customArchetypes?.length) {
       warnings.push({
         code: 'ARCHETYPES_NO_PROFILES',
         path: 'layers.extensions.archetypes.profiles',
@@ -1187,10 +1187,10 @@ export class ConfigValidator {
     const warnings: LayeredValidationWarning[] = [];
 
     // Architecture-Extension compatibility
-    if (config.layers.detection?.platform?.architecture && config.layers.extensions) {
-      const architecture = config.layers.detection.platform.architecture;
-      const enabledExtensions = Object.keys(config.layers.extensions).filter(
-        key => config.layers.extensions[key]?.enabled
+    if (config.detection?.platform?.architecture && config.extensions) {
+      const architecture = config.detection.platform.architecture;
+      const enabledExtensions = Object.keys(config.extensions).filter(
+        key => config.extensions[key]?.enabled
       );
 
       if (architecture === 'individual' && enabledExtensions.includes('saas')) {
@@ -1221,11 +1221,11 @@ export class ConfigValidator {
     }
 
     // Universal-Detection compatibility
-    if (config.layers.universal?.makerkit?.accountType && config.layers.detection?.platform?.architecture) {
-      const accountType = config.layers.universal.makerkit.accountType;
-      const architecture = config.layers.detection.platform.architecture;
+    if (config.universal?.makerkit?.accountType && config.detection?.platform?.architecture) {
+      const accountType = config.universal.makerkit.accountType;
+      const architecture = config.detection.platform.architecture;
 
-      if (accountType === 'personal' && architecture === 'team') {
+      if (accountType === 'individual' && architecture === 'team') {
         errors.push({
           code: 'ACCOUNT_ARCHITECTURE_CONFLICT',
           path: 'layers',
@@ -1266,11 +1266,11 @@ export class ConfigValidator {
     }
 
     // Layer structure validation
-    if (!config.layers) {
+    if (!config.universal || !config.detection || !config.extensions) {
       errors.push({
         code: 'MISSING_LAYERS',
         path: 'layers',
-        message: 'Layered configuration missing layers object',
+        message: 'Layered configuration missing required layer properties',
         severity: 'critical',
         category: 'structure',
         layer: 'cross-layer',
@@ -1286,9 +1286,9 @@ export class ConfigValidator {
    */
   private async validateLayeredPerformance(config: LayeredConfiguration): Promise<LayeredPerformanceValidation> {
     // Analyze layer complexity
-    const universalComplexity = this.analyzeLayerComplexity(config.layers.universal);
-    const detectionComplexity = this.analyzeLayerComplexity(config.layers.detection);
-    const extensionComplexity = this.analyzeLayerComplexity(config.layers.extensions);
+    const universalComplexity = this.analyzeLayerComplexity(config.universal);
+    const detectionComplexity = this.analyzeLayerComplexity(config.detection);
+    const extensionComplexity = this.analyzeLayerComplexity(config.extensions);
     const crossLayerComplexity = this.analyzeCrossLayerComplexity(config);
 
     const overallComplexity = (universalComplexity + detectionComplexity + extensionComplexity + crossLayerComplexity) / 4;
@@ -1352,7 +1352,7 @@ export class ConfigValidator {
     const suggestions: LayeredValidationSuggestion[] = [];
 
     // Performance optimization suggestions
-    const extensionComplexity = this.analyzeLayerComplexity(config.layers.extensions);
+    const extensionComplexity = this.analyzeLayerComplexity(config.extensions);
     if (extensionComplexity > 5) {
       suggestions.push({
         type: 'optimization',
@@ -1529,14 +1529,14 @@ export class ConfigValidator {
     let complexity = 0;
     
     // Detection-Extension interactions
-    if (config.layers.detection?.platform && config.layers.extensions) {
-      complexity += Object.keys(config.layers.extensions).filter(key => 
-        config.layers.extensions[key]?.enabled
+    if (config.detection?.platform && config.extensions) {
+      complexity += Object.keys(config.extensions).filter(key => 
+        config.extensions[key]?.enabled
       ).length;
     }
     
     // Universal-Detection interactions
-    if (config.layers.universal?.makerkit && config.layers.detection?.platform) {
+    if (config.universal?.makerkit && config.detection?.platform) {
       complexity += 1;
     }
     
@@ -1568,9 +1568,9 @@ export class ConfigValidator {
     ];
 
     // Layer-specific suggestions
-    if (config.layers.extensions) {
-      const enabledExtensions = Object.keys(config.layers.extensions).filter(
-        key => config.layers.extensions[key]?.enabled
+    if (config.extensions) {
+      const enabledExtensions = Object.keys(config.extensions).filter(
+        key => config.extensions[key]?.enabled
       );
       if (enabledExtensions.length > 2) {
         suggestions.push('Consider reducing number of enabled extensions');

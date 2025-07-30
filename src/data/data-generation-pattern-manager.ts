@@ -162,7 +162,11 @@ export class DataGenerationPatternManager {
 
     Logger.info('🔗 Enforcing referential integrity...');
 
-    const integrityConfig = config.dataGenerationPatterns.referencialIntegrity;
+    const integrityConfig: ReferentialIntegrityConfig = {
+      ...config.dataGenerationPatterns.referencialIntegrity,
+      cascadeLevels: 3, // Default value since not defined in config
+      checkConstraints: true // Default value since not defined in config
+    };
     let processedData = { ...data };
     let orphansRemoved = 0;
     let referencesFixed = 0;
@@ -542,7 +546,7 @@ export class DataGenerationPatternManager {
   }
 
   private tableMatchesDomain(table: string, domain: string): boolean {
-    const domainTablePatterns = {
+    const domainTablePatterns: Record<string, string[]> = {
       'outdoor-adventure': ['gear', 'setup', 'equipment', 'item'],
       'saas-platform': ['project', 'task', 'team', 'workspace'],
       'ecommerce': ['product', 'order', 'cart', 'payment'],
@@ -550,7 +554,7 @@ export class DataGenerationPatternManager {
     };
 
     const patterns = domainTablePatterns[domain] || [];
-    return patterns.some(pattern => table.toLowerCase().includes(pattern));
+    return patterns.some((pattern: string) => table.toLowerCase().includes(pattern));
   }
 
   private getPatternForTable(table: string, domainConfig: any): DataGenerationPattern {

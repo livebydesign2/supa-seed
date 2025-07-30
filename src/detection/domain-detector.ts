@@ -168,7 +168,9 @@ export class DomainDetectionEngine {
       secondaryDomains,
       domainEvidence: allEvidence,
       hybridCapabilities,
+      detectedFeatures: this.extractDomainFeatures(allEvidence),
       reasoning,
+      recommendations: this.generateDomainRecommendations(primaryDomainResult.domain, primaryDomainResult.overallConfidence),
       detectionMetrics,
       warnings: this.generateWarnings(filteredResults),
       errors: []
@@ -222,7 +224,9 @@ export class DomainDetectionEngine {
       secondaryDomains,
       domainEvidence: allEvidence,
       hybridCapabilities,
+      detectedFeatures: this.extractDomainFeatures(allEvidence),
       reasoning,
+      recommendations: this.generateDomainRecommendations(primaryDomainResult.domain, primaryDomainResult.overallConfidence * 0.95),
       detectionMetrics,
       warnings: ['Fast detection mode - some patterns may not be fully analyzed'],
       errors: []
@@ -289,7 +293,9 @@ export class DomainDetectionEngine {
       secondaryDomains,
       domainEvidence: allEvidence,
       hybridCapabilities,
+      detectedFeatures: this.extractDomainFeatures(allEvidence),
       reasoning,
+      recommendations: this.generateDomainRecommendations(primaryDomainResult.domain, adjustedConfidence),
       detectionMetrics,
       warnings: ['Conservative mode - may default to generic for ambiguous cases'],
       errors: []
@@ -347,7 +353,9 @@ export class DomainDetectionEngine {
       secondaryDomains,
       domainEvidence: allEvidence,
       hybridCapabilities,
+      detectedFeatures: this.extractDomainFeatures(allEvidence),
       reasoning,
+      recommendations: this.generateDomainRecommendations(primaryDomainResult.domain, boostedConfidence),
       detectionMetrics,
       warnings: ['Aggressive mode - confidence may be optimistically high'],
       errors: []
@@ -509,11 +517,13 @@ export class DomainDetectionEngine {
       secondaryDomains: [],
       domainEvidence: [...overrideEvidence, ...analysisEvidence],
       hybridCapabilities: false,
+      detectedFeatures: [],
       reasoning: [
         `Manual override applied: ${override.primaryDomain}`,
         `Override confidence: 0.95`,
         overriddenResult ? `Supporting analysis: ${overriddenResult.overallConfidence.toFixed(2)} confidence` : 'No supporting analysis available'
       ],
+      recommendations: [`Manual override for ${override.primaryDomain} domain applied`, 'Verify seeding configuration matches overridden domain'],
       detectionMetrics: {
         executionTime: Date.now() - startTime,
         patternsAnalyzed: overriddenResult ? overriddenResult.matchedPatterns.length : 0,
@@ -540,7 +550,9 @@ export class DomainDetectionEngine {
       secondaryDomains: [],
       domainEvidence: [],
       hybridCapabilities: false,
+      detectedFeatures: [],
       reasoning: ['Detection failed - defaulting to generic domain'],
+      recommendations: ['Manual domain verification recommended due to detection failure'],
       detectionMetrics: {
         executionTime: Date.now() - startTime,
         patternsAnalyzed: 0,
@@ -659,6 +671,68 @@ export class DomainDetectionEngine {
       size: this.detectionCache.size,
       entries: Array.from(this.detectionCache.keys())
     };
+  }
+
+  /**
+   * Extract detected features from domain evidence
+   */
+  private extractDomainFeatures(evidence: DomainEvidence[]): string[] {
+    const features = new Set<string>();
+    
+    evidence.forEach(ev => {
+      // Extract feature names from evidence types and descriptions
+      if (ev.type === 'table_pattern') {
+        features.add(`table_pattern_${ev.description.toLowerCase().replace(/\s+/g, '_')}`);
+      } else if (ev.type === 'column_analysis') {
+        features.add(`column_pattern_${ev.description.toLowerCase().replace(/\s+/g, '_')}`);
+      } else if (ev.type === 'relationship_pattern') {
+        features.add(`relationship_${ev.description.toLowerCase().replace(/\s+/g, '_')}`);
+      } else {
+        features.add(ev.type);
+      }
+    });
+    
+    return Array.from(features);
+  }
+
+  /**
+   * Generate domain-specific recommendations
+   */
+  private generateDomainRecommendations(domain: ContentDomainType, confidence: number): string[] {
+    const recommendations: string[] = [];
+    
+    // Base recommendations based on confidence
+    if (confidence < 0.5) {
+      recommendations.push('Consider manual domain verification due to low confidence');
+    } else if (confidence < 0.7) {
+      recommendations.push('Review domain detection results and verify against expected schema patterns');
+    }
+    
+    // Domain-specific recommendations
+    switch (domain) {
+      case 'outdoor':
+        recommendations.push('Consider enabling outdoor-specific data generation patterns');
+        recommendations.push('Review gear and setup table relationships for outdoor domain');
+        break;
+      case 'saas':
+        recommendations.push('Enable team and workspace management features');
+        recommendations.push('Consider subscription and billing table requirements');
+        break;
+      case 'ecommerce':
+        recommendations.push('Verify product catalog and order management tables');
+        recommendations.push('Consider payment processing and inventory tracking features');
+        break;
+      case 'social':
+        recommendations.push('Enable user interaction and content sharing features');
+        recommendations.push('Consider privacy settings and content moderation requirements');
+        break;
+      case 'generic':
+        recommendations.push('Generic domain detected - consider more specific domain configuration');
+        recommendations.push('Review schema patterns to identify potential specialized domain features');
+        break;
+    }
+    
+    return recommendations;
   }
 }
 

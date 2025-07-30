@@ -329,7 +329,7 @@ export class DataVolumeManager {
    */
 
   private getBaseVolumesByEnvironment(environment: string) {
-    const baseVolumes = {
+    const baseVolumes: Record<string, { users: number; avgItems: number; relationships: number }> = {
       development: { users: 5, avgItems: 3, relationships: 2 },
       staging: { users: 25, avgItems: 6, relationships: 4 },
       production: { users: 100, avgItems: 10, relationships: 6 }
@@ -338,7 +338,7 @@ export class DataVolumeManager {
   }
 
   private getLoadMultiplier(expectedLoad: string): number {
-    const multipliers = {
+    const multipliers: Record<string, number> = {
       light: 0.7,
       medium: 1.0,
       heavy: 1.5

@@ -66,6 +66,9 @@ export interface UnifiedDetectionResult {
     /** Detection conflicts and resolutions */
     conflicts: DetectionConflict[];
     
+    /** Integration warnings */
+    warnings: string[];
+    
     /** Performance metrics */
     performance: {
       totalExecutionTime: number;
@@ -92,6 +95,9 @@ export interface CrossValidationResult {
   
   /** Overall cross-validation score */
   overallAgreement: number; // 0-1
+  
+  /** Individual engine agreement scores */
+  engineAgreement: Record<string, number>;
   
   /** Specific agreements and disagreements */
   agreements: string[];
@@ -422,6 +428,7 @@ export class DetectionIntegrationEngine {
           crossValidation,
           recommendations,
           conflicts,
+          warnings: this.generateIntegrationWarnings(architectureResult, domainResult, schemaResult, frameworkResult),
           performance: {
             totalExecutionTime: totalTime,
             schemaIntrospectionTime: schemaTime,
@@ -580,7 +587,12 @@ export class DetectionIntegrationEngine {
       domainArchitectureAgreement,
       overallAgreement,
       agreements,
-      disagreements
+      disagreements,
+      engineAgreement: {
+        'architecture-framework': architectureFrameworkAgreement,
+        'schema-architecture': schemaArchitectureAgreement,
+        'domain-architecture': domainArchitectureAgreement
+      }
     };
   }
 
@@ -930,7 +942,12 @@ export class DetectionIntegrationEngine {
       domainArchitectureAgreement: 0.5,
       overallAgreement: 0.5,
       agreements: [],
-      disagreements: []
+      disagreements: [],
+      engineAgreement: {
+        'architecture-framework': 0.5,
+        'schema-architecture': 0.5,
+        'domain-architecture': 0.5
+      }
     };
   }
 
@@ -1047,6 +1064,45 @@ export class DetectionIntegrationEngine {
       isFrameworkDetected: schemaResult.framework.confidence > 0.5,
       executionTime
     };
+  }
+
+  /**
+   * Generate integration warnings based on detection results
+   */
+  private generateIntegrationWarnings(
+    architectureResult: any,
+    domainResult: any,
+    schemaResult: any,
+    frameworkResult: any
+  ): string[] {
+    const warnings: string[] = [];
+
+    // Low confidence warnings
+    if (architectureResult.confidence < 0.6) {
+      warnings.push('Low confidence in architecture detection - results may be inaccurate');
+    }
+    if (domainResult.confidence < 0.6) {
+      warnings.push('Low confidence in domain detection - results may be inaccurate');
+    }
+    if (frameworkResult.confidence < 0.6) {
+      warnings.push('Low confidence in framework detection - results may be inaccurate');
+    }
+
+    // Integration consistency warnings
+    const hasArchitectureWarnings = architectureResult.warnings?.length > 0;
+    const hasDomainWarnings = domainResult.warnings?.length > 0;
+    
+    if (hasArchitectureWarnings && hasDomainWarnings) {
+      warnings.push('Multiple detection systems reported warnings - consider manual verification');
+    }
+
+    // Framework mismatch warnings
+    if (schemaResult.framework.framework !== frameworkResult.framework && 
+        frameworkResult.confidence > 0.7) {
+      warnings.push('Schema and framework detection results differ - verify framework configuration');
+    }
+
+    return warnings;
   }
 }
 

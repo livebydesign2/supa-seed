@@ -43,6 +43,12 @@ export interface UniversalCoreConfig {
 
   /** MakerKit compatibility settings */
   makerkit: {
+    /** Enable MakerKit integration */
+    enabled: boolean;
+    
+    /** Account type for MakerKit integration */
+    accountType: 'individual' | 'team' | 'hybrid';
+    
     /** Complete authentication flow (auth.users + auth.identities + MFA) */
     completeAuthFlow: boolean;
     
@@ -107,6 +113,39 @@ export interface UniversalCoreConfig {
     };
   };
 
+  /** Security configuration */
+  security: {
+    /** RLS compliance settings */
+    rlsCompliance: boolean;
+    
+    /** Row-level security policies */
+    policies: {
+      enforceUserScope: boolean;
+      validatePermissions: boolean;
+      auditAccess: boolean;
+    };
+  };
+
+  /** Webhook configuration */
+  webhook: {
+    /** Enable webhook support */
+    enabled: boolean;
+    
+    /** Webhook authentication */
+    authentication: {
+      enabled: boolean;
+      method: 'jwt' | 'api-key' | 'custom';
+      secretKey?: string;
+    };
+    
+    /** Webhook endpoints */
+    endpoints: {
+      beforeInsert?: string;
+      afterInsert?: string;
+      onError?: string;
+    };
+  };
+
   /** Environment configuration */
   environment: {
     /** Target environment type */
@@ -152,6 +191,9 @@ export interface SmartDetectionConfig {
     
     /** Detection confidence score */
     confidence: number;
+    
+    /** Domain identification */
+    domain: ContentDomainType | 'auto';
     
     /** Evidence supporting detection */
     evidence: {
@@ -232,6 +274,21 @@ export interface SmartDetectionConfig {
     };
   };
 
+  /** Auto-configuration settings */
+  autoConfiguration: {
+    /** Enable automatic configuration updates */
+    enabled: boolean;
+    
+    /** Auto-detection confidence threshold */
+    confidenceThreshold: number;
+    
+    /** Auto-apply configuration changes */
+    autoApply: boolean;
+    
+    /** Configuration strategy */
+    strategy: 'conservative' | 'balanced' | 'aggressive';
+  };
+
   /** Auto-generated configuration optimizations */
   optimizations: {
     /** Performance optimizations based on detected scale */
@@ -266,6 +323,9 @@ export interface SmartDetectionConfig {
  * Pluggable extensions and customizations
  */
 export interface ExtensionsLayerConfig {
+  /** Allow dynamic property access */
+  [key: string]: any;
+  
   /** Configuration layer metadata */
   layer: {
     type: 'extensions';

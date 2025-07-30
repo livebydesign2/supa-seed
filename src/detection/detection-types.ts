@@ -141,6 +141,9 @@ export interface PlatformArchitectureDetectionResult {
   /** Platform features detected */
   platformFeatures: PlatformFeature[];
   
+  /** Detected features as string array for reporting */
+  detectedFeatures: string[];
+  
   /** Detailed reasoning for the detection */
   reasoning: string[];
   
@@ -519,6 +522,12 @@ export interface DomainDetectionResult {
   
   /** Evidence supporting domain detection */
   domainEvidence: DomainEvidence[];
+  
+  /** Detected features as string array for reporting */
+  detectedFeatures: string[];
+  
+  /** Recommendations based on domain detection */
+  recommendations: string[];
   
   /** Whether platform has hybrid domain capabilities */
   hybridCapabilities: boolean;

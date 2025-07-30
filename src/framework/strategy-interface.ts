@@ -137,6 +137,27 @@ export interface StrategyConstraintResult {
   errors: string[];
   warnings: string[];
   recommendations: string[];
+  businessRules?: BusinessRule[]; // Optional for backward compatibility
+}
+
+export interface BusinessRule {
+  id: string;
+  name: string;
+  type: 'validation' | 'transformation' | 'dependency' | 'business_logic';
+  table: string;
+  condition: string;
+  action: 'allow' | 'deny' | 'modify' | 'require';
+  errorMessage?: string;
+  autoFix?: {
+    type: 'set_field' | 'create_dependency' | 'skip_operation' | 'modify_workflow' | 'sql' | 'config' | 'data_modification';
+    description: string;
+    sql?: string;
+    confidence: number;
+    impact?: 'low' | 'medium' | 'high';
+  };
+  confidence: number;
+  sqlPattern: string;
+  dependencies: string[];
 }
 
 export interface SeedingStrategy {

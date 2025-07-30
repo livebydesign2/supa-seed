@@ -56,6 +56,7 @@ export interface AutoFixSuggestion {
   description: string;
   action: AutoFixAction;
   confidence: number;
+  impact?: 'low' | 'medium' | 'high'; // Added for compatibility
 }
 
 export interface AutoFixAction {

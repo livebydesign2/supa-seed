@@ -15,7 +15,8 @@
     "removeComments": false,
     "resolveJsonModule": true,
     "allowSyntheticDefaultImports": true,
-    "moduleResolution": "node"
+    "moduleResolution": "node",
+    "downlevelIteration": true
   },
   "include": [
     "src/**/*"

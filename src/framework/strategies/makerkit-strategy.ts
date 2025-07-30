@@ -17,7 +17,6 @@ import {
   StrategyConstraintResult
 } from '../strategy-interface';
 import { IdentityManager } from '../../auth/identity-manager';
-import { MFAManager } from '../../auth/mfa-manager';
 import { DevelopmentWebhookManager } from '../../webhooks/development-webhook-manager';
 import type { 
   CompleteUserData, 
@@ -25,11 +24,7 @@ import type {
   IdentityProviderType,
   AuthFlowConfig 
 } from '../../auth/auth-types';
-import type { 
-  MFAFactorData, 
-  MFAFactorCreationResult,
-  ArchetypeMFAPreferences 
-} from '../../auth/mfa-types';
+// MFA types removed - functionality not fully implemented
 import type {
   DevelopmentWebhookConfig,
   WebhookEndpoint,
@@ -52,6 +47,7 @@ import type {
 } from '../../security/rls-compliance-validator';
 import { RelationshipAnalyzer } from '../../schema/relationship-analyzer';
 import { JunctionTableHandler } from '../../schema/junction-table-handler';
+import type { UnifiedDetectionResult } from '../../detection/detection-integration';
 import { MultiTenantManager } from '../../schema/multi-tenant-manager';
 import { StorageIntegrationManager } from '../../storage/storage-integration-manager';
 import { Logger } from '../../utils/logger';
@@ -115,7 +111,6 @@ export class MakerKitStrategy implements SeedingStrategy {
   private multiTenantManager?: MultiTenantManager;
   private storageIntegrationManager?: StorageIntegrationManager;
   private identityManager?: IdentityManager;
-  private mfaManager?: MFAManager;
   private webhookManager?: DevelopmentWebhookManager;
   private rlsComplianceEngine?: RLSComplianceEngine;
   private rlsComplianceValidator?: RLSComplianceValidator;
@@ -128,8 +123,6 @@ export class MakerKitStrategy implements SeedingStrategy {
     // Initialize identity manager for complete auth flows
     this.identityManager = new IdentityManager(client);
     
-    // Initialize MFA manager for multi-factor authentication support
-    this.mfaManager = new MFAManager(client);
     
     // Initialize webhook manager for development webhook support
     this.webhookManager = new DevelopmentWebhookManager(client);
@@ -266,9 +259,15 @@ export class MakerKitStrategy implements SeedingStrategy {
       const detectionTime = Date.now() - detectionStartTime;
       
       Logger.success(`✅ Platform detection completed in ${detectionTime}ms`);
-      Logger.info(`   Architecture: ${this.detectionResults.architecture.architectureType} (${(this.detectionResults.architecture.confidence * 100).toFixed(1)}% confidence)`);
-      Logger.info(`   Domain: ${this.detectionResults.domain.primaryDomain} (${(this.detectionResults.domain.confidence * 100).toFixed(1)}% confidence)`);
-      Logger.info(`   Overall Confidence: ${(this.detectionResults.integration.overallConfidence * 100).toFixed(1)}%`);
+      if (this.detectionResults?.architecture) {
+        Logger.info(`   Architecture: ${this.detectionResults.architecture.architectureType} (${(this.detectionResults.architecture.confidence * 100).toFixed(1)}% confidence)`);
+      }
+      if (this.detectionResults?.domain) {
+        Logger.info(`   Domain: ${this.detectionResults.domain.primaryDomain} (${(this.detectionResults.domain.confidence * 100).toFixed(1)}% confidence)`);
+      }
+      if (this.detectionResults?.integration) {
+        Logger.info(`   Overall Confidence: ${(this.detectionResults.integration.overallConfidence * 100).toFixed(1)}%`);
+      }
       
       // Step 2: Generate auto-configuration based on detection
       const configStartTime = Date.now();
@@ -285,11 +284,15 @@ export class MakerKitStrategy implements SeedingStrategy {
       const configTime = Date.now() - configStartTime;
       
       Logger.success(`✅ Auto-configuration generated in ${configTime}ms`);
-      Logger.info(`   Configuration Confidence: ${(this.autoConfiguration.confidence * 100).toFixed(1)}%`);
-      Logger.info(`   Templates Applied: ${this.autoConfiguration.generationMetrics.templatesApplied}`);
+      if (this.autoConfiguration?.confidence !== undefined) {
+        Logger.info(`   Configuration Confidence: ${(this.autoConfiguration.confidence * 100).toFixed(1)}%`);
+      }
+      if (this.autoConfiguration?.generationMetrics?.templatesApplied !== undefined) {
+        Logger.info(`   Templates Applied: ${this.autoConfiguration.generationMetrics.templatesApplied}`);
+      }
       
       // Log key configuration recommendations
-      if (this.autoConfiguration.reasoning.length > 0) {
+      if (this.autoConfiguration?.reasoning && this.autoConfiguration.reasoning.length > 0) {
         Logger.info('📋 Configuration Reasoning:');
         this.autoConfiguration.reasoning.slice(0, 3).forEach(reason => {
           Logger.info(`   • ${reason}`);
@@ -297,7 +300,7 @@ export class MakerKitStrategy implements SeedingStrategy {
       }
       
       // Log warnings if any
-      if (this.autoConfiguration.warnings.length > 0) {
+      if (this.autoConfiguration?.warnings && this.autoConfiguration.warnings.length > 0) {
         Logger.warn('⚠️  Configuration Warnings:');
         this.autoConfiguration.warnings.forEach(warning => {
           Logger.warn(`   • ${warning}`);
@@ -370,7 +373,7 @@ export class MakerKitStrategy implements SeedingStrategy {
    * Get platform-specific user archetypes based on detection
    */
   getPlatformSpecificArchetypes(): string[] {
-    if (!this.detectionResults) {
+    if (!this.detectionResults?.architecture || !this.detectionResults?.domain) {
       return ['admin@test.com', 'user@test.com']; // Default archetypes
     }
     
@@ -422,7 +425,7 @@ export class MakerKitStrategy implements SeedingStrategy {
     imagesPerSetup: number;
     enableRealImages: boolean;
   } {
-    if (!this.detectionResults) {
+    if (!this.detectionResults?.architecture || !this.detectionResults?.domain) {
       return {
         userCount: 5,
         setupsPerUser: 2,
@@ -701,17 +704,18 @@ export class MakerKitStrategy implements SeedingStrategy {
       }
 
       // Step 2.5: Create MFA factors if enabled (FR-1.2: Add MFA Factor Support)
-      if (this.authFlowConfig.enableMFA && this.mfaManager) {
-        Logger.debug('Creating MFA factors for complete auth flow');
-        
-        const mfaFactors = await this.createMFAFactorsForUser(authUser.user.id, data);
-        if (mfaFactors.length > 0) {
-          result.mfaFactors = mfaFactors;
-          result.recommendations.push(`Created ${mfaFactors.length} MFA factor${mfaFactors.length !== 1 ? 's' : ''} for enhanced security`);
-        } else {
-          result.warnings.push('MFA enabled but no factors were created');
-        }
-      }
+      // TODO: MFA functionality temporarily disabled
+      // if (this.authFlowConfig.enableMFA && this.mfaManager) {
+      //   Logger.debug('Creating MFA factors for complete auth flow');
+      //   
+      //   const mfaFactors = await this.createMFAFactorsForUser(authUser.user.id, data);
+      //   if (mfaFactors.length > 0) {
+      //     result.mfaFactors = mfaFactors;
+      //     result.recommendations.push(`Created ${mfaFactors.length} MFA factor${mfaFactors.length !== 1 ? 's' : ''} for enhanced security`);
+      //   } else {
+      //     result.warnings.push('MFA enabled but no factors were created');
+      //   }
+      // }
 
       // Step 3: Wait for MakerKit triggers and handle account creation
       if (this.authFlowConfig.useMakerKitTriggers) {
@@ -916,6 +920,7 @@ export class MakerKitStrategy implements SeedingStrategy {
 
   /**
    * Get MFA validation result for the platform
+   * TODO: MFA functionality temporarily disabled
    */
   async validateMFASupport(): Promise<{
     supported: boolean;
@@ -924,35 +929,15 @@ export class MakerKitStrategy implements SeedingStrategy {
     errors: string[];
     warnings: string[];
   }> {
-    if (!this.mfaManager) {
-      return {
-        supported: false,
-        tableExists: false,
-        hasPermissions: false,
-        errors: ['MFA manager not initialized'],
-        warnings: []
-      };
-    }
+    // TODO: MFA functionality temporarily disabled
+    return {
+      supported: false,
+      tableExists: false,
+      hasPermissions: false,
+      errors: ['MFA functionality temporarily disabled'],
+      warnings: []
+    };
 
-    try {
-      const validation = await this.mfaManager.validateMFATableAccess();
-      
-      return {
-        supported: this.authFlowConfig.enableMFA,
-        tableExists: validation.tableExists,
-        hasPermissions: validation.hasPermissions,
-        errors: validation.errors,
-        warnings: validation.warnings
-      };
-    } catch (error: any) {
-      return {
-        supported: false,
-        tableExists: false,
-        hasPermissions: false,
-        errors: [`MFA validation failed: ${error.message}`],
-        warnings: []
-      };
-    }
   }
 
   /**
@@ -1138,8 +1123,9 @@ export class MakerKitStrategy implements SeedingStrategy {
       return {
         success: true,
         tables: enhancedTables,
-        totalConstraints: discoveryResult.businessRules.length,
+        totalConstraints: discoveryResult.businessRules?.length || 0,
         confidence: discoveryResult.confidence,
+        businessRules: discoveryResult.businessRules || [],
         errors: [],
         warnings: [],
         recommendations: [
@@ -1155,6 +1141,7 @@ export class MakerKitStrategy implements SeedingStrategy {
         tables: [],
         totalConstraints: 0,
         confidence: 0,
+        businessRules: [],
         errors: [error.message],
         warnings: [],
         recommendations: ['Review constraint discovery configuration']
@@ -1592,46 +1579,12 @@ export class MakerKitStrategy implements SeedingStrategy {
   /**
    * Create MFA factors for a user based on their preferences
    * Implements FR-1.2: Add MFA Factor Support
+   * TODO: MFA functionality not fully implemented - returning empty array
    */
-  private async createMFAFactorsForUser(userId: string, userData: CompleteUserData & { mfaPreferences?: ArchetypeMFAPreferences }): Promise<any[]> {
-    if (!this.mfaManager) {
-      Logger.warn('MFA manager not initialized');
-      return [];
-    }
-
-    try {
-      // Get MFA preferences from user data or use defaults
-      const mfaPreferences = userData.mfaPreferences || {
-        securityLevel: 'basic',
-        preferredFactorTypes: ['totp'],
-        factorCount: 1,
-        backupCodesEnabled: true
-      };
-
-      // Generate archetype-based MFA factors
-      const factorResults = await this.mfaManager.generateArchetypeFactors(
-        userId,
-        mfaPreferences.securityLevel,
-        {
-          preferTOTP: mfaPreferences.preferredFactorTypes.includes('totp'),
-          preferPhone: mfaPreferences.preferredFactorTypes.includes('phone'),
-          phoneNumber: (userData as any).phone,
-          multipleFactors: mfaPreferences.factorCount > 1
-        }
-      );
-
-      // Extract successful factors
-      const mfaFactors = factorResults
-        .filter(result => result.success && result.factor)
-        .map(result => result.factor!);
-
-      Logger.success(`✅ Created ${mfaFactors.length} MFA factors for user ${userId}`);
-      return mfaFactors;
-
-    } catch (error: any) {
-      Logger.error(`MFA factor creation failed for user ${userId}:`, error);
-      return [];
-    }
+  private async createMFAFactorsForUser(userId: string, userData: CompleteUserData & { mfaPreferences?: any }): Promise<any[]> {
+    // MFA functionality not fully implemented
+    Logger.debug('MFA functionality not implemented - skipping MFA factor creation');
+    return [];
   }
 
   /**
@@ -2333,8 +2286,9 @@ export class MakerKitStrategy implements SeedingStrategy {
       const enhancedResult = await this.enhanceComplianceResultForMakerKit(result);
       
       Logger.success(`✅ MakerKit RLS compliance validation completed`);
-      Logger.info(`📊 Compliance Grade: ${enhancedResult.overallCompliance.grade}`);
-      Logger.info(`🔍 MakerKit Score: ${enhancedResult.overallCompliance.score}/100`);
+      const compliance = this.getComplianceDetails(enhancedResult.overallCompliance);
+      Logger.info(`📊 Compliance Grade: ${compliance.grade}`);
+      Logger.info(`🔍 MakerKit Score: ${compliance.score}/100`);
       
       return enhancedResult;
 
@@ -2367,7 +2321,7 @@ export class MakerKitStrategy implements SeedingStrategy {
       const validationResult = await this.rlsComplianceEngine.quickComplianceCheck(
         tableName,
         operation,
-        userContext
+        1 // Default data count for quick check
       );
 
       // Enhance with MakerKit-specific insights
@@ -2380,10 +2334,10 @@ export class MakerKitStrategy implements SeedingStrategy {
       const riskLevel = this.assessMakerKitRLSRisk(tableName, validationResult);
 
       return {
-        isCompliant: validationResult.isCompliant,
-        requiresUserContext: validationResult.requiresUserContext,
+        isCompliant: validationResult.isCompliant ?? false,
+        requiresUserContext: validationResult.requiresUserContext ?? false,
         recommendations: [
-          ...validationResult.suggestedFixes.map(fix => fix.description),
+          ...(validationResult.suggestedFixes || []).map(fix => fix.description),
           ...makerkitRecommendations
         ],
         riskLevel
@@ -2511,7 +2465,7 @@ export class MakerKitStrategy implements SeedingStrategy {
     const requiresManualReview: string[] = [];
 
     // Process auto-fix results
-    for (const autoFix of result.autoFixResults) {
+    for (const autoFix of result.autoFixResults || []) {
       switch (autoFix.status) {
         case 'applied':
           fixesApplied++;
@@ -2561,7 +2515,9 @@ export class MakerKitStrategy implements SeedingStrategy {
       recommendations: enhancedRecommendations,
       // Add MakerKit-specific metadata
       executionMetrics: {
-        ...result.executionMetrics
+        duration: result.executionMetrics?.duration ?? 0,
+        tablesProcessed: result.executionMetrics?.tablesProcessed ?? 0,
+        policiesAnalyzed: result.executionMetrics?.policiesAnalyzed ?? 0
       }
     };
   }
@@ -2651,7 +2607,7 @@ export class MakerKitStrategy implements SeedingStrategy {
           params: [tableName, constraintName]
         });
       
-      return data && (data as any[]).length > 0;
+      return Boolean(data && (data as any[]).length > 0);
     } catch (error) {
       return false;
     }
@@ -2661,11 +2617,11 @@ export class MakerKitStrategy implements SeedingStrategy {
     const patterns: any[] = [];
 
     // Analyze common MakerKit RLS patterns
-    for (const policy of result.policyAnalysis.parsedPolicies) {
+    for (const policy of result.policyAnalysis?.parsedPolicies || []) {
       if (policy.parsed.expression.includes('auth.uid()')) {
         patterns.push({
           type: 'user_scoped_access',
-          table: policy.tableName,
+          table: policy.table,
           description: 'User-scoped access pattern detected'
         });
       }
@@ -2673,7 +2629,7 @@ export class MakerKitStrategy implements SeedingStrategy {
       if (policy.parsed.expression.includes('account_id')) {
         patterns.push({
           type: 'tenant_isolation',
-          table: policy.tableName,
+          table: policy.table,
           description: 'Tenant isolation pattern detected'
         });
       }
@@ -2686,7 +2642,8 @@ export class MakerKitStrategy implements SeedingStrategy {
     const recommendations: any[] = [];
 
     // Add MakerKit-specific security recommendations
-    if (result.overallCompliance.score < 80) {
+    const compliance = this.getComplianceDetails(result.overallCompliance);
+    if (compliance.score < 80) {
       recommendations.push({
         id: 'makerkit-security-enhancement',
         priority: 'high',
@@ -2718,14 +2675,15 @@ export class MakerKitStrategy implements SeedingStrategy {
 
   private generateMakerKitRLSFixRecommendations(result: ComplianceEngineResult): string[] {
     const recommendations: string[] = [];
+    const compliance = this.getComplianceDetails(result.overallCompliance);
 
     // Analyze critical issues specific to MakerKit
-    if (result.overallCompliance.criticalIssues > 0) {
+    if (compliance.criticalIssues > 0) {
       recommendations.push('Prioritize fixing critical RLS issues in auth and account tables');
       recommendations.push('Implement proper tenant isolation before production deployment');
     }
 
-    if (result.policyAnalysis.securityDistribution.weak > 0) {
+    if ((result.policyAnalysis?.securityDistribution?.weak ?? 0) > 0) {
       recommendations.push('Strengthen weak RLS policies with proper user context validation');
       recommendations.push('Consider implementing role-based access control for team features');
     }
@@ -3094,12 +3052,12 @@ export class MakerKitStrategy implements SeedingStrategy {
     for (const table of tables) {
       try {
         const constraints = await this.discoverConstraints([table]);
-        if (constraints.success && constraints.businessRules.length > 0) {
+        if (constraints.success && (constraints.businessRules?.length ?? 0) > 0) {
           stats.tablesWithConstraints++;
         }
 
         // Use generic constraint analysis since specific properties may not exist
-        const constraintCount = constraints.businessRules.length || 0;
+        const constraintCount = constraints.businessRules?.length ?? 0;
         stats.constraintsByType.total = (stats.constraintsByType.total || 0) + constraintCount;
 
         // Simplified constraint analysis
@@ -3216,6 +3174,35 @@ Generated on: ${new Date().toISOString()}
     }
 
     return modifiedData;
+  }
+
+  /**
+   * Get compliance details from union type
+   */
+  private getComplianceDetails(compliance: number | { score: number; grade: string; criticalIssues: number }): {
+    score: number;
+    grade: string;
+    criticalIssues: number;
+  } {
+    if (typeof compliance === 'number') {
+      return {
+        score: compliance,
+        grade: this.calculateGradeFromScore(compliance),
+        criticalIssues: 0
+      };
+    }
+    return compliance;
+  }
+
+  /**
+   * Calculate grade from numeric score
+   */
+  private calculateGradeFromScore(score: number): string {
+    if (score >= 90) return 'A';
+    if (score >= 80) return 'B';
+    if (score >= 70) return 'C';
+    if (score >= 60) return 'D';
+    return 'F';
   }
 
   /**

@@ -1,0 +1,5 @@
+# Technical Architecture Decision Records
+
+Document technical decisions that affect implementation approach, architecture, or technology choices.
+
+Format: `ADR-XXX-decision-name.md` 

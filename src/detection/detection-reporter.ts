@@ -416,7 +416,7 @@ export class DetectionCLI {
     configurationStrategy: string;
   } {
     const options = {
-      format: 'cli' as const,
+      format: 'cli' as 'cli' | 'json' | 'summary',
       showDetails: true,
       showConfiguration: true,
       configurationStrategy: 'comprehensive'

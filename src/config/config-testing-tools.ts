@@ -341,7 +341,8 @@ export class ConfigurationTestingEngine {
     for (const test of failedTests) {
       issues.push({
         severity: this.mapTestSeverity(test.category),
-        category: test.category === 'validation' ? 'validation' : test.category,
+        category: test.category === 'validation' ? 'validation' : 
+                  test.category === 'stress' ? 'performance' : test.category,
         message: test.message || `Test failed: ${test.name}`,
         location: test.id,
         suggestion: this.generateTestSuggestion(test),
@@ -592,10 +593,10 @@ export class ConfigurationTestingEngine {
     const startTime = performance.now();
     
     try {
-      const hasLayers = config.layers !== undefined;
-      const hasUniversal = config.layers?.universal !== undefined;
-      const hasDetection = config.layers?.detection !== undefined;
-      const hasExtensions = config.layers?.extensions !== undefined;
+      const hasLayers = config.universal !== undefined && config.detection !== undefined && config.extensions !== undefined;
+      const hasUniversal = config.universal !== undefined;
+      const hasDetection = config.detection !== undefined;
+      const hasExtensions = config.extensions !== undefined;
 
       const success = hasLayers && hasUniversal;
       
@@ -626,7 +627,7 @@ export class ConfigurationTestingEngine {
     const startTime = performance.now();
     
     try {
-      const universal = config.layers.universal;
+      const universal = config.universal;
       const hasMakerKit = universal?.makerkit !== undefined;
       const makerkitEnabled = universal?.makerkit?.enabled !== false;
       
@@ -658,7 +659,7 @@ export class ConfigurationTestingEngine {
     const startTime = performance.now();
     
     try {
-      const detection = config.layers.detection;
+      const detection = config.detection;
       const hasValidArchitecture = !detection?.platform?.architecture || 
         ['individual', 'team', 'hybrid', 'auto'].includes(detection.platform.architecture);
       const hasValidDomain = !detection?.platform?.domain || 
@@ -692,7 +693,7 @@ export class ConfigurationTestingEngine {
     const startTime = performance.now();
     
     try {
-      const extensions = config.layers.extensions;
+      const extensions = config.extensions;
       const enabledExtensions = extensions ? Object.keys(extensions).filter(
         key => extensions[key]?.enabled
       ).length : 0;
@@ -725,11 +726,11 @@ export class ConfigurationTestingEngine {
     const startTime = performance.now();
     
     try {
-      const architecture = config.layers.detection?.platform?.architecture;
-      const accountType = config.layers.universal?.makerkit?.accountType;
+      const architecture = config.detection?.platform?.architecture;
+      const accountType = config.universal?.makerkit?.accountType;
       
       // Check for obvious conflicts
-      const hasConflict = (accountType === 'personal' && architecture === 'team') ||
+      const hasConflict = (accountType === 'individual' && architecture === 'team') ||
                          (accountType === 'team' && architecture === 'individual');
       
       const success = !hasConflict;
@@ -792,9 +793,9 @@ export class ConfigurationTestingEngine {
     const startTime = performance.now();
     
     try {
-      const rlsEnabled = config.layers.universal?.security?.rlsCompliance !== false;
-      const webhookSecure = !config.layers.universal?.webhook?.enabled || 
-                           config.layers.universal?.webhook?.authentication?.enabled;
+      const rlsEnabled = config.universal?.security?.rlsCompliance !== false;
+      const webhookSecure = !config.universal?.webhook?.enabled || 
+                           config.universal?.webhook?.authentication?.enabled;
       
       const success = rlsEnabled && webhookSecure;
       
@@ -824,8 +825,8 @@ export class ConfigurationTestingEngine {
     const startTime = performance.now();
     
     try {
-      const rlsCompliance = config.layers.universal?.security?.rlsCompliance !== false;
-      const hasSecurityConfig = config.layers.universal?.security !== undefined;
+      const rlsCompliance = config.universal?.security?.rlsCompliance !== false;
+      const hasSecurityConfig = config.universal?.security !== undefined;
       
       const success = rlsCompliance && hasSecurityConfig;
       
@@ -862,15 +863,15 @@ export class ConfigurationTestingEngine {
     
     // Measure individual layer load times
     const universalStart = performance.now();
-    const universalCopy = JSON.parse(JSON.stringify(config.layers.universal));
+    const universalCopy = JSON.parse(JSON.stringify(config.universal));
     const universalTime = performance.now() - universalStart;
 
     const detectionStart = performance.now();
-    const detectionCopy = JSON.parse(JSON.stringify(config.layers.detection));
+    const detectionCopy = JSON.parse(JSON.stringify(config.detection));
     const detectionTime = performance.now() - detectionStart;
 
     const extensionsStart = performance.now();
-    const extensionsCopy = JSON.parse(JSON.stringify(config.layers.extensions));
+    const extensionsCopy = JSON.parse(JSON.stringify(config.extensions));
     const extensionsTime = performance.now() - extensionsStart;
 
     const totalTime = performance.now() - startTime;

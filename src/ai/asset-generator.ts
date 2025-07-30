@@ -509,17 +509,17 @@ export class AIAssetGenerator {
         id: `ai-generated-${templateType}-${Date.now()}`,
         name: `AI Generated ${templateType} Template`,
         description: response.description || `Generated template for ${templateType}`,
-        category: 'seeder' as const,
-        tags: ['ai-generated', templateType],
-        version: '1.0.0',
-        compatibility: {
-          supaSeedVersion: '1.0.0'
-        },
-        variables: response.variables || [],
-        files: response.files || [],
+        category: 'seeder',
+        variables: response.variables || {},
         metadata: {
           created: new Date(),
-          updated: new Date()
+          updated: new Date(),
+          tags: ['ai-generated', templateType],
+          version: '1.0.0',
+          compatibility: {
+            supaSeedVersion: '1.0.0'
+          },
+          files: response.files || []
         }
       },
       confidence: response.confidence || 75,

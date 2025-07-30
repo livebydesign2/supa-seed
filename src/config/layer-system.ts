@@ -31,6 +31,8 @@ export const DEFAULT_UNIVERSAL_CONFIG: UniversalCoreConfig = {
     readonly: true
   },
   makerkit: {
+    enabled: true,
+    accountType: 'hybrid' as const,
     completeAuthFlow: true,
     constraintCompliance: true,
     rlsCompliance: true,
@@ -72,6 +74,22 @@ export const DEFAULT_UNIVERSAL_CONFIG: UniversalCoreConfig = {
       maxRetries: 3
     }
   },
+  security: {
+    rlsCompliance: true,
+    policies: {
+      enforceUserScope: true,
+      validatePermissions: true,
+      auditAccess: false
+    }
+  },
+  webhook: {
+    enabled: false,
+    authentication: {
+      enabled: false,
+      method: 'jwt' as const
+    },
+    endpoints: {}
+  },
   environment: {
     type: 'development',
     debugging: {
@@ -97,6 +115,7 @@ export const DEFAULT_DETECTION_CONFIG: Omit<SmartDetectionConfig, 'layer'> = {
   platform: {
     architecture: 'auto',
     confidence: 0,
+    domain: 'auto' as const,
     evidence: {
       tablePatterns: [],
       relationshipPatterns: [],
@@ -115,6 +134,12 @@ export const DEFAULT_DETECTION_CONFIG: Omit<SmartDetectionConfig, 'layer'> = {
       businessLogicHints: []
     },
     domainSettings: {}
+  },
+  autoConfiguration: {
+    enabled: true,
+    confidenceThreshold: 0.8,
+    autoApply: false,
+    strategy: 'balanced' as const
   },
   optimizations: {
     performance: {
