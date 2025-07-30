@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.4.5] - 2025-07-30
+
+### 🔧 Hotfix - Setup Type Resolution
+
+#### Fixed
+- **Template Type Warnings**: Eliminated "No setup types found" warnings for Vehicle and Backpack templates
+- **Domain Fallback Logic**: Added intelligent fallback to legacy outdoor setup types when domain config is missing
+- **Backward Compatibility**: Preserved full functionality for existing Vehicle/Backpack template types
+
+#### Technical Details
+- Fixed domain configuration defaulting to 'generic' without Vehicle/Backpack setup types
+- Implemented automatic merge of legacy outdoor types when needed
+- No breaking changes to existing configurations
+
+---
+
 ## [2.4.4] - 2025-07-30
 
 ### 🚀 Critical Release - FEAT-003 Memory Management & Schema Mapping
