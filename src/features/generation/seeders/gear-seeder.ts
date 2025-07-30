@@ -105,20 +105,39 @@ export class GearSeeder extends SeedModule {
     const gearConfig = this.context.config.tables?.gear;
     const requestedCount = gearConfig?.count || 0;
     const forceGeneration = gearConfig?.forceGeneration || false;
+    const categoryStrategy = gearConfig?.categoryStrategy || 'auto';
     
-    console.log(`🎯 Gear configuration: count=${requestedCount}, forceGeneration=${forceGeneration}`);
+    console.log(`🎯 Gear configuration: count=${requestedCount}, forceGeneration=${forceGeneration}, categoryStrategy=${categoryStrategy}`);
     
     if (requestedCount <= 0) {
       console.log('ℹ️  No gear items requested (count=0), skipping gear generation');
       return;
     }
     
-    // Get or create gear categories
-    const categoryMap = await this.ensureGearCategories();
+    // Detect category strategy for gear table
+    const detectedStrategy = await this.detectGearCategoryStrategy();
+    const finalStrategy = categoryStrategy === 'auto' ? detectedStrategy.strategy : categoryStrategy;
     
-    // Create a flat list of all available gear items with categories
-    const availableGearItems = this.createGearItemPool(categoryMap);
-    console.log(`📦 Available gear pool: ${availableGearItems.length} items across ${Object.keys(categoryMap).length} categories`);
+    console.log(`🔍 Category strategy: ${finalStrategy} (detected: ${detectedStrategy.strategy})`);
+    
+    let categoryMap: Record<string, string> = {};
+    let availableGearItems: any[] = [];
+    
+    if (finalStrategy === 'enum') {
+      // Use enum-based categories
+      availableGearItems = await this.createEnumGearItemPool(detectedStrategy, gearConfig);
+      console.log(`📦 Available gear pool: ${availableGearItems.length} items with enum categories`);
+    } else if (finalStrategy === 'fk') {
+      // Use FK-based categories (original logic)
+      categoryMap = await this.ensureGearCategories();
+      availableGearItems = this.createGearItemPool(categoryMap);
+      console.log(`📦 Available gear pool: ${availableGearItems.length} items across ${Object.keys(categoryMap).length} categories`);
+    } else {
+      console.warn('⚠️  Unable to determine category strategy, falling back to FK-based');
+      categoryMap = await this.ensureGearCategories();
+      availableGearItems = this.createGearItemPool(categoryMap);
+      console.log(`📦 Available gear pool: ${availableGearItems.length} items across ${Object.keys(categoryMap).length} categories`);
+    }
     
     if (availableGearItems.length === 0) {
       console.warn('⚠️  No gear items available for generation');
@@ -134,10 +153,13 @@ export class GearSeeder extends SeedModule {
     
     for (const itemData of itemsToCreate) {
       try {
+        // Determine table name (try gear_items first, then gear)
+        const tableName = await this.getGearTableName();
+        
         // Check if item already exists (unless force generation is enabled)
         if (!forceGeneration) {
           const { data: existingItem } = await client
-            .from('gear_items')
+            .from(tableName)
             .select('id')
             .eq('make', itemData.make)
             .eq('model', itemData.model)
@@ -149,16 +171,33 @@ export class GearSeeder extends SeedModule {
           }
         }
 
+        // Prepare insertion data based on strategy
+        const insertData: any = {
+          make: itemData.make,
+          model: itemData.model,
+          price: itemData.price,
+          weight: itemData.weight,
+          description: itemData.description,
+        };
+
+        // Add category data based on strategy
+        if (finalStrategy === 'enum') {
+          // For enum strategy, use the enum column directly
+          const categoryColumn = detectedStrategy.categoryColumn || 'category';
+          insertData[categoryColumn] = itemData[categoryColumn];
+          
+          // Also store the gear type for reference
+          if (itemData.gear_type) {
+            insertData.gear_type = itemData.gear_type;
+          }
+        } else {
+          // For FK strategy, use category_id
+          insertData.category_id = itemData.category_id;
+        }
+
         const { error } = await client
-          .from('gear_items')
-          .insert({
-            category_id: itemData.category_id,
-            make: itemData.make,
-            model: itemData.model,
-            price: itemData.price,
-            weight: itemData.weight,
-            description: itemData.description,
-          });
+          .from(tableName)
+          .insert(insertData);
 
         if (error) {
           console.error(`❌ Failed to create gear item ${itemData.make} ${itemData.model}:`, error);
@@ -179,6 +218,183 @@ export class GearSeeder extends SeedModule {
     } else if (totalCreated === requestedCount) {
       console.log(`🎯 Successfully generated exactly ${requestedCount} gear items as requested`);
     }
+  }
+
+  /**
+   * Check if a column exists in a table
+   */
+  private async columnExists(tableName: string, columnName: string): Promise<boolean> {
+    const schemaAdapter = new (await import('../../../core/schema-adapter')).SchemaAdapter(this.context.client);
+    return await schemaAdapter.columnExists(tableName, columnName);
+  }
+
+  /**
+   * Get the gear table name (try multiple possibilities)
+   */
+  private async getGearTableName(): Promise<string> {
+    const schemaAdapter = new (await import('../../../core/schema-adapter')).SchemaAdapter(this.context.client);
+    
+    const possibleNames = ['gear_items', 'gear', 'equipment', 'items'];
+    for (const tableName of possibleNames) {
+      const exists = await schemaAdapter.tableExists(tableName);
+      if (exists) {
+        return tableName;
+      }
+    }
+    
+    // Default to gear_items if none found
+    return 'gear_items';
+  }
+
+  /**
+   * Detect gear table category strategy
+   */
+  private async detectGearCategoryStrategy(): Promise<{
+    strategy: 'enum' | 'fk' | 'none';
+    categoryColumn?: string;
+    enumValues?: string[];
+    categoryTableName?: string;
+  }> {
+    const schemaAdapter = new (await import('../../../core/schema-adapter')).SchemaAdapter(this.context.client);
+    
+    // First check for gear_items table
+    let tableName = 'gear_items';
+    const gearItemsExists = await schemaAdapter.tableExists(tableName);
+    
+    if (!gearItemsExists) {
+      // Try alternative table names
+      const alternativeNames = ['gear', 'equipment', 'items'];
+      for (const altName of alternativeNames) {
+        const exists = await schemaAdapter.tableExists(altName);
+        if (exists) {
+          tableName = altName;
+          break;
+        }
+      }
+    }
+    
+    console.log(`🔍 Detecting category strategy for table: ${tableName}`);
+    return await schemaAdapter.detectCategoryStrategy(tableName);
+  }
+
+  /**
+   * Create gear item pool for enum-based categories
+   */
+  private async createEnumGearItemPool(detectedStrategy: any, gearConfig: any): Promise<any[]> {
+    const pool: any[] = [];
+    const { categoryColumn, enumValues } = detectedStrategy;
+    
+    // Get enum values from config or detected values
+    const availableEnumValues = gearConfig?.enumCategories || enumValues || [];
+    
+    if (availableEnumValues.length === 0) {
+      console.warn('⚠️  No enum values available for gear categories');
+      return [];
+    }
+    
+    console.log(`🏷️  Using enum categories: ${availableEnumValues.join(', ')}`);
+    
+    // Create category mapping from gear types to enum values
+    const categoryMapping = gearConfig?.categoryMapping || this.createDefaultCategoryMapping(availableEnumValues);
+    
+    for (const [gearType, items] of Object.entries(this.gearData)) {
+      // Map gear type to enum value
+      const enumValue = categoryMapping[gearType] || this.findBestEnumMatch(gearType, availableEnumValues);
+      
+      if (!enumValue) {
+        console.warn(`⚠️  No enum mapping found for gear type '${gearType}', skipping`);
+        continue;
+      }
+      
+      for (const item of items) {
+        pool.push({
+          [categoryColumn || 'category']: enumValue,
+          gear_type: gearType,
+          make: item.make,
+          model: item.model,
+          price: item.price,
+          weight: item.weight,
+          description: `${item.make} ${item.model} - Professional grade outdoor gear`,
+        });
+      }
+    }
+    
+    return pool;
+  }
+
+  /**
+   * Create default category mapping for enum values
+   */
+  private createDefaultCategoryMapping(enumValues: string[]): Record<string, string> {
+    const mapping: Record<string, string> = {};
+    
+    // Common mappings for outdoor gear
+    const commonMappings = [
+      { gearTypes: ['Shelter'], enumValue: 'backpacking' },
+      { gearTypes: ['Sleep System'], enumValue: 'backpacking' },
+      { gearTypes: ['Cooking'], enumValue: 'car-camping' },
+      { gearTypes: ['Navigation', 'Safety'], enumValue: 'ultralight' },
+      { gearTypes: ['Clothing'], enumValue: 'backpacking' },
+      { gearTypes: ['Electronics'], enumValue: 'overlanding' },
+      { gearTypes: ['Tools'], enumValue: 'car-camping' },
+      { gearTypes: ['Hydration'], enumValue: 'ultralight' },
+      { gearTypes: ['Vehicle'], enumValue: 'overlanding' },
+    ];
+    
+    for (const { gearTypes, enumValue } of commonMappings) {
+      if (enumValues.includes(enumValue)) {
+        for (const gearType of gearTypes) {
+          mapping[gearType] = enumValue;
+        }
+      }
+    }
+    
+    // Fallback to first available enum value for unmapped types
+    const fallbackEnum = enumValues[0];
+    for (const gearType of Object.keys(this.gearData)) {
+      if (!mapping[gearType]) {
+        mapping[gearType] = fallbackEnum;
+      }
+    }
+    
+    console.log(`🗺️  Category mapping:`, mapping);
+    return mapping;
+  }
+
+  /**
+   * Find best enum match for a gear type
+   */
+  private findBestEnumMatch(gearType: string, enumValues: string[]): string | null {
+    const gearTypeLower = gearType.toLowerCase();
+    
+    // Direct matches
+    for (const enumValue of enumValues) {
+      if (gearTypeLower.includes(enumValue.toLowerCase()) || enumValue.toLowerCase().includes(gearTypeLower)) {
+        return enumValue;
+      }
+    }
+    
+    // Semantic matches
+    const semanticMatches: Record<string, string[]> = {
+      'backpacking': ['shelter', 'sleep', 'clothing', 'hydration'],
+      'car-camping': ['cooking', 'tools'],
+      'overlanding': ['vehicle', 'electronics'],
+      'ultralight': ['navigation', 'safety', 'hydration'],
+      'van-life': ['vehicle', 'electronics', 'cooking']
+    };
+    
+    for (const [enumValue, keywords] of Object.entries(semanticMatches)) {
+      if (enumValues.includes(enumValue)) {
+        for (const keyword of keywords) {
+          if (gearTypeLower.includes(keyword)) {
+            return enumValue;
+          }
+        }
+      }
+    }
+    
+    // Fallback to first available enum value
+    return enumValues[0] || null;
   }
 
   /**
@@ -302,13 +518,28 @@ export class GearSeeder extends SeedModule {
     
     console.log(`🔗 Creating gear-setup associations for ${setups.length} setups...`);
     
-    // Get all gear items
+    // Detect category strategy and table name
+    const detectedStrategy = await this.detectGearCategoryStrategy();
+    const tableName = await this.getGearTableName();
+    
+    // Get all gear items with appropriate category selection
+    let selectQuery = 'id, make, model, price, weight';
+    
+    if (detectedStrategy.strategy === 'enum') {
+      // For enum strategy, select the enum column directly
+      const categoryColumn = detectedStrategy.categoryColumn || 'category';
+      selectQuery += `, ${categoryColumn}`;
+      if (await this.columnExists(tableName, 'gear_type')) {
+        selectQuery += ', gear_type';
+      }
+    } else {
+      // For FK strategy, join with categories table
+      selectQuery += ', gear_categories!inner(name)';
+    }
+    
     const { data: allGear } = await client
-      .from('gear_items')
-      .select(`
-        id, make, model, price, weight,
-        gear_categories!inner(name)
-      `);
+      .from(tableName)
+      .select(selectQuery);
 
     if (!allGear?.length) {
       console.log('⚠️  No gear items found, skipping associations');
@@ -355,17 +586,38 @@ export class GearSeeder extends SeedModule {
 
   private selectRelevantGear(setup: CachedSetup, allGear: any[]): any[] {
     // Filter gear based on setup type and category
-    if (setup.category.includes('Vehicle') || (setup.baseTemplateId && setup.baseTemplateId.includes('Vehicle'))) {
-      // Vehicle setups get vehicle-specific gear plus general outdoor gear
-      return allGear.filter(gear => 
-        ['Vehicle', 'Electronics', 'Safety', 'Cooking', 'Tools'].includes(gear.gear_categories.name)
-      );
-    } else {
-      // Backpack setups get lighter, more portable gear
-      return allGear.filter(gear => 
-        !['Vehicle'].includes(gear.gear_categories.name)
-      );
-    }
+    const isVehicleSetup = setup.category.includes('Vehicle') || setup.category.includes('overlanding') || 
+                          (setup.baseTemplateId && setup.baseTemplateId.includes('Vehicle'));
+    
+    return allGear.filter(gear => {
+      // Handle enum-based categories
+      if (gear.category || gear.outdoor_category) {
+        const gearCategory = gear.category || gear.outdoor_category;
+        const gearType = gear.gear_type || '';
+        
+        if (isVehicleSetup) {
+          // Vehicle setups prefer overlanding/car-camping gear
+          return ['overlanding', 'car-camping'].includes(gearCategory) || 
+                 ['Vehicle', 'Electronics', 'Safety', 'Cooking', 'Tools'].includes(gearType);
+        } else {
+          // Backpack setups prefer backpacking/ultralight gear
+          return ['backpacking', 'ultralight'].includes(gearCategory) && 
+                 !['Vehicle'].includes(gearType);
+        }
+      }
+      
+      // Handle FK-based categories (original logic)
+      if (gear.gear_categories?.name) {
+        if (isVehicleSetup) {
+          return ['Vehicle', 'Electronics', 'Safety', 'Cooking', 'Tools'].includes(gear.gear_categories.name);
+        } else {
+          return !['Vehicle'].includes(gear.gear_categories.name);
+        }
+      }
+      
+      // If no category info available, include all gear
+      return true;
+    });
   }
 
   private generateGearNotes(gear: any): string {

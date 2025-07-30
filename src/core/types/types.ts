@@ -94,6 +94,10 @@ export interface SeedConfig {
     gear?: {
       count?: number;
       forceGeneration?: boolean; // Create variants if needed to reach exact count
+      categoryStrategy?: 'enum' | 'fk' | 'auto'; // How to handle categories (default: 'auto')
+      categoryMapping?: Record<string, string>; // Map gear types to enum values
+      enumCategories?: string[]; // Valid enum values for direct insertion
+      skipCategoryTableCreation?: boolean; // Skip creating separate category tables
     };
   };
 }

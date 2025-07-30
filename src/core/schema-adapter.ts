@@ -336,7 +336,7 @@ export class SchemaAdapter {
     return null;
   }
 
-  private async tableExists(tableName: string): Promise<boolean> {
+  async tableExists(tableName: string): Promise<boolean> {
     try {
       // For local Supabase environments, add extra timeout and retry logic
       const isLocal = this.isLocalSupabaseEnvironment();
@@ -1159,7 +1159,7 @@ Technical details: ${error.message}
   /**
    * Check if a column exists in a table
    */
-  private async columnExists(tableName: string, columnName: string): Promise<boolean> {
+  async columnExists(tableName: string, columnName: string): Promise<boolean> {
     try {
       const { error } = await this.client
         .from(tableName)
@@ -1426,6 +1426,115 @@ Technical details: ${error.message}
       suggestedAssociations: associations,
       frameworkSpecificTips: tips
     };
+  }
+
+  /**
+   * Detect enum types in a table column
+   */
+  async detectEnumValues(tableName: string, columnName: string): Promise<string[] | null> {
+    try {
+      // Try to get enum values from PostgreSQL system catalogs
+      const { data: enumData, error } = await this.client
+        .rpc('get_column_enum_values', {
+          table_name: tableName,
+          column_name: columnName
+        });
+
+      if (!error && enumData && Array.isArray(enumData)) {
+        return enumData;
+      }
+
+      // Fallback: Try querying pg_enum directly
+      const { data: pgEnumData, error: pgEnumError } = await this.client
+        .from('information_schema.columns')
+        .select('udt_name')
+        .eq('table_name', tableName)
+        .eq('column_name', columnName)
+        .single();
+
+      if (!pgEnumError && pgEnumData?.udt_name) {
+        const { data: enumValues, error: enumError } = await this.client
+          .rpc('get_enum_values', {
+            enum_name: pgEnumData.udt_name
+          });
+
+        if (!enumError && enumValues && Array.isArray(enumValues)) {
+          return enumValues.map((row: any) => row.enumlabel || row);
+        }
+      }
+
+      return null;
+    } catch (error) {
+      Logger.debug(`Error detecting enum values for ${tableName}.${columnName}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Check if a table uses enum-based categories vs FK-based categories
+   */
+  async detectCategoryStrategy(tableName: string): Promise<{
+    strategy: 'enum' | 'fk' | 'none';
+    categoryColumn?: string;
+    enumValues?: string[];
+    categoryTableName?: string;
+  }> {
+    try {
+      // Common category column names to check
+      const categoryColumns = ['category', 'category_type', 'outdoor_category', 'gear_category'];
+      
+      for (const columnName of categoryColumns) {
+        // Check if column exists
+        const columnExists = await this.columnExists(tableName, columnName);
+        if (!columnExists) continue;
+
+        // Check if it's an enum
+        const enumValues = await this.detectEnumValues(tableName, columnName);
+        if (enumValues && enumValues.length > 0) {
+          Logger.debug(`Detected enum category strategy for ${tableName}.${columnName}:`, enumValues);
+          return {
+            strategy: 'enum',
+            categoryColumn: columnName,
+            enumValues
+          };
+        }
+      }
+
+      // Check for FK-based category strategy
+      const categoryFkColumns = ['category_id', 'gear_category_id', 'setup_category_id'];
+      for (const columnName of categoryFkColumns) {
+        const columnExists = await this.columnExists(tableName, columnName);
+        if (columnExists) {
+          // Try to determine the referenced table
+          const categoryTableName = this.inferCategoryTableName(columnName);
+          const categoryTableExists = await this.tableExists(categoryTableName);
+          
+          if (categoryTableExists) {
+            Logger.debug(`Detected FK category strategy for ${tableName}.${columnName} -> ${categoryTableName}`);
+            return {
+              strategy: 'fk',
+              categoryColumn: columnName,
+              categoryTableName
+            };
+          }
+        }
+      }
+
+      return { strategy: 'none' };
+    } catch (error) {
+      Logger.debug(`Error detecting category strategy for ${tableName}:`, error);
+      return { strategy: 'none' };
+    }
+  }
+
+  /**
+   * Infer category table name from FK column name
+   */
+  private inferCategoryTableName(fkColumnName: string): string {
+    if (fkColumnName.includes('gear_category')) return 'gear_categories';
+    if (fkColumnName.includes('setup_category')) return 'setup_categories';
+    if (fkColumnName.includes('category')) return 'categories';
+    return 'categories'; // Default fallback
   }
 
   /**

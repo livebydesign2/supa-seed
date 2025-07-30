@@ -7,6 +7,83 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.5.1] - 2025-07-30
+
+### 🚀 Major Enhancement - Enum Category Support
+
+**Resolves schema compatibility issues with applications using enum-based categories instead of separate category tables.**
+
+#### Fixed
+- **🔥 CRITICAL: Schema Compatibility**: Fixed gear generation to work with enum-based category columns (e.g., `outdoor_category` enum) instead of only FK-based category tables
+- **🔥 CRITICAL: Configuration Ignored**: Framework now respects `categoryStrategy`, `enumCategories`, and `categoryMapping` configuration options
+- **🔥 CRITICAL: Table Detection**: Auto-detects whether gear table uses enum columns or FK relationships for categories
+
+#### Added
+- **Enum Category Detection**: Automatic detection of enum-based vs FK-based category strategies
+- **Flexible Configuration**: Support for `categoryStrategy: 'enum' | 'fk' | 'auto'` in gear configuration
+- **Category Mapping**: Custom mapping from gear types to enum values via `categoryMapping` config
+- **Auto-Strategy Detection**: Intelligent fallback when `categoryStrategy: 'auto'` is used
+- **Enhanced Table Detection**: Supports multiple gear table names (`gear_items`, `gear`, `equipment`, `items`)
+
+#### Technical Details
+- **Root Cause**: SupaSeed assumed all applications use separate category tables with FK relationships
+- **Solution**: Added schema introspection to detect enum columns and generate gear items with direct enum values
+- **Compatibility**: Maintains backward compatibility with FK-based category tables
+- **Configuration**: New gear config options for enum handling and category mapping
+
+#### Configuration Examples
+
+**Enum-Based Categories (New)**:
+```json
+{
+  "tables": {
+    "gear": { 
+      "count": 25,
+      "categoryStrategy": "enum",
+      "enumCategories": ["overlanding", "van-life", "car-camping", "backpacking", "ultralight"],
+      "categoryMapping": {
+        "Shelter": "backpacking",
+        "Vehicle": "overlanding",
+        "Cooking": "car-camping"
+      }
+    }
+  }
+}
+```
+
+**FK-Based Categories (Original)**:
+```json
+{
+  "tables": {
+    "gear": { 
+      "count": 25,
+      "categoryStrategy": "fk"
+    }
+  }
+}
+```
+
+**Auto-Detection (Recommended)**:
+```json
+{
+  "tables": {
+    "gear": { 
+      "count": 25,
+      "categoryStrategy": "auto"
+    }
+  }
+}
+```
+
+#### Production Impact
+- **Universal Schema Support**: Works with any PostgreSQL enum-based categorization pattern
+- **Campfire Compatibility**: Resolves blocking issues with `outdoor_category` enum fields
+- **Zero Breaking Changes**: Existing FK-based configurations continue to work unchanged
+
+**✅ Result**: Applications using enum-based categories (like Campfire's `outdoor_category`) now generate gear items correctly with direct enum values instead of attempting to create separate category tables.
+
+---
+
 ## [2.5.0] - 2025-07-30
 
 ### 🎉 Comprehensive Seeding Production Ready - FEAT-009
