@@ -9,7 +9,21 @@ import { createQueryTranslator } from '../../../schema/query-translator';
 export class SetupSeeder extends SeedModule {
   private getSetupTypes(): Record<string, string[]> {
     const domainConfig = getDomainConfig(this.context.config.domain);
-    return domainConfig.setupTypes;
+    
+    // Fallback to legacy outdoor setup types if domain doesn't have the needed types
+    const domainSetupTypes = domainConfig.setupTypes;
+    const hasVehicleTypes = domainSetupTypes['Vehicle']?.length > 0;
+    const hasBackpackTypes = domainSetupTypes['Backpack']?.length > 0;
+    
+    if (!hasVehicleTypes || !hasBackpackTypes) {
+      // Merge domain types with legacy outdoor types for backward compatibility
+      return {
+        ...domainSetupTypes,
+        ...this.outdoorSetupTypes
+      };
+    }
+    
+    return domainSetupTypes;
   }
 
   // Legacy outdoor setup types for backward compatibility
