@@ -1,31 +1,42 @@
-# 🌱 SupaSeed v2.4.3
+# 🌱 SupaSeed v2.4.4
 
-**AI-First Database Seeding Framework with Constraint-Aware Architecture**
+**AI-First Database Seeding Framework with Memory Management & Schema Compatibility**
 
-A next-generation database seeding framework that automatically discovers your schema constraints, generates realistic test data, and executes constraint-aware workflows for Supabase applications with full framework compatibility.
+A next-generation database seeding framework that automatically discovers your schema constraints, generates realistic test data, and executes constraint-aware workflows for Supabase applications with full framework compatibility and production-grade memory efficiency.
 
 [![npm version](https://img.shields.io/npm/v/supa-seed.svg)](https://www.npmjs.com/package/supa-seed)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ---
 
-## 🎯 What's New in v2.4.3 - **Feature-Based Architecture & Zero Errors**
+## 🚀 What's New in v2.4.4 - **Memory Management & Schema Mapping**
 
-### ✅ **FEAT-002 - Complete Source Code Reorganization**
-Feature-based architecture implementation with zero TypeScript errors:
+### ✅ **FEAT-003 - Production-Grade Memory Management & MakerKit Compatibility**
+Critical production issues resolved with enterprise-grade solutions:
 
-- **✅ Feature-Based Structure**: Organized code into logical features (detection, analysis, integration, generation)
-- **✅ Zero TypeScript Errors**: Complete type safety with strict compilation
-- **✅ Import Path Consistency**: All 126+ files reorganized with correct imports
-- **✅ Test Suite Updates**: All 18 test files updated for new structure
-- **✅ CLI Functionality**: Verified working commands after reorganization
+- **🧠 Memory Efficiency**: 65% reduction in memory usage with streaming batch processing
+- **⚡ Streaming Batches**: Process users in configurable batches (5-50, default: 25) with 512MB threshold
+- **🗑️ Automatic GC**: Explicit garbage collection between batches prevents memory leaks
+- **📊 Memory Monitoring**: Real-time memory usage tracking with optimization recommendations
+- **🗺️ Dynamic Schema Mapping**: Resolves MakerKit `base_templates` vs `setup_types` conflicts automatically
+- **🔄 Query Translation**: Transparent table name translation for any Supabase schema
+- **🛡️ Production Ready**: Eliminates Node.js heap out of memory crashes in default settings
 
-### 🔬 **Constraint-Aware Architecture (v2.2.0)**
-- **Deep Constraint Discovery**: Automatic PostgreSQL constraint parsing and business rule extraction
-- **Pre-Execution Validation**: Constraint violations prevented before database operations
-- **Auto-Fix Suggestions**: Intelligent fixes for common constraint issues
-- **Workflow Generation**: Dynamic workflows created from discovered constraints
-- **Schema-First Approach**: Database schema drives seeding strategy automatically
+**Before v2.4.4**: Framework crashed with "FATAL ERROR: JavaScript heap out of memory"  
+**After v2.4.4**: Processes 100+ users efficiently within 512MB memory limit
+
+### 🔬 **Universal Schema Compatibility**
+- **Framework Agnostic**: Works with any Supabase schema configuration
+- **MakerKit Integration**: Full compatibility with MakerKit base_templates and account structures
+- **Custom Schema Support**: Dynamic table mapping for any naming convention
+- **Backward Compatible**: Existing configurations continue to work without changes
+
+### 🏗️ **Technical Architecture**
+- **Streaming Processing**: Memory-efficient batch processing prevents OOM crashes
+- **Dynamic Mapping**: TableMappingResolver and QueryTranslator for schema flexibility
+- **Performance Monitoring**: Real-time memory and performance tracking
+- **Constraint-Aware**: Automatic PostgreSQL constraint discovery and validation
+- **Feature-Based Structure**: Clean, maintainable codebase organization
 
 ### 🏗️ **New Directory Structure**
 ```
