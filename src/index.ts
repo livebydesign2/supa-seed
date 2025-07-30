@@ -62,10 +62,10 @@ export class SupaSeedFramework {
       // Define seeding order (dependency-aware)
       const seeders: SeedModule[] = [
         new AuthSeeder(this.context),
-        new BaseDataSeeder(this.context),
         new UserSeeder(this.context),
-        new GearSeeder(this.context),
+        new BaseDataSeeder(this.context),
         new SetupSeeder(this.context),
+        new GearSeeder(this.context),
         new MediaSeeder(this.context),
       ];
 

@@ -78,9 +78,15 @@ export class GearSeeder extends SeedModule {
     console.log('⚙️  Seeding gear items...');
     
     const setups = this.context.cache.get('setups') as CachedSetup[];
+    console.log(`🔍 Checking cache for setups... found ${setups?.length || 0} setups`);
+    
     if (!setups?.length) {
-      console.log('⚠️  No setups found in cache, skipping gear seeding');
-      return;
+      const cacheKeys = Array.from(this.context.cache.keys());
+      console.error('❌ CRITICAL: No setups found in cache for gear seeding');
+      console.error(`   Available cache keys: ${cacheKeys.join(', ')}`);
+      console.error('   This indicates a dependency chain failure.');
+      console.error('   Gear seeding requires setups to be created and cached first.');
+      throw new Error('Dependency validation failed: GearSeeder requires cached setups');
     }
 
     // First, seed all gear items to the database

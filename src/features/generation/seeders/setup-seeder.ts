@@ -466,6 +466,7 @@ export class SetupSeeder extends SeedModule {
     
     // Cache the results
     this.context.cache.set('setups', createdSetups);
+    console.log(`📦 Cached ${createdSetups.length} setups for dependent seeders`);
     
     // Log completion with memory statistics
     Logger.info(`✅ Setup seeding completed:`, {

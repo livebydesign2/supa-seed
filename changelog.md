@@ -7,6 +7,84 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.4.9] - 2025-07-30
+
+### 🚨 Critical Fixes - FEAT-007 & FEAT-008
+
+**Resolves two critical issues preventing comprehensive table seeding in production environments.**
+
+### FEAT-007: Dependency Chain Cache Fixes
+
+#### Fixed
+- **🔥 CRITICAL: Dependency Chain Failure**: Fixed seeder execution order - GearSeeder now runs AFTER SetupSeeder instead of before
+- **🔥 CRITICAL: Cache Population Missing**: 80% of tables (gear, posts, modifications) no longer skip with "No [dependency] found in cache"
+- **🔥 CRITICAL: Silent Failures**: Replaced silent skipping with clear error messages when dependencies are missing
+- **🔥 CRITICAL: Execution Order**: Corrected seeder order to respect dependency chain (users → setups → gear)
+
+#### Added
+- **Dependency Validation**: GearSeeder now validates required setups exist before proceeding
+- **Cache Debugging**: Enhanced logging shows cache population and availability for dependent seeders  
+- **Clear Error Messages**: Explicit errors explain missing dependencies instead of silent skipping
+- **Execution Order Documentation**: Seeder order now clearly follows dependency requirements
+
+#### Technical Details
+- **Root Cause**: GearSeeder executed before SetupSeeder, causing cache to be empty when dependencies checked
+- **Fix**: Reordered seeders to: AuthSeeder → UserSeeder → BaseDataSeeder → SetupSeeder → GearSeeder → MediaSeeder
+- **Validation**: Added cache key inspection and clear error messages for missing dependencies
+- **Logging**: SetupSeeder now logs cache population count for visibility
+
+#### Migration Guide
+This fix requires no configuration changes. All existing configurations will now work correctly:
+```javascript
+{
+  "tables": {
+    "setups": { "count": 12 },
+    "gear": { "count": 50 }      // Will now generate 50 items instead of 0
+  }
+}
+```
+
+**⚠️ Breaking Change**: GearSeeder now throws errors instead of silently skipping when setups are missing. This is intentional to surface configuration issues.
+
+**✅ Result**: Tables configured with dependencies now generate their specified record counts instead of 0 records.
+
+### FEAT-008: User Constraint Handling
+
+#### Fixed
+- **🔥 CRITICAL: User Creation Failures**: Fixed MakerKit `unique_personal_account` constraint violations preventing additional user creation
+- **🔥 CRITICAL: Constraint Ignorance**: Framework now detects and respects MakerKit personal account limitations
+- **🔥 CRITICAL: Silent Failures**: Replaced generic constraint violation errors with clear explanations and actionable guidance
+- **🔥 CRITICAL: No Graceful Degradation**: Framework now creates maximum possible users within constraints instead of failing completely
+
+#### Added
+- **Constraint Detection**: Pre-creation checking for MakerKit personal account constraints
+- **Graceful Degradation**: Framework adapts requested user count to fit within detected constraints
+- **Enhanced Error Messages**: Clear explanations of constraint limits with actionable recommendations
+- **Safe User Creation**: Pre-validation prevents constraint violations from occurring
+
+#### Technical Details
+- **Root Cause**: Framework attempted to create multiple personal accounts without checking MakerKit's `unique_personal_account` constraint
+- **Fix**: Added constraint detection and pre-creation validation to prevent violations
+- **Validation**: Framework now counts existing personal accounts and calculates safe additional user creation limits
+- **Logging**: Clear messaging explains constraint adaptations and provides guidance for developers
+
+#### Migration Guide
+This fix requires no configuration changes. All existing configurations will now work correctly within constraint limits:
+```javascript
+{
+  "additionalUsers": {
+    "count": 10,  // Framework will create maximum allowed within constraints
+    "personas": ["casual_camper", "expert_overlander", "van_life"]
+  }
+}
+```
+
+**⚠️ Behavioral Change**: Framework now creates fewer users when MakerKit constraints are detected, but provides clear explanations instead of failing with constraint violations.
+
+**✅ Result**: Additional user creation succeeds within constraint limits with clear messaging about limitations.
+
+---
+
 ## [2.4.8] - 2025-07-30
 
 ### 🚨 Critical Fix - FEAT-006 Data Generation Scaling Fixes

@@ -223,13 +223,24 @@ export class UserSeeder extends SeedModule {
     const additionalCount = additionalConfig.count || 7;
     const personas = additionalConfig.personas || ['casual_user', 'expert_user', 'content_creator', 'admin_user', 'power_user'];
     
-    console.log(`🆕 Creating ${additionalCount} additional users with personas...`);
+    // NEW: Pre-check constraints to determine realistic user creation limits
+    const constraintLimits = await this.checkUserCreationLimits();
+    const safeAdditionalCount = Math.min(additionalCount, constraintLimits.maxAdditional);
+    
+    if (safeAdditionalCount < additionalCount) {
+      console.log(`⚠️  MakerKit constraint limits additional users to ${safeAdditionalCount} (requested: ${additionalCount})`);
+      console.log(`   Existing personal accounts: ${constraintLimits.existingPersonalAccounts}`);
+      console.log(`   Maximum allowed: ${constraintLimits.maxPersonalAccounts}`);
+      console.log(`   Adapting to create ${safeAdditionalCount} users within constraints`);
+    } else {
+      console.log(`🆕 Creating ${additionalCount} additional users with personas...`);
+    }
     
     const newUsers: CachedUser[] = [];
     let createdCount = 0;
     let failedCount = 0;
 
-    for (let i = 0; i < additionalCount; i++) {
+    for (let i = 0; i < safeAdditionalCount; i++) {
       try {
         // Create user with persona-based profile
         const persona = personas[i % personas.length];
@@ -248,7 +259,14 @@ export class UserSeeder extends SeedModule {
       }
     }
 
-    console.log(`✅ Additional user creation: ${createdCount} successful, ${failedCount} failed`);
+    // Enhanced logging with constraint information
+    if (safeAdditionalCount < additionalCount) {
+      const skippedCount = additionalCount - safeAdditionalCount;
+      console.log(`✅ Additional user creation: ${createdCount} successful, ${failedCount} failed, ${skippedCount} skipped (constraint limits)`);
+      console.log(`💡 To create more users, consider using existing users or team accounts instead of personal accounts`);
+    } else {
+      console.log(`✅ Additional user creation: ${createdCount} successful, ${failedCount} failed`);
+    }
 
     // Step 3: Combine existing and new users
     const allUsers = [...existingUsers, ...newUsers];
@@ -431,6 +449,70 @@ export class UserSeeder extends SeedModule {
     if (validation.recommendations.length > 0) {
       console.log('💡 Recommendations:');
       validation.recommendations.forEach(rec => console.log(`    • ${rec}`));
+    }
+  }
+
+  /**
+   * Check user creation limits based on constraints
+   */
+  private async checkUserCreationLimits(): Promise<{
+    maxAdditional: number;
+    existingPersonalAccounts: number;
+    maxPersonalAccounts: number;
+    constraintDetected: boolean;
+  }> {
+    try {
+      // Check if we have MakerKit pattern with personal account constraints
+      const strategy = this.schemaAdapter.getUserCreationStrategy();
+      
+      if (strategy !== 'makerkit-profiles') {
+        // Not MakerKit, no constraints expected
+        return {
+          maxAdditional: Infinity,
+          existingPersonalAccounts: 0,
+          maxPersonalAccounts: Infinity,
+          constraintDetected: false
+        };
+      }
+
+      // Count existing personal accounts
+      const { data: existingAccounts, error } = await this.context.client
+        .from('accounts')
+        .select('id')
+        .eq('is_personal_account', true);
+
+      if (error) {
+        console.log('⚠️  Could not check existing personal accounts, proceeding without constraints');
+        return {
+          maxAdditional: Infinity,
+          existingPersonalAccounts: 0,
+          maxPersonalAccounts: -1,
+          constraintDetected: false
+        };
+      }
+
+      const existingCount = existingAccounts?.length || 0;
+      
+      // MakerKit typically allows 1 personal account per workspace
+      // This is based on the unique_personal_account constraint pattern
+      const maxAllowed = 1;
+      const maxAdditional = Math.max(0, maxAllowed - existingCount);
+
+      return {
+        maxAdditional,
+        existingPersonalAccounts: existingCount,
+        maxPersonalAccounts: maxAllowed,
+        constraintDetected: true
+      };
+
+    } catch (error: any) {
+      console.log('⚠️  Error checking user creation limits, proceeding without constraints:', error.message);
+      return {
+        maxAdditional: Infinity,
+        existingPersonalAccounts: -1,
+        maxPersonalAccounts: -1,
+        constraintDetected: false
+      };
     }
   }
 

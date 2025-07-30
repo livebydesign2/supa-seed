@@ -652,6 +652,16 @@ Technical details: ${error.message}
     // "Profiles can only be created for personal accounts" requires account to exist before profile
     if (this.schemaInfo?.hasAccounts) {
       try {
+        // NEW: Pre-check for MakerKit personal account constraints
+        const constraintCheck = await this.checkPersonalAccountConstraints();
+        if (!constraintCheck.canCreate) {
+          const errorMsg = `Cannot create personal account: ${constraintCheck.reason}. ` +
+            `Existing personal accounts: ${constraintCheck.existingCount}, ` +
+            `Maximum allowed: ${constraintCheck.maxAllowed}`;
+          Logger.warn(errorMsg);
+          return { id: '', success: false, error: errorMsg };
+        }
+
         const { error: accountError } = await this.client
           .from('accounts')
           .insert({
@@ -663,6 +673,13 @@ Technical details: ${error.message}
           });
         
         if (accountError) {
+          // Check if this is the specific constraint violation we're trying to prevent
+          if (accountError.message.includes('unique_personal_account')) {
+            const enhancedError = `Personal account constraint violation: MakerKit limits personal accounts per workspace. ` +
+              `Current constraint prevents additional personal accounts. ` +
+              `Consider using existing accounts or configuring team accounts instead.`;
+            return { id: '', success: false, error: enhancedError };
+          }
           return { id: '', success: false, error: `Account creation failed: ${accountError.message}` };
         }
         
@@ -834,6 +851,104 @@ Technical details: ${error.message}
     }
 
     return { id: userId, success: true };
+  }
+
+  /**
+   * Check if we can create additional personal accounts based on MakerKit constraints
+   */
+  private async checkPersonalAccountConstraints(): Promise<{
+    canCreate: boolean;
+    reason: string;
+    existingCount: number;
+    maxAllowed: number;
+  }> {
+    try {
+      // Check if we can detect the unique_personal_account constraint
+      const hasConstraint = await this.detectUniquePersonalAccountConstraint();
+      
+      if (!hasConstraint) {
+        // No constraint detected, allow creation
+        return {
+          canCreate: true,
+          reason: 'No personal account constraints detected',
+          existingCount: 0,
+          maxAllowed: Infinity
+        };
+      }
+
+      // Count existing personal accounts
+      const { data: existingAccounts, error } = await this.client
+        .from('accounts')
+        .select('id')
+        .eq('is_personal_account', true);
+
+      if (error) {
+        Logger.warn('Failed to check existing personal accounts:', error);
+        // If we can't check, allow creation but warn
+        return {
+          canCreate: true,
+          reason: 'Unable to verify constraint limits',
+          existingCount: 0,
+          maxAllowed: -1
+        };
+      }
+
+      const existingCount = existingAccounts?.length || 0;
+      
+      // MakerKit typically allows 1 personal account per workspace
+      // This is a common pattern we've observed
+      const maxAllowed = 1;
+
+      if (existingCount >= maxAllowed) {
+        return {
+          canCreate: false,
+          reason: 'MakerKit unique_personal_account constraint limit reached',
+          existingCount,
+          maxAllowed
+        };
+      }
+
+      return {
+        canCreate: true,
+        reason: 'Within personal account limits',
+        existingCount,
+        maxAllowed
+      };
+
+    } catch (error: any) {
+      Logger.warn('Error checking personal account constraints:', error);
+      // If constraint checking fails, allow creation but with warning
+      return {
+        canCreate: true,
+        reason: 'Constraint checking failed, proceeding with caution',
+        existingCount: -1,
+        maxAllowed: -1
+      };
+    }
+  }
+
+  /**
+   * Detect if the unique_personal_account constraint exists
+   */
+  private async detectUniquePersonalAccountConstraint(): Promise<boolean> {
+    try {
+      // Try to query the constraint from the information schema
+      const { data, error } = await this.client
+        .from('information_schema.table_constraints')
+        .select('constraint_name')
+        .eq('table_name', 'accounts')
+        .ilike('constraint_name', '%unique_personal_account%');
+
+      if (error) {
+        Logger.debug('Failed to query constraints from information_schema:', error);
+        return false;
+      }
+
+      return data && data.length > 0;
+    } catch (error) {
+      Logger.debug('Error detecting unique_personal_account constraint:', error);
+      return false;
+    }
   }
 
   /**
